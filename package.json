@@ -1,0 +1,12 @@
+{
+  "name": "indian-railways-train-simulator",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "esbuild js/main.js --bundle --outfile=bundle.js --format=iife",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  }
+}

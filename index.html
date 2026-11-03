@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Indian Railways Train Simulator | WAP-7 & WDP-4D</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- WebGL 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- HUD Interface Overlay -->
+  <div id="hud-overlay">
+    
+    <!-- TOP BAR -->
+    <header class="hud-top-bar hud-interactive">
+      <div class="train-title-card">
+        <div class="ir-badge">
+          <span class="crest">🚂</span>
+          <span>INDIAN RAILWAYS / भारतीय रेल</span>
+        </div>
+        <div class="train-name" id="train-title">12301 RAJDHANI EXPRESS</div>
+        <div class="train-sub">
+          <span id="loco-shed">GZB WAP-7 #30201</span>
+          <span>•</span>
+          <span id="loco-class">Electric 25kV AC (6,350 HP)</span>
+        </div>
+      </div>
+
+      <div class="route-card">
+        <div class="route-info">
+          <span class="route-label">Next Station</span>
+          <span class="route-value">RATLAM JN</span>
+        </div>
+        <div class="route-info">
+          <span class="route-label">Distance</span>
+          <span class="route-value" id="station-dist">1.8 km</span>
+        </div>
+        <div class="route-info">
+          <span class="route-label">Track Speed</span>
+          <span class="route-value" style="color: #00e676;">130 KM/H</span>
+        </div>
+      </div>
+
+      <!-- Camera & Quick Tools -->
+      <div class="quick-tools">
+        <button class="tool-btn active" data-cam="chase" title="Chase Orbit Camera [Key C]">🎥 Orbit</button>
+        <button class="tool-btn" data-cam="cab" title="Loco Pilot Cockpit View [Key C]">🕹️ Cab View</button>
+        <button class="tool-btn" data-cam="railfan" title="Trackside Railfan Flyby [Key C]">📷 Railfan</button>
+        <button class="tool-btn" data-cam="window" title="Passenger Coach Window [Key C]">🪟 Window</button>
+        <button class="tool-btn" data-cam="drone" title="Aerial Drone [Key C]">🚁 Drone</button>
+        <button class="tool-btn" id="btn-train-switch" title="Switch Electric / Diesel [Key T]">🔄 Switch Train</button>
+        <button class="tool-btn" id="btn-weather" title="Cycle Weather / Time [Key V]">🌦️ DAY</button>
+        <button class="tool-btn" id="btn-help" title="Keyboard Controls Guide">❓ Help</button>
+      </div>
+    </header>
+
+    <!-- CENTER ALERT BANNER -->
+    <div id="alert-banner">⚠️ SPAD PENALTY: EMERGENCY BRAKE APPLIED!</div>
+
+    <!-- BOTTOM INSTRUMENT CONSOLE / DRIVER DESK -->
+    <footer class="hud-bottom-bar hud-interactive">
+      
+      <!-- SPEEDOMETER & DYNAMIC GAUGES -->
+      <div class="speedo-cluster">
+        <div class="gauge-wrap">
+          <svg class="gauge-svg" viewBox="0 0 160 160">
+            <defs>
+              <linearGradient id="speedo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00e676"/>
+                <stop offset="65%" stop-color="#ffd600"/>
+                <stop offset="100%" stop-color="#ff1744"/>
+              </linearGradient>
+            </defs>
+            <circle class="gauge-bg" cx="80" cy="80" r="70"/>
+            <circle class="gauge-fill" id="speedo-fill" cx="80" cy="80" r="70"/>
+          </svg>
+          <div class="gauge-center-content">
+            <div class="speed-digital" id="speed-digital">0</div>
+            <div class="speed-unit">KM/H</div>
+            <div class="speed-limit-badge">MAX 130</div>
+          </div>
+        </div>
+
+        <div class="sub-gauges">
+          <div class="sub-gauge-item">
+            <div class="sub-gauge-header">
+              <span>TRACTIVE EFFORT</span>
+              <span class="sub-gauge-val" id="te-val">0 kN</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar traction" id="te-bar"></div>
+            </div>
+          </div>
+
+          <div class="sub-gauge-item">
+            <div class="sub-gauge-header">
+              <span>BRAKE PIPE (BP)</span>
+              <span class="sub-gauge-val" style="color: #00e676;" id="bp-val">5.0 bar</span>
+            </div>
+            <div class="sub-gauge-header" style="margin-top: 4px;">
+              <span>CYLINDER (BC)</span>
+              <span class="sub-gauge-val" style="color: #ff5252;" id="bc-val">0.0 bar</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAB SIGNALS & OHE VOLTAGE -->
+      <div class="signal-cluster">
+        <div class="signal-post">
+          <div class="signal-box">
+            <div class="aspect-lamp green lit" id="aspect-green" title="Clear / Proceed"></div>
+            <div class="aspect-lamp yellow1" id="aspect-yellow1" title="Caution / Attention"></div>
+            <div class="aspect-lamp red" id="aspect-red" title="Danger / Stop"></div>
+            <div class="aspect-lamp yellow2" id="aspect-yellow2" title="Attention"></div>
+          </div>
+        </div>
+
+        <div class="signal-meta">
+          <span class="route-label">Cab Signal</span>
+          <span class="signal-aspect-text" id="signal-aspect-text">PROCEED</span>
+          <span class="signal-distance-text">Next: Clear Line</span>
+        </div>
+
+        <div class="ohe-status">
+          <span class="ohe-title">OHE Catenary</span>
+          <span class="ohe-val" id="ohe-val">25.0 kV</span>
+          <span style="font-size: 11px; color: #00e676; font-weight: 600;" id="panto-status">UP (25kV)</span>
+        </div>
+      </div>
+
+      <!-- PHYSICAL THROTTLE, BRAKE & CAB CONTROLS -->
+      <div class="controls-cluster">
+        <div class="lever-group">
+          <!-- Throttle Lever -->
+          <div class="lever-item">
+            <span class="lever-label">THROTTLE</span>
+            <div class="lever-slider-wrap" id="throttle-slider" title="Click or Drag Throttle [W/S]">
+              <div class="lever-track-groove"></div>
+              <div class="lever-handle throttle" id="throttle-handle"></div>
+            </div>
+            <span class="lever-val" id="notch-val">N0</span>
+          </div>
+
+          <!-- Train Air Brake Lever -->
+          <div class="lever-item">
+            <span class="lever-label">BRAKE</span>
+            <div class="lever-slider-wrap" id="brake-slider" title="Click or Drag Brake [A/D]">
+              <div class="lever-track-groove"></div>
+              <div class="lever-handle brake" id="brake-handle"></div>
+            </div>
+            <span class="lever-val" id="brake-val">0%</span>
+          </div>
+        </div>
+
+        <!-- Buttons Bank -->
+        <div class="button-bank">
+          <button class="control-btn horn-btn" id="btn-horn" title="Blow Dual-Tone Horn [Space / H]">
+            🎺 HORN BLAST
+            <span class="key-hint">[SPACE / H]</span>
+          </button>
+          
+          <button class="control-btn" id="btn-reverser" title="Toggle Forward/Neutral/Reverse [Key R]">
+            ⚙️ FORWARD (F)
+          </button>
+
+          <button class="control-btn" id="btn-lights" title="Toggle Headlight Beam [Key L]">
+            💡 Lights: BRIGHT
+          </button>
+
+          <button class="control-btn" id="btn-panto" title="Raise or Lower Pantograph [Key P]">
+            ⚡ Pantograph
+          </button>
+
+          <button class="control-btn emergency-btn" id="btn-emergency" title="Emergency Brake Dump [Key E]">
+            🛑 EMERGENCY BRAKE [E]
+          </button>
+        </div>
+      </div>
+
+    </footer>
+
+  </div>
+
+  <!-- HELP & KEYBOARD SHORTCUTS MODAL -->
+  <div id="help-modal">
+    <div class="modal-header">
+      <div class="modal-title">Loco Pilot Keyboard & Touch Controls</div>
+      <button class="modal-close" id="close-help">&times;</button>
+    </div>
+    <div class="shortcuts-grid">
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Throttle Notch Up (+1)</span>
+        <span class="kbd-badge">W / ↑</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Throttle Notch Down (-1)</span>
+        <span class="kbd-badge">S / ↓</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Apply Train Brake (A-9)</span>
+        <span class="kbd-badge">A</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Release Train Brake</span>
+        <span class="kbd-badge">D</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Dual-Tone Indian Horn</span>
+        <span class="kbd-badge">Space / H</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Emergency Brake (Slam)</span>
+        <span class="kbd-badge">E</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Reverser (Fwd / Neut / Rev)</span>
+        <span class="kbd-badge">R</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Cycle Camera Mode</span>
+        <span class="kbd-badge">C</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Switch Train (WAP-7 / Diesel)</span>
+        <span class="kbd-badge">T</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Headlight High/Dim/Off</span>
+        <span class="kbd-badge">L</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Pantograph Raise/Lower</span>
+        <span class="kbd-badge">P</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Cycle Weather / Time of Day</span>
+        <span class="kbd-badge">V</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Look Around in Cab</span>
+        <span class="kbd-badge">Mouse Drag</span>
+      </div>
+      <div class="shortcut-row">
+        <span class="shortcut-desc">Mute / Unmute Audio</span>
+        <span class="kbd-badge">M</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUDIO INITIALIZATION & START OVERLAY -->
+  <div id="start-overlay">
+    <div class="start-box">
+      <div class="start-logo">🚂</div>
+      <h1 class="start-title">INDIAN RAILWAYS SIMULATOR</h1>
+      <div class="start-subtitle">भारतीय रेल - HIGH FIDELITY 3D SIMULATION</div>
+      
+      <p class="start-desc">
+        Experience authentic Indian Railways mainline operations. Drive the iconic <strong>WAP-7 High-Speed Electric Locomotive</strong> with LHB coaches (Rajdhani Express) or the roaring <strong>WDP-4D Diesel Locomotive</strong> through scenic mustard and green countryside. Features realistic VVVF inverter audio, dual-tone pneumatic horn, full driver cockpit with functional dials, and 4-aspect colour signals.
+      </p>
+
+      <div class="train-preview-selectors">
+        <div class="preview-card selected" data-train="electric">
+          <div class="preview-card-title">⚡ WAP-7 + LHB Rake</div>
+          <div class="preview-card-desc">Image 1: 6,350 HP 25kV AC Electric with Rajdhani Red/Silver coaches</div>
+        </div>
+
+        <div class="preview-card" data-train="diesel">
+          <div class="preview-card-title">🔥 WDP-4D + ICF Rake</div>
+          <div class="preview-card-desc">Image 2: Chevron nose Diesel with Classic Blue coaches through yellow fields</div>
+        </div>
+      </div>
+
+      <button class="start-btn" id="start-btn" onclick="document.getElementById('start-overlay').style.display='none'; if(window.trainApp && window.trainApp.audio) { window.trainApp.audio.init(); window.trainApp.audio.resume(); }">START SIMULATION / प्रारंभ करें</button>
+    </div>
+  </div>
+
+  <!-- Main Self-Contained Bundle -->
+  <script src="bundle.js"></script>
+</body>
+</html>
+
