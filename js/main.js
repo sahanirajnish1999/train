@@ -156,6 +156,15 @@ class SimulatorApp {
         case 'KeyL':
           this.train.cycleHeadlight();
           break;
+        case 'KeyN':
+          const netSt = this.train.toggleCaptureNet();
+          const netBtn = document.getElementById('btn-capture-net');
+          if (netBtn) {
+            netBtn.innerText = `🛡️ Net: ${netSt ? 'DEPLOYED' : 'RETRACTED'}`;
+            netBtn.classList.toggle('active', netSt);
+          }
+          this.audio.triggerBrakeHiss(0.3);
+          break;
         case 'KeyP':
           this.physics.togglePantograph();
           break;
@@ -293,6 +302,17 @@ class SimulatorApp {
     if (btnPanto) {
       btnPanto.addEventListener('click', () => {
         this.physics.togglePantograph();
+      });
+    }
+
+    // Capture Net button
+    const btnCaptureNet = document.getElementById('btn-capture-net');
+    if (btnCaptureNet) {
+      btnCaptureNet.addEventListener('click', () => {
+        const state = this.train.toggleCaptureNet();
+        btnCaptureNet.innerText = `🛡️ Net: ${state ? 'DEPLOYED' : 'RETRACTED'}`;
+        btnCaptureNet.classList.toggle('active', state);
+        this.audio.triggerBrakeHiss(0.3);
       });
     }
 

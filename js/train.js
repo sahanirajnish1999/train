@@ -5,6 +5,7 @@
 // ====================================================================
 
 import * as THREE from 'three';
+import { ObstacleCaptureNet } from './captureNet.js';
 
 export class TrainModel {
   constructor(scene) {
@@ -27,6 +28,10 @@ export class TrainModel {
     this.couplerGap = 0.8;
     this.coachCount = 6;
     this.wheelRadius = 0.54; // Standard broad gauge wheel
+
+    // Safety Obstacle Capture Net (Front Airbag / Rescue Scoop)
+    this.captureNetDeployed = true; // Enabled by default as requested by user
+    this.captureNet = null;
 
     // Generate high-fidelity procedural canvas textures
     this.textures = this.createProceduralTextures();
@@ -327,6 +332,9 @@ export class TrainModel {
     // Two Co-Co 3-Axle Bogies sitting precisely on the steel rails
     this.buildCoCoBogie(group, length * 0.28);
     this.buildCoCoBogie(group, -length * 0.28);
+
+    // Front Obstacle Capture Net & Safety Airbag Scoop (Dedicated Module: js/captureNet.js)
+    this.captureNet = new ObstacleCaptureNet(group, length, this.captureNetDeployed);
   }
 
   // ---------------------------------------------------------
@@ -472,6 +480,9 @@ export class TrainModel {
     // Bogies
     this.buildCoCoBogie(group, length * 0.28);
     this.buildCoCoBogie(group, -length * 0.28);
+
+    // Front Obstacle Capture Net & Safety Airbag Scoop (Dedicated Module: js/captureNet.js)
+    this.captureNet = new ObstacleCaptureNet(group, length, this.captureNetDeployed);
   }
 
   // ---------------------------------------------------------
@@ -603,6 +614,21 @@ export class TrainModel {
     this.rotatingWheels.forEach(w => {
       w.rotation.x += deltaAngle;
     });
+  }
+
+  // ---------------------------------------------------------
+  // Toggle Front Capture Net Deployment (Controlled via js/captureNet.js)
+  // ---------------------------------------------------------
+  toggleCaptureNet() {
+    this.captureNetDeployed = !this.captureNetDeployed;
+    if (this.captureNet) {
+      this.captureNet.setDeployed(this.captureNetDeployed);
+    }
+    return this.captureNetDeployed;
+  }
+
+  get captureNetGroup() {
+    return this.captureNet ? this.captureNet.group : null;
   }
 
   cycleHeadlight() {
