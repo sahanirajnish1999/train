@@ -33339,6 +33339,94 @@ void main() {
       });
     }
     // ---------------------------------------------------------
+    // Inflatable Capture Net Rapid Pneumatic Deployment Audio
+    // ---------------------------------------------------------
+    playPneumaticDeploySound() {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        const bufSize = Math.floor(this.ctx.sampleRate * 0.45);
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.1));
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(1800, now);
+        filter.Q.setValueAtTime(1.8, now);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.9, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.42);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start(now);
+        const clack = this.ctx.createOscillator();
+        clack.type = "triangle";
+        clack.frequency.setValueAtTime(220, now);
+        clack.frequency.exponentialRampToValueAtTime(45, now + 0.08);
+        const clackGain = this.ctx.createGain();
+        clackGain.gain.setValueAtTime(0.7, now);
+        clackGain.gain.exponentialRampToValueAtTime(1e-3, now + 0.08);
+        clack.connect(clackGain);
+        clackGain.connect(this.masterGain);
+        clack.start(now);
+        clack.stop(now + 0.09);
+      } catch (e) {
+      }
+    }
+    // ---------------------------------------------------------
+    // AI Sensor Target Acquisition Ping
+    // ---------------------------------------------------------
+    playTargetAcquiredBeep(isHazard = false) {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        const freq = isHazard ? 880 : 1320;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = isHazard ? "sawtooth" : "sine";
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.setValueAtTime(freq * 1.25, now + 0.06);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.18);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } catch (e) {
+      }
+    }
+    // ---------------------------------------------------------
+    // Obstacle Safely Collected Chime
+    // ---------------------------------------------------------
+    playRescueSuccessChime() {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        [1046.5, 1318.5, 1567.98].forEach((f, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const t = now + idx * 0.1;
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(f, t);
+          gain.gain.setValueAtTime(0.3, t);
+          gain.gain.exponentialRampToValueAtTime(1e-3, t + 0.4);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(t);
+          osc.stop(t + 0.45);
+        });
+      } catch (e) {
+      }
+    }
+    // ---------------------------------------------------------
     // Main Audio Update Loop
     // ---------------------------------------------------------
     update(speedKmh, throttlePercent, brakePercent, isElectric = true) {
@@ -35033,15 +35121,29 @@ void main() {
      * @param {number} locoLength - Locomotive length in meters (default 20.5m)
      * @param {boolean} initialDeployed - Whether the net is deployed on spawn
      */
-    constructor(parentGroup, locoLength = 20.5, initialDeployed = true) {
+    constructor(parentGroup, locoLength = 20.5, initialDeployed = false) {
       this.parent = parentGroup;
       this.locoLength = locoLength;
       this.isDeployed = initialDeployed;
+      this.deployProgress = initialDeployed ? 1 : 0;
+      this.targetDeploy = initialDeployed ? 1 : 0;
+      this.deploySpeed = 3.8;
+      this.collectedList = [];
+      this.totalPayloadWeight = 0;
       this.textures = this.createProceduralTextures();
       this.group = new Group();
       this.group.name = "captureNet";
+      this.deployableScoop = new Group();
+      this.deployableScoop.name = "deployableScoop";
+      this.group.add(this.deployableScoop);
+      this.cradleCargoGroup = new Group();
+      this.cradleCargoGroup.name = "cradleCargoGroup";
+      this.deployableScoop.add(this.cradleCargoGroup);
+      this.leds = {};
+      this.lidarBeam = null;
+      this.lidarSweepAngle = 0;
       this.build();
-      this.group.visible = this.isDeployed;
+      this.applyDeployTransform(this.deployProgress);
       if (this.parent) {
         this.parent.add(this.group);
       }
@@ -35051,57 +35153,73 @@ void main() {
     // ------------------------------------------------------------------
     createProceduralTextures() {
       const canvasNet = document.createElement("canvas");
-      canvasNet.width = 256;
-      canvasNet.height = 256;
+      canvasNet.width = 512;
+      canvasNet.height = 512;
       const ctxNet = canvasNet.getContext("2d");
-      ctxNet.clearRect(0, 0, 256, 256);
-      ctxNet.lineWidth = 18;
-      ctxNet.strokeStyle = "#78350f";
+      ctxNet.clearRect(0, 0, 512, 512);
+      ctxNet.lineWidth = 26;
+      ctxNet.strokeStyle = "#451a03";
       ctxNet.beginPath();
-      ctxNet.moveTo(0, 131);
-      ctxNet.lineTo(256, 131);
-      ctxNet.moveTo(131, 0);
-      ctxNet.lineTo(131, 256);
+      ctxNet.moveTo(0, 260);
+      ctxNet.lineTo(512, 260);
+      ctxNet.moveTo(260, 0);
+      ctxNet.lineTo(260, 512);
       ctxNet.stroke();
       ctxNet.lineWidth = 14;
+      ctxNet.strokeStyle = "rgba(69, 26, 3, 0.45)";
+      ctxNet.beginPath();
+      ctxNet.moveTo(0, 0);
+      ctxNet.lineTo(512, 512);
+      ctxNet.moveTo(512, 0);
+      ctxNet.lineTo(0, 512);
+      ctxNet.stroke();
+      ctxNet.lineWidth = 20;
       ctxNet.strokeStyle = "#eab308";
       ctxNet.beginPath();
-      ctxNet.moveTo(0, 128);
-      ctxNet.lineTo(256, 128);
-      ctxNet.moveTo(128, 0);
-      ctxNet.lineTo(128, 256);
+      ctxNet.moveTo(0, 256);
+      ctxNet.lineTo(512, 256);
+      ctxNet.moveTo(256, 0);
+      ctxNet.lineTo(256, 512);
       ctxNet.stroke();
-      ctxNet.lineWidth = 4;
+      ctxNet.lineWidth = 10;
+      ctxNet.strokeStyle = "#ca8a04";
+      ctxNet.beginPath();
+      ctxNet.moveTo(0, 0);
+      ctxNet.lineTo(512, 512);
+      ctxNet.moveTo(512, 0);
+      ctxNet.lineTo(0, 512);
+      ctxNet.stroke();
+      ctxNet.lineWidth = 6;
       ctxNet.strokeStyle = "#fef08a";
       ctxNet.beginPath();
-      ctxNet.moveTo(0, 124);
-      ctxNet.lineTo(256, 124);
-      ctxNet.moveTo(124, 0);
-      ctxNet.lineTo(124, 256);
+      ctxNet.moveTo(0, 250);
+      ctxNet.lineTo(512, 250);
+      ctxNet.moveTo(250, 0);
+      ctxNet.lineTo(250, 512);
       ctxNet.stroke();
-      ctxNet.strokeStyle = "#ca8a04";
-      ctxNet.lineWidth = 3;
-      for (let i = 0; i < 256; i += 24) {
+      ctxNet.strokeStyle = "#a16207";
+      ctxNet.lineWidth = 4;
+      for (let i = 0; i < 512; i += 28) {
         ctxNet.beginPath();
-        ctxNet.moveTo(i, 120);
-        ctxNet.lineTo(i + 8, 136);
+        ctxNet.moveTo(i, 244);
+        ctxNet.lineTo(i + 12, 268);
         ctxNet.stroke();
         ctxNet.beginPath();
-        ctxNet.moveTo(120, i);
-        ctxNet.lineTo(136, i + 8);
+        ctxNet.moveTo(244, i);
+        ctxNet.lineTo(268, i + 12);
         ctxNet.stroke();
       }
-      ctxNet.fillStyle = "#78350f";
+      ctxNet.fillStyle = "#451a03";
       ctxNet.beginPath();
-      ctxNet.arc(128, 128, 18, 0, Math.PI * 2);
+      ctxNet.arc(256, 256, 28, 0, Math.PI * 2);
       ctxNet.fill();
-      ctxNet.fillStyle = "#facc15";
+      ctxNet.fillStyle = "#eab308";
       ctxNet.beginPath();
-      ctxNet.arc(128, 128, 14, 0, Math.PI * 2);
+      ctxNet.arc(256, 256, 22, 0, Math.PI * 2);
       ctxNet.fill();
-      ctxNet.fillStyle = "#fef9c3";
+      ctxNet.fillStyle = "#fef08a";
       ctxNet.beginPath();
-      ctxNet.arc(124, 124, 6, 0, Math.PI * 2);
+      ctxNet.arc(250, 250, 10, 0, Math.PI * 2);
       ctxNet.fill();
       const captureNetMeshTex = new CanvasTexture(canvasNet);
       captureNetMeshTex.wrapS = RepeatWrapping;
@@ -35111,10 +35229,10 @@ void main() {
       canvasCushion.width = 512;
       canvasCushion.height = 512;
       const ctxCushion = canvasCushion.getContext("2d");
-      ctxCushion.fillStyle = "#ea580c";
+      ctxCushion.fillStyle = "#f97316";
       ctxCushion.fillRect(0, 0, 512, 512);
-      ctxCushion.strokeStyle = "#c2410c";
-      ctxCushion.lineWidth = 1;
+      ctxCushion.strokeStyle = "rgba(194, 65, 12, 0.4)";
+      ctxCushion.lineWidth = 1.5;
       for (let i = 0; i < 512; i += 16) {
         ctxCushion.beginPath();
         ctxCushion.moveTo(i, 0);
@@ -35125,63 +35243,86 @@ void main() {
       }
       for (let bx = 0; bx < 512; bx += 128) {
         const gradH = ctxCushion.createLinearGradient(bx, 0, bx + 64, 0);
-        gradH.addColorStop(0, "rgba(255, 255, 255, 0.22)");
+        gradH.addColorStop(0, "rgba(255, 255, 255, 0.28)");
         gradH.addColorStop(1, "rgba(255, 255, 255, 0.0)");
         ctxCushion.fillStyle = gradH;
-        ctxCushion.fillRect(bx + 16, 0, 48, 512);
+        ctxCushion.fillRect(bx + 12, 0, 52, 512);
         const gradS = ctxCushion.createLinearGradient(bx + 64, 0, bx + 128, 0);
         gradS.addColorStop(0, "rgba(0, 0, 0, 0.0)");
-        gradS.addColorStop(1, "rgba(0, 0, 0, 0.45)");
+        gradS.addColorStop(1, "rgba(0, 0, 0, 0.50)");
         ctxCushion.fillStyle = gradS;
         ctxCushion.fillRect(bx + 64, 0, 64, 512);
         ctxCushion.fillStyle = "#7c2d12";
-        ctxCushion.fillRect(bx + 125, 0, 6, 512);
+        ctxCushion.fillRect(bx + 124, 0, 8, 512);
         ctxCushion.fillStyle = "#fef08a";
-        for (let y = 6; y < 512; y += 18) {
-          ctxCushion.fillRect(bx + 122, y, 3, 7);
-          ctxCushion.fillRect(bx + 131, y, 3, 7);
+        for (let y = 6; y < 512; y += 16) {
+          ctxCushion.fillRect(bx + 121, y, 2.5, 7);
+          ctxCushion.fillRect(bx + 132, y, 2.5, 7);
         }
       }
+      ctxCushion.save();
+      ctxCushion.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctxCushion.font = 'bold 20px "Courier New", monospace';
+      ctxCushion.textAlign = "center";
+      ctxCushion.fillText("OBSTACLE SCOOP \u2022 MAX 150KG", 256, 120);
+      ctxCushion.font = 'bold 16px "Courier New", monospace';
+      ctxCushion.fillText("AIRBAG INFLATION WP: 12 BAR", 256, 380);
+      ctxCushion.restore();
       const captureCushionTex = new CanvasTexture(canvasCushion);
       captureCushionTex.wrapS = RepeatWrapping;
       captureCushionTex.wrapT = RepeatWrapping;
       captureCushionTex.repeat.set(2, 2);
       const canvasGauge = document.createElement("canvas");
-      canvasGauge.width = 128;
-      canvasGauge.height = 128;
+      canvasGauge.width = 256;
+      canvasGauge.height = 256;
       const ctxG = canvasGauge.getContext("2d");
-      ctxG.fillStyle = "#f8fafc";
+      ctxG.fillStyle = "#f1f5f9";
       ctxG.beginPath();
-      ctxG.arc(64, 64, 60, 0, Math.PI * 2);
+      ctxG.arc(128, 128, 124, 0, Math.PI * 2);
       ctxG.fill();
-      ctxG.lineWidth = 5;
+      ctxG.lineWidth = 8;
       ctxG.strokeStyle = "#475569";
       ctxG.stroke();
-      ctxG.lineWidth = 6;
+      ctxG.fillStyle = "#ffffff";
+      ctxG.beginPath();
+      ctxG.arc(128, 128, 116, 0, Math.PI * 2);
+      ctxG.fill();
+      ctxG.lineWidth = 14;
       ctxG.strokeStyle = "#22c55e";
       ctxG.beginPath();
-      ctxG.arc(64, 64, 48, 0.75 * Math.PI, 1.55 * Math.PI);
+      ctxG.arc(128, 128, 92, 0.8 * Math.PI, 1.55 * Math.PI);
       ctxG.stroke();
       ctxG.strokeStyle = "#ef4444";
       ctxG.beginPath();
-      ctxG.arc(64, 64, 48, 1.55 * Math.PI, 1.95 * Math.PI);
+      ctxG.arc(128, 128, 92, 1.55 * Math.PI, 1.95 * Math.PI);
       ctxG.stroke();
-      ctxG.fillStyle = "#0f172a";
-      ctxG.font = "bold 11px sans-serif";
-      ctxG.textAlign = "center";
-      ctxG.fillText("BAR", 64, 48);
-      ctxG.font = "9px monospace";
-      ctxG.fillText("300", 88, 76);
-      ctxG.fillText("0", 40, 76);
-      ctxG.strokeStyle = "#dc2626";
+      ctxG.strokeStyle = "#0f172a";
       ctxG.lineWidth = 3;
+      for (let a = 0.75 * Math.PI; a <= 2.05 * Math.PI; a += 0.08) {
+        const r1 = 82;
+        const r2 = 98;
+        ctxG.beginPath();
+        ctxG.moveTo(128 + Math.cos(a) * r1, 128 + Math.sin(a) * r1);
+        ctxG.lineTo(128 + Math.cos(a) * r2, 128 + Math.sin(a) * r2);
+        ctxG.stroke();
+      }
+      ctxG.fillStyle = "#0f172a";
+      ctxG.font = "bold 22px sans-serif";
+      ctxG.textAlign = "center";
+      ctxG.fillText("BAR", 128, 95);
+      ctxG.font = "bold 15px monospace";
+      ctxG.fillText("0", 70, 165);
+      ctxG.fillText("200", 128, 65);
+      ctxG.fillText("300", 188, 165);
+      ctxG.strokeStyle = "#dc2626";
+      ctxG.lineWidth = 5;
       ctxG.beginPath();
-      ctxG.moveTo(64, 64);
-      ctxG.lineTo(44, 44);
+      ctxG.moveTo(128, 128);
+      ctxG.lineTo(128 - 25, 128 - 70);
       ctxG.stroke();
       ctxG.fillStyle = "#1e293b";
       ctxG.beginPath();
-      ctxG.arc(64, 64, 6, 0, Math.PI * 2);
+      ctxG.arc(128, 128, 12, 0, Math.PI * 2);
       ctxG.fill();
       const gaugeDialTex = new CanvasTexture(canvasGauge);
       return {
@@ -35191,50 +35332,157 @@ void main() {
       };
     }
     // ------------------------------------------------------------------
-    // Build 3D Capture Net Model
+    // Build 3D Sensor Suite & Deployable Capture Net Model
     // ------------------------------------------------------------------
     build() {
       const zBase = this.locoLength / 2 + 0.35;
       const zTip = zBase + 3.1;
       const boomOrangeMat = new MeshStandardMaterial({
         map: this.textures.captureCushionTex,
-        roughness: 0.55,
-        metalness: 0.1
+        roughness: 0.38,
+        metalness: 0.08
       });
       const tipYellowMat = new MeshStandardMaterial({
         color: 16436245,
         // High-visibility warning yellow canvas
-        roughness: 0.45,
-        metalness: 0.15
+        roughness: 0.35,
+        metalness: 0.12
       });
       const netMeshMat = new MeshStandardMaterial({
         map: this.textures.captureNetMeshTex,
         transparent: true,
-        alphaTest: 0.25,
+        alphaTest: 0.2,
         side: DoubleSide,
-        roughness: 0.8,
+        roughness: 0.65,
         metalness: 0.05
       });
       const metalMat = new MeshStandardMaterial({
-        color: 9741240,
-        // Polished silver inflators / structural steel
-        roughness: 0.25,
-        metalness: 0.85
+        color: 14870768,
+        // Polished stainless steel / aluminium inflators
+        roughness: 0.18,
+        metalness: 0.92
+      });
+      const brassMat = new MeshStandardMaterial({
+        color: 14251782,
+        // Brass valve fittings
+        roughness: 0.22,
+        metalness: 0.88
+      });
+      const darkHousingMat = new MeshStandardMaterial({
+        color: 1976635,
+        // Dark graphite aerospace sensor housing
+        roughness: 0.32,
+        metalness: 0.75
+      });
+      const glassLensMat = new MeshPhysicalMaterial({
+        color: 165063,
+        // AR coated optical lens
+        roughness: 0.04,
+        metalness: 0.1,
+        transmission: 0.9,
+        thickness: 0.15
       });
       const rubberMat = new MeshStandardMaterial({
-        color: 2565930,
+        color: 1579035,
         // Tough vulcanized rubber bumper tips
         roughness: 0.85,
-        metalness: 0.1
+        metalness: 0.05
       });
       const hoseMat = new MeshStandardMaterial({
-        color: 1579035,
+        color: 592139,
         // Black flexible high-pressure pneumatic hoses
-        roughness: 0.7,
-        metalness: 0.2
+        roughness: 0.65,
+        metalness: 0.15
       });
       const gaugeFaceMat = new MeshBasicMaterial({
         map: this.textures.gaugeDialTex
+      });
+      const camPod = new Group();
+      camPod.position.set(0, 2.45, zBase + 0.18);
+      const camHousing = new Mesh(new BoxGeometry(0.42, 0.14, 0.24), darkHousingMat);
+      camHousing.castShadow = true;
+      camPod.add(camHousing);
+      [-0.13, 0.13].forEach((cx) => {
+        const lensRim = new Mesh(new CylinderGeometry(0.048, 0.048, 0.04, 16).rotateX(Math.PI / 2), metalMat);
+        lensRim.position.set(cx, 0, 0.13);
+        camPod.add(lensRim);
+        const lensGlass = new Mesh(new SphereGeometry(0.038, 12, 10), glassLensMat);
+        lensGlass.position.set(cx, 0, 0.14);
+        camPod.add(lensGlass);
+      });
+      this.group.add(camPod);
+      const lidarGroup = new Group();
+      lidarGroup.position.set(0, 2.18, zBase + 0.35);
+      const lidarPuck = new Mesh(new CylinderGeometry(0.13, 0.13, 0.16, 20), darkHousingMat);
+      lidarPuck.castShadow = true;
+      lidarGroup.add(lidarPuck);
+      const lidarWindow = new Mesh(new CylinderGeometry(0.132, 0.132, 0.06, 20), glassLensMat);
+      lidarWindow.position.y = 0.02;
+      lidarGroup.add(lidarWindow);
+      const lidarBeamGeo = new ConeGeometry(3.5, 42, 16, 1, true);
+      lidarBeamGeo.rotateX(Math.PI / 2);
+      const lidarBeamMat = new MeshBasicMaterial({
+        color: 440020,
+        // Cyan laser sweep
+        transparent: true,
+        opacity: 0.12,
+        side: DoubleSide,
+        depthWrite: false
+      });
+      const lidarBeam = new Mesh(lidarBeamGeo, lidarBeamMat);
+      lidarBeam.position.set(0, 0, 21);
+      lidarGroup.add(lidarBeam);
+      this.lidarBeam = lidarBeam;
+      this.group.add(lidarGroup);
+      const radarGroup = new Group();
+      radarGroup.position.set(0, 1.25, zBase + 0.42);
+      const radarBase = new Mesh(new BoxGeometry(0.32, 0.24, 0.08), darkHousingMat);
+      radarGroup.add(radarBase);
+      const radarRadome = new Mesh(new CylinderGeometry(0.1, 0.1, 0.03, 16).rotateX(Math.PI / 2), metalMat);
+      radarRadome.position.z = 0.05;
+      radarGroup.add(radarRadome);
+      this.group.add(radarGroup);
+      const ecuGroup = new Group();
+      ecuGroup.position.set(1.42, 1.15, zBase + 0.08);
+      const ecuBox = new Mesh(new BoxGeometry(0.3, 0.46, 0.24), darkHousingMat);
+      ecuBox.castShadow = true;
+      ecuGroup.add(ecuBox);
+      for (let f = -0.18; f <= 0.18; f += 0.05) {
+        const fin = new Mesh(new BoxGeometry(0.04, 0.02, 0.22), metalMat);
+        fin.position.set(0.16, f, 0);
+        ecuGroup.add(fin);
+      }
+      const ledMatPWR = new MeshBasicMaterial({ color: 2278750 });
+      const ledMatLIDAR = new MeshBasicMaterial({ color: 440020 });
+      const ledMatRADAR = new MeshBasicMaterial({ color: 16096779 });
+      const ledMatAI = new MeshBasicMaterial({ color: 1096065 });
+      const ledMatSOLENOID = new MeshBasicMaterial({ color: 15680580 });
+      const ledPWR = new Mesh(new SphereGeometry(0.016, 8, 8), ledMatPWR);
+      ledPWR.position.set(0.16, 0.16, 0.08);
+      ecuGroup.add(ledPWR);
+      const ledLIDAR = new Mesh(new SphereGeometry(0.016, 8, 8), ledMatLIDAR);
+      ledLIDAR.position.set(0.16, 0.08, 0.08);
+      ecuGroup.add(ledLIDAR);
+      const ledRADAR = new Mesh(new SphereGeometry(0.016, 8, 8), ledMatRADAR);
+      ledRADAR.position.set(0.16, 0, 0.08);
+      ecuGroup.add(ledRADAR);
+      const ledAI = new Mesh(new SphereGeometry(0.016, 8, 8), ledMatAI);
+      ledAI.position.set(0.16, -0.08, 0.08);
+      ecuGroup.add(ledAI);
+      const ledSOLENOID = new Mesh(new SphereGeometry(0.016, 8, 8), ledMatSOLENOID);
+      ledSOLENOID.position.set(0.16, -0.16, 0.08);
+      ecuGroup.add(ledSOLENOID);
+      this.leds = { pwr: ledPWR, lidar: ledLIDAR, radar: ledRADAR, ai: ledAI, solenoid: ledSOLENOID };
+      this.group.add(ecuGroup);
+      [-0.95, 0.95].forEach((mx) => {
+        const clamp2 = new Mesh(new BoxGeometry(0.32, 0.32, 0.38), metalMat);
+        clamp2.position.set(mx, 0.95, zBase - 0.08);
+        clamp2.castShadow = true;
+        this.group.add(clamp2);
+        const rodStart = new Vector3(mx * 1.25, 2.18, zBase);
+        const rodEnd = new Vector3(mx * 0.85, 2.5, zBase - 0.35);
+        const rod = createTube(rodStart, rodEnd, 0.035, metalMat);
+        if (rod) this.group.add(rod);
       });
       const v = {
         topL_base: new Vector3(-1.32, 2.2, zBase),
@@ -35305,26 +35553,20 @@ void main() {
         return mesh;
       }
       const tubePairs = [
-        // Rear Mounting Arch
         [v.topL_base, v.topR_base, 0.12, tipYellowMat],
-        // Top brow with yellow protective sleeve
         [v.botL_base, v.botR_base, 0.12, boomOrangeMat],
         [v.topL_base, v.botL_base, 0.12, boomOrangeMat],
         [v.topR_base, v.botR_base, 0.12, boomOrangeMat],
-        // Upper Booms (Shoulder slopes)
         [v.topL_base, v.shoulderL, 0.12, boomOrangeMat],
         [v.shoulderL, v.noseTopL, 0.12, boomOrangeMat],
         [v.topR_base, v.shoulderR, 0.12, boomOrangeMat],
         [v.shoulderR, v.noseTopR, 0.12, boomOrangeMat],
-        // Lower Booms (Keel rails)
         [v.botL_base, v.midBotL, 0.12, boomOrangeMat],
         [v.midBotL, v.noseBotL, 0.12, boomOrangeMat],
         [v.botR_base, v.midBotR, 0.12, boomOrangeMat],
         [v.midBotR, v.noseBotR, 0.12, boomOrangeMat],
-        // Side Rib Struts
         [v.shoulderL, v.midBotL, 0.11, boomOrangeMat],
         [v.shoulderR, v.midBotR, 0.11, boomOrangeMat],
-        // Front Nose Frame
         [v.noseTopL, v.noseTopR, 0.1, tipYellowMat],
         [v.noseBotL, v.noseBotR, 0.1, tipYellowMat],
         [v.noseTopL, v.noseBotL, 0.1, tipYellowMat],
@@ -35332,11 +35574,11 @@ void main() {
       ];
       tubePairs.forEach((p) => {
         const tube = createTube(p[0], p[1], p[2], p[3]);
-        if (tube) this.group.add(tube);
+        if (tube) this.deployableScoop.add(tube);
       });
       Object.entries(v).forEach(([name, pt]) => {
         const isYellow = name.startsWith("nose") || name.startsWith("top");
-        this.group.add(createKnuckle(pt, 0.135, isYellow ? tipYellowMat : boomOrangeMat));
+        this.deployableScoop.add(createKnuckle(pt, 0.135, isYellow ? tipYellowMat : boomOrangeMat));
       });
       [
         [v.topL_base, v.shoulderL],
@@ -35356,7 +35598,7 @@ void main() {
           strap.position.copy(pos);
           const dir = pB.clone().sub(pA).normalize();
           strap.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir);
-          this.group.add(strap);
+          this.deployableScoop.add(strap);
         });
       });
       [-0.16, 0.16].forEach((cx) => {
@@ -35365,38 +35607,34 @@ void main() {
         const cone = new Mesh(coneGeo, tipYellowMat);
         cone.position.set(cx, 0.49, zTip + 0.31);
         cone.castShadow = true;
-        this.group.add(cone);
+        this.deployableScoop.add(cone);
         const tipCap = new Mesh(new SphereGeometry(0.065, 14, 10), rubberMat);
         tipCap.position.set(cx, 0.49, zTip + 0.62);
-        this.group.add(tipCap);
+        this.deployableScoop.add(tipCap);
         const collar = new Mesh(new TorusGeometry(0.18, 0.025, 8, 16), boomOrangeMat);
         collar.position.set(cx, 0.49, zTip);
-        this.group.add(collar);
+        this.deployableScoop.add(collar);
       });
       const noseHoodGeo = new BufferGeometry();
       const nhPos = [
-        // Top nose edge
         v.noseTopL.x,
         v.noseTopL.y,
         v.noseTopL.z,
         v.noseTopR.x,
         v.noseTopR.y,
         v.noseTopR.z,
-        // Mid cone join
         0.16,
         0.52,
         zTip + 0.28,
         -0.16,
         0.52,
         zTip + 0.28,
-        // Bottom nose edge
         v.noseBotL.x,
         v.noseBotL.y,
         v.noseBotL.z,
         v.noseBotR.x,
         v.noseBotR.y,
         v.noseBotR.z,
-        // Under cone join
         0.16,
         0.46,
         zTip + 0.28,
@@ -35411,76 +35649,84 @@ void main() {
         0,
         2,
         3,
-        // Upper sloped hood
         3,
         2,
         6,
         3,
         6,
         7,
-        // Front center bridge
         7,
         6,
         5,
         7,
         5,
         4
-        // Bottom under-skirt
       ];
       noseHoodGeo.setAttribute("position", new Float32BufferAttribute(nhPos, 3));
       noseHoodGeo.setIndex(nhIndices);
       noseHoodGeo.computeVertexNormals();
       const noseHoodMesh = new Mesh(noseHoodGeo, tipYellowMat);
-      this.group.add(noseHoodMesh);
-      this.group.add(createQuadPanel(v.topL_base, v.topR_base, v.shoulderR, v.shoulderL, 16, 6, netMeshMat));
-      this.group.add(createQuadPanel(v.shoulderL, v.shoulderR, v.noseTopR, v.noseTopL, 16, 16, netMeshMat));
-      this.group.add(createQuadPanel(v.topL_base, v.shoulderL, v.midBotL, v.botL_base, 8, 10, netMeshMat));
-      this.group.add(createQuadPanel(v.shoulderL, v.noseTopL, v.noseBotL, v.midBotL, 16, 10, netMeshMat));
-      this.group.add(createQuadPanel(v.shoulderR, v.topR_base, v.botR_base, v.midBotR, 8, 10, netMeshMat));
-      this.group.add(createQuadPanel(v.noseTopR, v.shoulderR, v.midBotR, v.noseBotR, 16, 10, netMeshMat));
-      this.group.add(createQuadPanel(v.botL_base, v.botR_base, v.midBotR, v.midBotL, 14, 8, netMeshMat));
-      this.group.add(createQuadPanel(v.midBotL, v.midBotR, v.noseBotR, v.noseBotL, 14, 16, netMeshMat));
-      const bolsterCount = 5;
+      this.deployableScoop.add(noseHoodMesh);
+      this.deployableScoop.add(createQuadPanel(v.topL_base, v.topR_base, v.shoulderR, v.shoulderL, 16, 6, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.shoulderL, v.shoulderR, v.noseTopR, v.noseTopL, 16, 16, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.topL_base, v.shoulderL, v.midBotL, v.botL_base, 8, 10, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.shoulderL, v.noseTopL, v.noseBotL, v.midBotL, 16, 10, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.shoulderR, v.topR_base, v.botR_base, v.midBotR, 8, 10, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.noseTopR, v.shoulderR, v.midBotR, v.noseBotR, 16, 10, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.botL_base, v.botR_base, v.midBotR, v.midBotL, 14, 8, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.midBotL, v.midBotR, v.noseBotR, v.noseBotL, 14, 16, netMeshMat));
+      const bolsterCount = 6;
       const bW = 2.45 / bolsterCount;
       for (let i = 0; i < bolsterCount; i++) {
         const bx = -1.225 + (i + 0.5) * bW;
-        const bGeo = new CylinderGeometry(bW * 0.44, bW * 0.44, 1.48, 16);
+        const bGeo = new CylinderGeometry(bW * 0.46, bW * 0.46, 1.52, 18);
         const bolster = new Mesh(bGeo, boomOrangeMat);
         bolster.position.set(bx, 1.46, zBase + 0.12);
         bolster.castShadow = true;
-        this.group.add(bolster);
+        this.deployableScoop.add(bolster);
+        if (i === 1 || i === 4) {
+          const valveRing = new Mesh(new CylinderGeometry(0.065, 0.065, 0.04, 16).rotateX(Math.PI / 2), metalMat);
+          valveRing.position.set(bx, 1.46, zBase + 0.24);
+          this.deployableScoop.add(valveRing);
+          const valveCap = new Mesh(new SphereGeometry(0.042, 12, 8), darkHousingMat);
+          valveCap.position.set(bx, 1.46, zBase + 0.26);
+          this.deployableScoop.add(valveCap);
+        }
       }
-      const topPadGeo = new CylinderGeometry(0.14, 0.14, 2.55, 16);
+      const topPadGeo = new CylinderGeometry(0.14, 0.14, 2.55, 18);
       topPadGeo.rotateZ(Math.PI / 2);
       const topPad = new Mesh(topPadGeo, tipYellowMat);
       topPad.position.set(0, 2.22, zBase + 0.12);
-      this.group.add(topPad);
+      this.deployableScoop.add(topPad);
       [-1.15, 1.15].forEach((px2) => {
         const pocketGeo = new BoxGeometry(0.06, 0.38, 0.48);
         const pocket = new Mesh(pocketGeo, tipYellowMat);
         pocket.position.set(px2, 1.35, zBase + 0.45);
-        this.group.add(pocket);
+        this.deployableScoop.add(pocket);
       });
       [-1.24, 1.24].forEach((ix, idx) => {
         const sign2 = idx === 0 ? -1 : 1;
-        const cylGeo = new CylinderGeometry(0.08, 0.08, 0.45, 14);
+        const cylGeo = new CylinderGeometry(0.085, 0.085, 0.48, 16);
         cylGeo.rotateZ(sign2 * 0.3);
         const cyl = new Mesh(cylGeo, metalMat);
         cyl.position.set(ix, 0.88, zBase + 0.65);
         cyl.castShadow = true;
-        this.group.add(cyl);
+        this.deployableScoop.add(cyl);
+        const hexManifold = new Mesh(new CylinderGeometry(0.038, 0.038, 0.06, 6), brassMat);
+        hexManifold.position.set(ix, 1.14, zBase + 0.65);
+        this.deployableScoop.add(hexManifold);
         const gaugeStem = new Mesh(new CylinderGeometry(0.02, 0.02, 0.08, 8), metalMat);
         gaugeStem.position.set(ix + sign2 * 0.08, 1.05, zBase + 0.65);
-        this.group.add(gaugeStem);
-        const gaugeBody = new Mesh(new CylinderGeometry(0.06, 0.06, 0.035, 16).rotateZ(Math.PI / 2), metalMat);
+        this.deployableScoop.add(gaugeStem);
+        const gaugeBody = new Mesh(new CylinderGeometry(0.065, 0.065, 0.038, 18).rotateZ(Math.PI / 2), metalMat);
         gaugeBody.position.set(ix + sign2 * 0.12, 1.1, zBase + 0.65);
-        this.group.add(gaugeBody);
+        this.deployableScoop.add(gaugeBody);
         const dialFace = new Mesh(
-          new CircleGeometry(0.052, 16).rotateY(sign2 > 0 ? Math.PI / 2 : -Math.PI / 2),
+          new CircleGeometry(0.056, 18).rotateY(sign2 > 0 ? Math.PI / 2 : -Math.PI / 2),
           gaugeFaceMat
         );
-        dialFace.position.set(ix + sign2 * 0.138, 1.1, zBase + 0.65);
-        this.group.add(dialFace);
+        dialFace.position.set(ix + sign2 * 0.142, 1.1, zBase + 0.65);
+        this.deployableScoop.add(dialFace);
         const hosePts = [
           new Vector3(ix + sign2 * 0.08, 0.95, zBase + 0.65),
           new Vector3(ix + sign2 * 0.14, 0.72, zBase + 0.9),
@@ -35490,31 +35736,101 @@ void main() {
         const hoseCurve = new CatmullRomCurve3(hosePts);
         const hoseGeo = new TubeGeometry(hoseCurve, 16, 0.02, 8, false);
         const hose = new Mesh(hoseGeo, hoseMat);
-        this.group.add(hose);
+        this.deployableScoop.add(hose);
       });
-      [-0.95, 0.95].forEach((mx) => {
-        const clamp2 = new Mesh(new BoxGeometry(0.32, 0.32, 0.38), metalMat);
-        clamp2.position.set(mx, 0.95, zBase - 0.08);
-        clamp2.castShadow = true;
-        this.group.add(clamp2);
-        const rodStart = new Vector3(mx * 1.25, 2.18, zBase);
-        const rodEnd = new Vector3(mx * 0.85, 2.5, zBase - 0.35);
-        const rod = createTube(rodStart, rodEnd, 0.035, metalMat);
-        if (rod) this.group.add(rod);
-      });
+      this.cradleCargoGroup.position.set(0, 0.58, zBase + 1.55);
     }
     // ------------------------------------------------------------------
-    // Deployment & Visibility Controls
+    // Pneumatic Rapid Inflation & Deployment Animation
     // ------------------------------------------------------------------
-    toggle() {
+    applyDeployTransform(progress) {
+      const zBase = this.locoLength / 2 + 0.35;
+      const scaleZ = 0.06 + 0.94 * progress;
+      const scaleXY = 0.72 + 0.28 * progress;
+      this.deployableScoop.scale.set(scaleXY, scaleXY, scaleZ);
+      this.deployableScoop.position.z = zBase * (1 - scaleZ);
+    }
+    // Rapid pneumatic solenoid activation (Fired by AI Safety Controller or manual toggle)
+    triggerSolenoidDeploy(audio) {
+      if (this.isDeployed && this.deployProgress > 0.8) return;
+      this.targetDeploy = 1;
+      this.isDeployed = true;
+      if (this.leds.solenoid) {
+        this.leds.solenoid.scale.set(2, 2, 2);
+        setTimeout(() => {
+          if (this.leds.solenoid) this.leds.solenoid.scale.set(1, 1, 1);
+        }, 400);
+      }
+      if (audio) {
+        audio.playPneumaticDeploySound();
+      }
+    }
+    toggle(audio) {
       this.isDeployed = !this.isDeployed;
-      this.group.visible = this.isDeployed;
+      this.targetDeploy = this.isDeployed ? 1 : 0;
+      if (this.isDeployed && audio) {
+        audio.playPneumaticDeploySound();
+      }
       return this.isDeployed;
     }
-    setDeployed(deployed) {
+    setDeployed(deployed, audio) {
       this.isDeployed = !!deployed;
-      this.group.visible = this.isDeployed;
+      this.targetDeploy = this.isDeployed ? 1 : 0;
+      if (this.isDeployed && audio) {
+        audio.playPneumaticDeploySound();
+      }
       return this.isDeployed;
+    }
+    // ------------------------------------------------------------------
+    // Obstacle Collection / Scoop into Bottom Cradle Net
+    // ------------------------------------------------------------------
+    collectObstacle(obstacleMesh, obstacleInfo) {
+      obstacleMesh.position.set(0, 0, this.collectedList.length * 0.45 - 0.3);
+      if (obstacleInfo.type === "human") {
+        obstacleMesh.rotation.x = -Math.PI / 2.8;
+        obstacleMesh.position.y = -0.15;
+      } else if (obstacleInfo.type === "animal") {
+        obstacleMesh.rotation.z = Math.PI / 6;
+        obstacleMesh.position.y = -0.1;
+      }
+      this.cradleCargoGroup.add(obstacleMesh);
+      this.collectedList.push(obstacleInfo);
+      this.totalPayloadWeight += obstacleInfo.mass;
+    }
+    clearCradle() {
+      while (this.cradleCargoGroup.children.length > 0) {
+        this.cradleCargoGroup.remove(this.cradleCargoGroup.children[0]);
+      }
+      this.collectedList = [];
+      this.totalPayloadWeight = 0;
+    }
+    // ------------------------------------------------------------------
+    // Real-Time Frame Update (Deployment physics, LiDAR beam, LEDs)
+    // ------------------------------------------------------------------
+    update(dt, isTargetDetected = false) {
+      if (Math.abs(this.deployProgress - this.targetDeploy) > 1e-3) {
+        this.deployProgress += (this.targetDeploy - this.deployProgress) * Math.min(dt * this.deploySpeed * 4, 1);
+        this.applyDeployTransform(this.deployProgress);
+      }
+      if (this.lidarBeam) {
+        this.lidarSweepAngle += dt * 3.5;
+        this.lidarBeam.rotation.z = Math.sin(this.lidarSweepAngle) * 0.12;
+        this.lidarBeam.material.opacity = 0.08 + Math.abs(Math.sin(this.lidarSweepAngle * 2)) * 0.08;
+      }
+      const timeSec = performance.now() * 1e-3;
+      if (this.leds.lidar) {
+        this.leds.lidar.material.color.setHex(Math.floor(timeSec * 8) % 2 === 0 ? 440020 : 165063);
+      }
+      if (this.leds.radar) {
+        this.leds.radar.material.color.setHex(Math.floor(timeSec * 5) % 2 === 0 ? 16096779 : 11817737);
+      }
+      if (this.leds.ai) {
+        if (isTargetDetected) {
+          this.leds.ai.material.color.setHex(Math.floor(timeSec * 14) % 2 === 0 ? 1096065 : 292951);
+        } else {
+          this.leds.ai.material.color.setHex(Math.floor(timeSec * 2) % 2 === 0 ? 366185 : 413243);
+        }
+      }
     }
   };
 
@@ -35535,7 +35851,7 @@ void main() {
       this.couplerGap = 0.8;
       this.coachCount = 6;
       this.wheelRadius = 0.54;
-      this.captureNetDeployed = true;
+      this.captureNetDeployed = false;
       this.captureNet = null;
       this.textures = this.createProceduralTextures();
       this.headlightBeam = null;
@@ -35547,42 +35863,249 @@ void main() {
     // ---------------------------------------------------------
     createProceduralTextures() {
       const canvasW = document.createElement("canvas");
-      canvasW.width = 1024;
-      canvasW.height = 256;
+      canvasW.width = 2048;
+      canvasW.height = 512;
       const ctxW = canvasW.getContext("2d");
-      ctxW.fillStyle = "#f3f4f6";
-      ctxW.fillRect(0, 0, 1024, 256);
-      ctxW.fillStyle = "#b91c1c";
-      ctxW.fillRect(0, 95, 1024, 75);
-      ctxW.fillStyle = "#fef08a";
-      ctxW.font = "bold 22px sans-serif";
-      ctxW.textAlign = "center";
-      ctxW.fillText("INDIAN RAILWAYS  \u2022  \u092D\u093E\u0930\u0924\u0940\u092F \u0930\u0947\u0932", 512, 140);
-      ctxW.fillStyle = "#111827";
-      ctxW.font = "bold 16px sans-serif";
-      ctxW.fillText("WAP-7 #30201 GZB", 160, 65);
-      ctxW.fillText("WAP-7 #30201 GZB", 864, 65);
-      ctxW.fillStyle = "#374151";
-      ctxW.fillRect(0, 205, 1024, 51);
-      ctxW.fillStyle = "#1f2937";
-      for (let x = 320; x <= 700; x += 18) {
-        ctxW.fillRect(x, 40, 8, 42);
+      ctxW.fillStyle = "#f1f5f9";
+      ctxW.fillRect(0, 0, 2048, 512);
+      ctxW.fillStyle = "rgba(148, 163, 184, 0.08)";
+      for (let y = 0; y < 512; y += 4) {
+        ctxW.fillRect(0, y, 2048, 2);
       }
+      ctxW.strokeStyle = "#cbd5e1";
+      ctxW.lineWidth = 2;
+      ctxW.beginPath();
+      ctxW.moveTo(0, 60);
+      ctxW.lineTo(2048, 60);
+      ctxW.moveTo(0, 180);
+      ctxW.lineTo(2048, 180);
+      ctxW.moveTo(0, 340);
+      ctxW.lineTo(2048, 340);
+      ctxW.stroke();
+      ctxW.fillStyle = "#94a3b8";
+      for (let x = 20; x < 2048; x += 32) {
+        ctxW.fillRect(x, 58, 3, 3);
+        ctxW.fillRect(x, 178, 3, 3);
+        ctxW.fillRect(x, 338, 3, 3);
+      }
+      const gradRed = ctxW.createLinearGradient(0, 180, 0, 340);
+      gradRed.addColorStop(0, "#7f1d1d");
+      gradRed.addColorStop(0.12, "#991b1b");
+      gradRed.addColorStop(0.88, "#991b1b");
+      gradRed.addColorStop(1, "#7f1d1d");
+      ctxW.fillStyle = gradRed;
+      ctxW.fillRect(0, 180, 2048, 160);
+      ctxW.fillStyle = "#facc15";
+      ctxW.fillRect(0, 172, 2048, 8);
+      ctxW.fillRect(0, 340, 2048, 8);
+      const crestX = 1024;
+      const crestY = 260;
+      ctxW.save();
+      ctxW.shadowColor = "rgba(0, 0, 0, 0.5)";
+      ctxW.shadowBlur = 8;
+      ctxW.fillStyle = "#1e3a8a";
+      ctxW.beginPath();
+      ctxW.arc(crestX, crestY, 44, 0, Math.PI * 2);
+      ctxW.fill();
+      ctxW.lineWidth = 5;
+      ctxW.strokeStyle = "#facc15";
+      ctxW.stroke();
+      ctxW.strokeStyle = "#fde047";
+      ctxW.lineWidth = 2;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+        ctxW.beginPath();
+        ctxW.moveTo(crestX, crestY);
+        ctxW.lineTo(crestX + Math.cos(a) * 36, crestY + Math.sin(a) * 36);
+        ctxW.stroke();
+      }
+      ctxW.fillStyle = "#fde047";
+      ctxW.beginPath();
+      ctxW.arc(crestX, crestY, 12, 0, Math.PI * 2);
+      ctxW.fill();
+      ctxW.restore();
+      ctxW.save();
+      ctxW.shadowColor = "rgba(0, 0, 0, 0.7)";
+      ctxW.shadowBlur = 6;
+      ctxW.shadowOffsetY = 2;
+      ctxW.fillStyle = "#fef08a";
+      ctxW.font = 'bold 36px "Times New Roman", Georgia, serif';
+      ctxW.textAlign = "right";
+      ctxW.fillText("INDIAN RAILWAYS", 940, 272);
+      ctxW.textAlign = "left";
+      ctxW.fillText("\u092D\u093E\u0930\u0924\u0940\u092F \u0930\u0947\u0932", 1108, 272);
+      ctxW.restore();
+      ctxW.fillStyle = "#0f172a";
+      ctxW.font = 'bold 32px "Courier New", monospace';
+      ctxW.textAlign = "left";
+      ctxW.fillText("WAP-7 #30201", 120, 130);
+      ctxW.font = "bold 20px sans-serif";
+      ctxW.fillStyle = "#475569";
+      ctxW.fillText("NORTHERN RAILWAY \u2022 GZB SHED \u2022 6350 HP", 120, 160);
+      ctxW.textAlign = "right";
+      ctxW.fillStyle = "#0f172a";
+      ctxW.font = 'bold 32px "Courier New", monospace';
+      ctxW.fillText("WAP-7 #30201", 1928, 130);
+      ctxW.font = "bold 20px sans-serif";
+      ctxW.fillStyle = "#475569";
+      ctxW.fillText("NORTHERN RAILWAY \u2022 GZB SHED \u2022 6350 HP", 1928, 160);
+      const louverStart = 560;
+      const louverEnd = 860;
+      const louver2Start = 1188;
+      const louver2End = 1488;
+      [[louverStart, louverEnd], [louver2Start, louver2End]].forEach(([start, end]) => {
+        ctxW.fillStyle = "#0f172a";
+        ctxW.fillRect(start - 8, 70, end - start + 16, 92);
+        for (let x = start; x <= end; x += 22) {
+          ctxW.fillStyle = "#e2e8f0";
+          ctxW.fillRect(x, 72, 4, 88);
+          ctxW.fillStyle = "#94a3b8";
+          ctxW.fillRect(x + 4, 72, 8, 88);
+          ctxW.fillStyle = "#1e293b";
+          ctxW.fillRect(x + 12, 72, 8, 88);
+        }
+        ctxW.strokeStyle = "#475569";
+        ctxW.lineWidth = 4;
+        ctxW.strokeRect(start - 8, 70, end - start + 16, 92);
+      });
+      [240, 1808].forEach((dx) => {
+        ctxW.strokeStyle = "#64748b";
+        ctxW.lineWidth = 4;
+        ctxW.strokeRect(dx - 60, 60, 120, 350);
+        ctxW.fillStyle = "#0f172a";
+        ctxW.fillRect(dx - 36, 90, 72, 80);
+        ctxW.strokeStyle = "#334155";
+        ctxW.lineWidth = 5;
+        ctxW.strokeRect(dx - 36, 90, 72, 80);
+        ctxW.fillStyle = "#1e293b";
+        ctxW.fillRect(dx - 32, 94, 64, 72);
+        ctxW.strokeStyle = "rgba(255, 255, 255, 0.4)";
+        ctxW.lineWidth = 2;
+        ctxW.beginPath();
+        ctxW.moveTo(dx - 28, 160);
+        ctxW.lineTo(dx + 28, 100);
+        ctxW.stroke();
+        ctxW.fillStyle = "#e2e8f0";
+        ctxW.fillRect(dx + 30, 240, 20, 8);
+        ctxW.fillStyle = "#475569";
+        ctxW.beginPath();
+        ctxW.arc(dx + 32, 244, 8, 0, Math.PI * 2);
+        ctxW.fill();
+        ctxW.fillStyle = "#facc15";
+        ctxW.beginPath();
+        ctxW.moveTo(dx, 310);
+        ctxW.lineTo(dx - 18, 336);
+        ctxW.lineTo(dx + 18, 336);
+        ctxW.closePath();
+        ctxW.fill();
+        ctxW.fillStyle = "#000";
+        ctxW.font = "bold 16px sans-serif";
+        ctxW.textAlign = "center";
+        ctxW.fillText("\u26A1", dx, 332);
+      });
+      const gradSkirt = ctxW.createLinearGradient(0, 410, 0, 512);
+      gradSkirt.addColorStop(0, "#334155");
+      gradSkirt.addColorStop(1, "#0f172a");
+      ctxW.fillStyle = gradSkirt;
+      ctxW.fillRect(0, 410, 2048, 102);
+      ctxW.fillStyle = "#1e293b";
+      for (let x = 380; x < 1668; x += 140) {
+        ctxW.fillRect(x, 430, 96, 54);
+        ctxW.strokeStyle = "#475569";
+        ctxW.lineWidth = 2;
+        ctxW.strokeRect(x, 430, 96, 54);
+        ctxW.fillStyle = "#020617";
+        for (let vy = 438; vy <= 476; vy += 8) {
+          ctxW.fillRect(x + 12, vy, 72, 4);
+        }
+        ctxW.fillStyle = "#1e293b";
+      }
+      ctxW.fillStyle = "#facc15";
+      [320, 900, 1148, 1728].forEach((jx) => {
+        ctxW.beginPath();
+        ctxW.moveTo(jx, 416);
+        ctxW.lineTo(jx - 12, 432);
+        ctxW.lineTo(jx + 12, 432);
+        ctxW.closePath();
+        ctxW.fill();
+      });
       const wap7SideTex = new CanvasTexture(canvasW);
       const canvasWF = document.createElement("canvas");
-      canvasWF.width = 512;
-      canvasWF.height = 512;
+      canvasWF.width = 1024;
+      canvasWF.height = 1024;
       const ctxWF = canvasWF.getContext("2d");
-      ctxWF.fillStyle = "#f3f4f6";
-      ctxWF.fillRect(0, 0, 512, 512);
-      ctxWF.fillStyle = "#b91c1c";
-      ctxWF.fillRect(0, 210, 512, 140);
-      ctxWF.fillStyle = "#111";
-      ctxWF.fillRect(160, 290, 192, 45);
-      ctxWF.fillStyle = "#fff";
-      ctxWF.font = "bold 24px monospace";
+      ctxWF.fillStyle = "#f8fafc";
+      ctxWF.fillRect(0, 0, 1024, 1024);
+      const gradFrontRed = ctxWF.createLinearGradient(0, 420, 0, 700);
+      gradFrontRed.addColorStop(0, "#7f1d1d");
+      gradFrontRed.addColorStop(0.1, "#991b1b");
+      gradFrontRed.addColorStop(0.9, "#991b1b");
+      gradFrontRed.addColorStop(1, "#7f1d1d");
+      ctxWF.fillStyle = gradFrontRed;
+      ctxWF.fillRect(0, 420, 1024, 280);
+      ctxWF.fillStyle = "#facc15";
+      ctxWF.fillRect(0, 410, 1024, 10);
+      ctxWF.fillRect(0, 700, 1024, 10);
+      ctxWF.save();
+      ctxWF.shadowColor = "rgba(0,0,0,0.6)";
+      ctxWF.shadowBlur = 12;
+      ctxWF.fillStyle = "#1e3a8a";
+      ctxWF.beginPath();
+      ctxWF.arc(512, 530, 72, 0, Math.PI * 2);
+      ctxWF.fill();
+      ctxWF.lineWidth = 6;
+      ctxWF.strokeStyle = "#facc15";
+      ctxWF.stroke();
+      ctxWF.strokeStyle = "#fde047";
+      ctxWF.lineWidth = 3;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+        ctxWF.beginPath();
+        ctxWF.moveTo(512, 530);
+        ctxWF.lineTo(512 + Math.cos(a) * 58, 530 + Math.sin(a) * 58);
+        ctxWF.stroke();
+      }
+      ctxWF.fillStyle = "#facc15";
+      ctxWF.beginPath();
+      ctxWF.arc(512, 530, 20, 0, Math.PI * 2);
+      ctxWF.fill();
+      ctxWF.restore();
+      ctxWF.fillStyle = "#0f172a";
+      ctxWF.fillRect(352, 626, 320, 60);
+      ctxWF.strokeStyle = "#e2e8f0";
+      ctxWF.lineWidth = 4;
+      ctxWF.strokeRect(352, 626, 320, 60);
+      ctxWF.fillStyle = "#ffffff";
+      ctxWF.font = 'bold 36px "Courier New", monospace';
       ctxWF.textAlign = "center";
-      ctxWF.fillText("30201 WAP7", 256, 322);
+      ctxWF.fillText("30201 WAP7", 512, 668);
+      ctxWF.fillStyle = "#facc15";
+      ctxWF.beginPath();
+      ctxWF.moveTo(512, 730);
+      ctxWF.lineTo(476, 786);
+      ctxWF.lineTo(548, 786);
+      ctxWF.closePath();
+      ctxWF.fill();
+      ctxWF.strokeStyle = "#dc2626";
+      ctxWF.lineWidth = 4;
+      ctxWF.stroke();
+      ctxWF.fillStyle = "#000000";
+      ctxWF.font = "bold 32px sans-serif";
+      ctxWF.textAlign = "center";
+      ctxWF.fillText("\u26A1", 512, 776);
+      ctxWF.fillStyle = "#991b1b";
+      ctxWF.font = "bold 18px sans-serif";
+      ctxWF.fillText("25 kV AC \u2022 DANGER \u2022 \u0938\u093E\u0935\u0927\u093E\u0928", 512, 814);
+      ctxWF.fillStyle = "#1e293b";
+      ctxWF.fillRect(0, 840, 1024, 184);
+      ctxWF.fillStyle = "#facc15";
+      for (let hx = -200; hx < 1200; hx += 80) {
+        ctxWF.beginPath();
+        ctxWF.moveTo(hx, 840);
+        ctxWF.lineTo(hx + 40, 840);
+        ctxWF.lineTo(hx - 20, 1024);
+        ctxWF.lineTo(hx - 60, 1024);
+        ctxWF.closePath();
+        ctxWF.fill();
+      }
       const wap7FrontTex = new CanvasTexture(canvasWF);
       const canvasD = document.createElement("canvas");
       canvasD.width = 512;
@@ -35604,23 +36127,60 @@ void main() {
       }
       const dieselFrontTex = new CanvasTexture(canvasD);
       const canvasL = document.createElement("canvas");
-      canvasL.width = 1024;
-      canvasL.height = 256;
+      canvasL.width = 2048;
+      canvasL.height = 512;
       const ctxL = canvasL.getContext("2d");
-      ctxL.fillStyle = "#d1d5db";
-      ctxL.fillRect(0, 0, 1024, 256);
-      ctxL.fillStyle = "#b91c1c";
-      ctxL.fillRect(0, 75, 1024, 110);
-      ctxL.fillStyle = "#ffffff";
-      ctxL.fillRect(0, 72, 1024, 3);
-      ctxL.fillRect(0, 185, 1024, 3);
-      ctxL.fillStyle = "#0f172a";
-      for (let i = 0; i < 11; i++) {
-        const wx = 70 + i * 82;
-        ctxL.fillRect(wx, 92, 60, 75);
+      ctxL.fillStyle = "#e2e8f0";
+      ctxL.fillRect(0, 0, 2048, 512);
+      ctxL.fillStyle = "rgba(100, 116, 139, 0.12)";
+      for (let y = 0; y < 150; y += 8) {
+        ctxL.fillRect(0, y, 2048, 3);
       }
-      ctxL.fillStyle = "#374151";
-      ctxL.fillRect(0, 215, 1024, 41);
+      const gradLhbRed = ctxL.createLinearGradient(0, 150, 0, 370);
+      gradLhbRed.addColorStop(0, "#7f1d1d");
+      gradLhbRed.addColorStop(0.1, "#991b1b");
+      gradLhbRed.addColorStop(0.9, "#991b1b");
+      gradLhbRed.addColorStop(1, "#7f1d1d");
+      ctxL.fillStyle = gradLhbRed;
+      ctxL.fillRect(0, 150, 2048, 220);
+      ctxL.fillStyle = "#ffffff";
+      ctxL.fillRect(0, 144, 2048, 6);
+      ctxL.fillRect(0, 370, 2048, 6);
+      for (let i = 0; i < 12; i++) {
+        const wx = 120 + i * 152;
+        ctxL.fillStyle = "#0f172a";
+        ctxL.fillRect(wx - 4, 180, 116, 148);
+        ctxL.fillStyle = "#1e293b";
+        ctxL.fillRect(wx, 184, 108, 140);
+        ctxL.fillStyle = "rgba(254, 240, 138, 0.20)";
+        ctxL.fillRect(wx + 8, 184, 92, 140);
+        ctxL.fillStyle = "rgba(203, 213, 225, 0.45)";
+        ctxL.fillRect(wx, 184, 22, 140);
+        ctxL.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        ctxL.lineWidth = 3;
+        ctxL.beginPath();
+        ctxL.moveTo(wx + 10, 314);
+        ctxL.lineTo(wx + 90, 194);
+        ctxL.stroke();
+      }
+      ctxL.fillStyle = "#fef08a";
+      ctxL.font = "bold 22px sans-serif";
+      ctxL.textAlign = "left";
+      ctxL.fillText("RAJDHANI EXPRESS \u2022 12301", 120, 135);
+      ctxL.textAlign = "right";
+      ctxL.fillText("AC 3-TIER \u2022 B-4 \u2022 08123/C", 1928, 135);
+      const gradLhbSkirt = ctxL.createLinearGradient(0, 420, 0, 512);
+      gradLhbSkirt.addColorStop(0, "#334155");
+      gradLhbSkirt.addColorStop(1, "#0f172a");
+      ctxL.fillStyle = gradLhbSkirt;
+      ctxL.fillRect(0, 420, 2048, 92);
+      ctxL.fillStyle = "#1e293b";
+      for (let x = 240; x < 1848; x += 220) {
+        ctxL.fillRect(x, 436, 130, 46);
+        ctxL.strokeStyle = "#475569";
+        ctxL.lineWidth = 2;
+        ctxL.strokeRect(x, 436, 130, 46);
+      }
       const lhbSideTex = new CanvasTexture(canvasL);
       const canvasI = document.createElement("canvas");
       canvasI.width = 1024;
@@ -35683,80 +36243,251 @@ void main() {
       }
     }
     // ---------------------------------------------------------
-    // WAP-7 High-Speed Electric Locomotive (Image 1)
+    // WAP-7 High-Speed Electric Locomotive (High-Fidelity Model)
     // ---------------------------------------------------------
     buildWAP7Locomotive(group) {
       const length = this.locoLength;
       const width = 3.15;
-      const height = 3.2;
+      const height = 2.7;
+      const centerLen = 15.5;
+      const cabLen = (length - centerLen) / 2;
       const materials = {
-        side: new MeshStandardMaterial({ map: this.textures.wap7SideTex, roughness: 0.35, metalness: 0.2 }),
-        front: new MeshStandardMaterial({ map: this.textures.wap7FrontTex, roughness: 0.35, metalness: 0.2 }),
-        roof: new MeshStandardMaterial({ color: 10265519, roughness: 0.4, metalness: 0.6 }),
-        darkSteel: new MeshStandardMaterial({ color: 2040877, roughness: 0.6, metalness: 0.7 }),
-        glass: new MeshPhysicalMaterial({ color: 1121838, transmission: 0.5, roughness: 0.1 }),
-        cowcatcher: new MeshStandardMaterial({ color: 14427686, roughness: 0.4, metalness: 0.2 }),
-        copper: new MeshStandardMaterial({ color: 14251782, roughness: 0.3, metalness: 0.8 }),
-        insulator: new MeshStandardMaterial({ color: 7877903, roughness: 0.3 })
+        side: new MeshStandardMaterial({ map: this.textures.wap7SideTex, roughness: 0.28, metalness: 0.35 }),
+        front: new MeshStandardMaterial({ map: this.textures.wap7FrontTex, roughness: 0.28, metalness: 0.35 }),
+        roof: new MeshStandardMaterial({ color: 9741240, roughness: 0.38, metalness: 0.55 }),
+        darkSteel: new MeshStandardMaterial({ color: 1976635, roughness: 0.5, metalness: 0.8 }),
+        chrome: new MeshStandardMaterial({ color: 16317180, roughness: 0.1, metalness: 0.95 }),
+        glass: new MeshPhysicalMaterial({ color: 988970, roughness: 0.05, metalness: 0.1, transmission: 0.7, thickness: 0.2 }),
+        cowcatcher: new MeshStandardMaterial({ color: 10033947, roughness: 0.4, metalness: 0.3 }),
+        hazard: new MeshStandardMaterial({ color: 16436245, roughness: 0.4, metalness: 0.2 }),
+        brass: new MeshStandardMaterial({ color: 14251782, roughness: 0.2, metalness: 0.9 }),
+        copper: new MeshStandardMaterial({ color: 11817737, roughness: 0.25, metalness: 0.85 }),
+        insulator: new MeshStandardMaterial({ color: 7877903, roughness: 0.25, metalness: 0.1 }),
+        rubber: new MeshStandardMaterial({ color: 988970, roughness: 0.9 })
       };
       const cubeMats = [
         materials.side,
-        // +X (Right)
+        // +X (Right side livery)
         materials.side,
-        // -X (Left)
+        // -X (Left side livery)
         materials.roof,
         // +Y (Roof)
         materials.darkSteel,
-        // -Y (Under)
+        // -Y (Underframe)
         materials.front,
-        // +Z (Front Nose)
+        // +Z (Internal bulkhead)
         materials.front
-        // -Z (Rear Nose)
+        // -Z (Internal bulkhead)
       ];
-      const bodyMesh = new Mesh(new BoxGeometry(width, height, length), cubeMats);
-      bodyMesh.position.y = 2;
-      bodyMesh.castShadow = true;
-      bodyMesh.receiveShadow = true;
-      group.add(bodyMesh);
-      const roofCurve = new CylinderGeometry(width / 2, width / 2, length, 16, 1, false, 0, Math.PI);
+      const bodyCenter = new Mesh(new BoxGeometry(width, height, centerLen), cubeMats);
+      bodyCenter.position.set(0, 2.05, 0);
+      bodyCenter.castShadow = true;
+      bodyCenter.receiveShadow = true;
+      group.add(bodyCenter);
+      const roofCurve = new CylinderGeometry(width / 2, width / 2, centerLen, 24, 1, false, 0, Math.PI);
       roofCurve.rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
-      const roofMesh = new Mesh(roofCurve, materials.roof);
-      roofMesh.position.y = 3.6;
-      roofMesh.scale.set(1, 0.35, 1);
-      group.add(roofMesh);
-      [-0.65, 0.65].forEach((x) => {
-        const win = new Mesh(new PlaneGeometry(0.95, 0.75), materials.glass);
-        win.position.set(x, 2.55, length / 2 + 0.02);
-        group.add(win);
+      const roofCenterMesh = new Mesh(roofCurve, materials.roof);
+      roofCenterMesh.position.set(0, 3.4, 0);
+      roofCenterMesh.scale.set(1, 0.38, 1);
+      group.add(roofCenterMesh);
+      [-3.8, -1.2, 1.2, 3.8].forEach((rz) => {
+        const hood = new Mesh(new BoxGeometry(1.6, 0.22, 1.8), materials.darkSteel);
+        hood.position.set(0, 3.65, rz);
+        hood.castShadow = true;
+        group.add(hood);
+        const ventMesh = new Mesh(new BoxGeometry(1.4, 0.04, 1.5), materials.darkSteel);
+        ventMesh.position.set(0, 3.77, rz);
+        group.add(ventMesh);
       });
-      const hlBox = new Mesh(new BoxGeometry(0.65, 0.28, 0.2), materials.darkSteel);
-      hlBox.position.set(0, 3.25, length / 2 + 0.05);
-      group.add(hlBox);
-      const lampGeo = new CylinderGeometry(0.1, 0.1, 0.08, 16).rotateX(Math.PI / 2);
-      [-0.16, 0.16].forEach((x) => {
-        const lamp = new Mesh(lampGeo, new MeshBasicMaterial({ color: 16777215 }));
-        lamp.position.set(x, 3.25, length / 2 + 0.16);
-        group.add(lamp);
+      [1, -1].forEach((dir) => {
+        const isFront = dir > 0;
+        const cabGroup = new Group();
+        cabGroup.position.set(0, 0, dir * (centerLen / 2));
+        cabGroup.scale.set(1, 1, dir);
+        const cabBody = new Mesh(new BoxGeometry(width, height, cabLen), [
+          materials.side,
+          materials.side,
+          materials.roof,
+          materials.darkSteel,
+          materials.front,
+          materials.darkSteel
+        ]);
+        cabBody.position.set(0, 2.05, cabLen / 2);
+        cabBody.castShadow = true;
+        cabGroup.add(cabBody);
+        const cabRoof = new Mesh(
+          new CylinderGeometry(width / 2, width / 2 * 0.94, cabLen, 20, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2),
+          materials.roof
+        );
+        cabRoof.position.set(0, 3.4, cabLen / 2);
+        cabRoof.scale.set(1, 0.38, 1);
+        cabGroup.add(cabRoof);
+        const noseWedge = new Mesh(
+          new ConeGeometry(width / 2, 0.9, 4).rotateY(Math.PI / 4).scale(1, 1, 0.5),
+          materials.front
+        );
+        noseWedge.position.set(0, 2.5, cabLen + 0.12);
+        cabGroup.add(noseWedge);
+        [-0.68, 0.68].forEach((wx) => {
+          const frame = new Mesh(new BoxGeometry(1.08, 0.82, 0.06), materials.rubber);
+          frame.position.set(wx, 2.58, cabLen + 0.02);
+          frame.rotation.x = -0.14;
+          cabGroup.add(frame);
+          const glassPane = new Mesh(new PlaneGeometry(0.96, 0.7), materials.glass);
+          glassPane.position.set(wx, 2.58, cabLen + 0.05);
+          glassPane.rotation.x = -0.14;
+          cabGroup.add(glassPane);
+          const visor = new Mesh(new BoxGeometry(1.08, 0.06, 0.18), materials.darkSteel);
+          visor.position.set(wx, 3.02, cabLen + 0.1);
+          cabGroup.add(visor);
+          const wiperPivot = new Group();
+          wiperPivot.position.set(wx, 2.22, cabLen + 0.06);
+          const wiperArm = new Mesh(new CylinderGeometry(0.012, 0.012, 0.45), materials.darkSteel);
+          wiperArm.position.set(0.08, 0.22, 0);
+          wiperArm.rotation.z = -0.35;
+          wiperPivot.add(wiperArm);
+          const wiperBlade = new Mesh(new BoxGeometry(0.02, 0.44, 0.015), materials.rubber);
+          wiperBlade.position.set(0.16, 0.24, 0.02);
+          wiperBlade.rotation.z = -0.35;
+          wiperPivot.add(wiperBlade);
+          cabGroup.add(wiperPivot);
+        });
+        const hlNacelle = new Mesh(new BoxGeometry(0.72, 0.32, 0.28), materials.darkSteel);
+        hlNacelle.position.set(0, 3.28, cabLen + 0.12);
+        hlNacelle.castShadow = true;
+        cabGroup.add(hlNacelle);
+        [-0.18, 0.18].forEach((hx) => {
+          const bezel = new Mesh(new CylinderGeometry(0.12, 0.12, 0.06, 20).rotateX(Math.PI / 2), materials.chrome);
+          bezel.position.set(hx, 3.28, cabLen + 0.26);
+          cabGroup.add(bezel);
+          const bulb = new Mesh(new SphereGeometry(0.085, 16, 12), new MeshBasicMaterial({ color: 16777215 }));
+          bulb.position.set(hx, 3.28, cabLen + 0.28);
+          cabGroup.add(bulb);
+        });
+        const flasher = new Mesh(new CylinderGeometry(0.05, 0.05, 0.04, 14).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 16096779 }));
+        flasher.position.set(0, 3.48, cabLen + 0.22);
+        cabGroup.add(flasher);
+        [-1.15, 1.15].forEach((mx) => {
+          const markerBezel = new Mesh(new CylinderGeometry(0.06, 0.06, 0.04, 14).rotateX(Math.PI / 2), materials.darkSteel);
+          markerBezel.position.set(mx, 1.25, cabLen + 0.05);
+          cabGroup.add(markerBezel);
+          const markerLens = new Mesh(new SphereGeometry(0.045, 10, 8), new MeshBasicMaterial({ color: isFront ? 16777215 : 15680580 }));
+          markerLens.position.set(mx, 1.25, cabLen + 0.07);
+          cabGroup.add(markerLens);
+        });
+        const hornGroup = new Group();
+        hornGroup.position.set(0, 3.72, cabLen - 0.4);
+        [-0.14, 0.14].forEach((hx) => {
+          const hornStem = new Mesh(new CylinderGeometry(0.02, 0.03, 0.38).rotateX(Math.PI / 2), materials.brass);
+          hornStem.position.set(hx, 0, 0.18);
+          hornGroup.add(hornStem);
+          const hornBell = new Mesh(new ConeGeometry(0.08, 0.16, 16).rotateX(Math.PI / 2), materials.brass);
+          hornBell.position.set(hx, 0, 0.38);
+          hornGroup.add(hornBell);
+        });
+        cabGroup.add(hornGroup);
+        const bufferBeam = new Mesh(new BoxGeometry(3.18, 0.44, 0.36), materials.darkSteel);
+        bufferBeam.position.set(0, 0.95, cabLen + 0.18);
+        bufferBeam.castShadow = true;
+        cabGroup.add(bufferBeam);
+        [-0.95, 0.95].forEach((bx) => {
+          const plunger = new Mesh(new CylinderGeometry(0.12, 0.12, 0.34, 16).rotateX(Math.PI / 2), materials.darkSteel);
+          plunger.position.set(bx, 0.95, cabLen + 0.48);
+          cabGroup.add(plunger);
+          const head = new Mesh(new CylinderGeometry(0.24, 0.24, 0.06, 20).rotateX(Math.PI / 2), materials.darkSteel);
+          head.position.set(bx, 0.95, cabLen + 0.66);
+          cabGroup.add(head);
+        });
+        const couplerStem = new Mesh(new BoxGeometry(0.24, 0.24, 0.65), materials.darkSteel);
+        couplerStem.position.set(0, 0.88, cabLen + 0.48);
+        cabGroup.add(couplerStem);
+        const couplerKnuckle = new Mesh(new BoxGeometry(0.28, 0.28, 0.22), materials.darkSteel);
+        couplerKnuckle.position.set(0.04, 0.88, cabLen + 0.8);
+        cabGroup.add(couplerKnuckle);
+        [-0.32, 0.32].forEach((hx, hidx) => {
+          const hoseColor = hidx === 0 ? 14427686 : 1483594;
+          const hosePts = [
+            new Vector3(hx, 0.95, cabLen + 0.35),
+            new Vector3(hx * 1.1, 0.65, cabLen + 0.5),
+            new Vector3(hx * 0.7, 0.45, cabLen + 0.45)
+          ];
+          const hoseCurve = new CatmullRomCurve3(hosePts);
+          const hoseMesh = new Mesh(
+            new TubeGeometry(hoseCurve, 12, 0.024, 8, false),
+            new MeshStandardMaterial({ color: hoseColor, roughness: 0.6 })
+          );
+          cabGroup.add(hoseMesh);
+        });
+        const plow = new Mesh(
+          new ConeGeometry(1.55, 0.68, 4).rotateY(Math.PI / 4).scale(1.15, 0.65, 0.85),
+          materials.cowcatcher
+        );
+        plow.position.set(0, 0.48, cabLen + 0.38);
+        plow.castShadow = true;
+        cabGroup.add(plow);
+        [-0.12, 0, 0.12].forEach((sy) => {
+          const slat = new Mesh(new BoxGeometry(2.3, 0.04, 0.12), materials.darkSteel);
+          slat.position.set(0, 0.48 + sy, cabLen + 0.52 - Math.abs(sy) * 0.2);
+          cabGroup.add(slat);
+        });
+        group.add(cabGroup);
       });
-      this.headlightBeam = new SpotLight(16775917, 8, 160, Math.PI / 7, 0.4, 1.2);
-      this.headlightBeam.position.set(0, 3.25, length / 2 + 0.5);
-      this.headlightBeam.target.position.set(0, 0, length / 2 + 80);
+      this.headlightBeam = new SpotLight(16775917, 8.5, 175, Math.PI / 6.5, 0.35, 1.2);
+      this.headlightBeam.position.set(0, 3.28, length / 2 + 0.4);
+      this.headlightBeam.target.position.set(0, 0.5, length / 2 + 85);
       this.headlightBeam.castShadow = true;
       group.add(this.headlightBeam);
       group.add(this.headlightBeam.target);
-      const plow = new Mesh(
-        new ConeGeometry(1.5, 0.65, 4).rotateY(Math.PI / 4).scale(1.1, 0.6, 0.8),
-        materials.cowcatcher
-      );
-      plow.position.set(0, 0.48, length / 2 + 0.3);
-      group.add(plow);
-      [-0.95, 0.95].forEach((x) => {
-        const buffer = new Mesh(new CylinderGeometry(0.22, 0.22, 0.08, 16).rotateX(Math.PI / 2), materials.darkSteel);
-        buffer.position.set(x, 0.95, length / 2 + 0.45);
-        group.add(buffer);
+      const underframeGroup = new Group();
+      underframeGroup.position.set(0, 0.72, 0);
+      const transformerBox = new Mesh(new BoxGeometry(2.7, 0.95, 4.2), materials.darkSteel);
+      transformerBox.castShadow = true;
+      underframeGroup.add(transformerBox);
+      for (let fz = -1.8; fz <= 1.8; fz += 0.4) {
+        [-1.38, 1.38].forEach((fx) => {
+          const finTube = new Mesh(new CylinderGeometry(0.04, 0.04, 0.85, 8), materials.darkSteel);
+          finTube.position.set(fx, 0, fz);
+          underframeGroup.add(finTube);
+        });
+      }
+      [-1.05, 1.05].forEach((tx) => {
+        const tank = new Mesh(
+          new CylinderGeometry(0.24, 0.24, 3.8, 18).rotateX(Math.PI / 2),
+          new MeshStandardMaterial({ color: 3359061, roughness: 0.4, metalness: 0.6 })
+        );
+        tank.position.set(tx, -0.15, 0);
+        tank.castShadow = true;
+        underframeGroup.add(tank);
+        [-1.5, 0, 1.5].forEach((tz) => {
+          const tBracket = new Mesh(new BoxGeometry(0.06, 0.4, 0.1), materials.darkSteel);
+          tBracket.position.set(tx, 0.08, tz);
+          underframeGroup.add(tBracket);
+        });
       });
+      group.add(underframeGroup);
       this.buildPantograph(group, materials, -length * 0.32, true);
       this.buildPantograph(group, materials, length * 0.32, false);
+      const busbarPts = [
+        new Vector3(0.35, 3.82, -length * 0.32),
+        new Vector3(0.35, 3.85, 0),
+        new Vector3(0.35, 3.82, length * 0.32)
+      ];
+      const busbarGeo = new TubeGeometry(new CatmullRomCurve3(busbarPts), 24, 0.022, 8, false);
+      const busbarMesh = new Mesh(busbarGeo, materials.copper);
+      group.add(busbarMesh);
+      [-4.5, -2, 0, 2, 4.5].forEach((iz) => {
+        const insGroup = new Group();
+        insGroup.position.set(0.35, 3.65, iz);
+        for (let s = 0; s < 3; s++) {
+          const shed = new Mesh(new CylinderGeometry(0.08, 0.12, 0.06, 12), materials.insulator);
+          shed.position.y = s * 0.06;
+          insGroup.add(shed);
+        }
+        group.add(insGroup);
+      });
+      const vcb = new Mesh(new BoxGeometry(0.48, 0.35, 0.72), materials.darkSteel);
+      vcb.position.set(-0.45, 3.75, 0.8);
+      group.add(vcb);
       this.buildCoCoBogie(group, length * 0.28);
       this.buildCoCoBogie(group, -length * 0.28);
       this.captureNet = new ObstacleCaptureNet(group, length, this.captureNetDeployed);
@@ -35799,32 +36530,59 @@ void main() {
       parent.add(panto);
     }
     // ---------------------------------------------------------
-    // Co-Co 3-Axle Broad Gauge Bogie (Exact rail alignment)
+    // Co-Co 3-Axle Broad Gauge Bogie (High-Fidelity Cast Steel)
     // ---------------------------------------------------------
     buildCoCoBogie(parent, zCenter) {
       const bogie = new Group();
       bogie.position.set(0, 0, zCenter);
-      const darkSteel = new MeshStandardMaterial({ color: 2040877, roughness: 0.6, metalness: 0.8 });
-      const wheelSteel = new MeshStandardMaterial({ color: 7041664, roughness: 0.2, metalness: 0.9 });
-      [-1.15, 1.15].forEach((x) => {
-        const beam = new Mesh(new BoxGeometry(0.18, 0.32, 4.4), darkSteel);
-        beam.position.set(x, 0.65, 0);
+      const darkSteel = new MeshStandardMaterial({ color: 1976635, roughness: 0.5, metalness: 0.8 });
+      const castSteel = new MeshStandardMaterial({ color: 3359061, roughness: 0.6, metalness: 0.7 });
+      const wheelSteel = new MeshStandardMaterial({ color: 14870768, roughness: 0.15, metalness: 0.95 });
+      const springMat = new MeshStandardMaterial({ color: 4674921, roughness: 0.4, metalness: 0.8 });
+      [-1.18, 1.18].forEach((x) => {
+        const beam = new Mesh(new BoxGeometry(0.18, 0.38, 4.6), castSteel);
+        beam.position.set(x, 0.68, 0);
+        beam.castShadow = true;
         bogie.add(beam);
+        [0, -1.6, 1.6].forEach((cz) => {
+          const trans = new Mesh(new BoxGeometry(0.24, 0.28, 0.35), darkSteel);
+          trans.position.set(x * 0.85, 0.68, cz);
+          bogie.add(trans);
+        });
       });
       const axleSpacing = [-1.6, 0, 1.6];
-      const railX = this.wheelRadius > 0 ? 0.838 : 0.838;
+      const railX = 0.838;
       axleSpacing.forEach((z) => {
         const axleGroup = new Group();
         axleGroup.position.set(0, this.wheelRadius, z);
-        const shaft = new Mesh(new CylinderGeometry(0.08, 0.08, 1.9).rotateZ(Math.PI / 2), darkSteel);
+        const shaft = new Mesh(new CylinderGeometry(0.085, 0.085, 1.95, 16).rotateZ(Math.PI / 2), darkSteel);
+        shaft.castShadow = true;
         axleGroup.add(shaft);
         [-railX, railX].forEach((x) => {
-          const wheel = new Mesh(new CylinderGeometry(this.wheelRadius, this.wheelRadius, 0.12, 20).rotateZ(Math.PI / 2), wheelSteel);
+          const wheel = new Mesh(new CylinderGeometry(this.wheelRadius, this.wheelRadius, 0.13, 24).rotateZ(Math.PI / 2), wheelSteel);
           wheel.position.x = x;
-          const flange = new Mesh(new CylinderGeometry(this.wheelRadius + 0.04, this.wheelRadius + 0.04, 0.03, 20).rotateZ(Math.PI / 2), wheelSteel);
-          flange.position.x = x + (x > 0 ? -0.07 : 0.07);
+          wheel.castShadow = true;
+          const hub = new Mesh(new CylinderGeometry(this.wheelRadius * 0.72, this.wheelRadius * 0.72, 0.135, 18).rotateZ(Math.PI / 2), castSteel);
+          wheel.add(hub);
+          const flange = new Mesh(new CylinderGeometry(this.wheelRadius + 0.038, this.wheelRadius + 0.038, 0.032, 24).rotateZ(Math.PI / 2), wheelSteel);
+          flange.position.x = x > 0 ? -0.075 : 0.075;
           wheel.add(flange);
           axleGroup.add(wheel);
+          const jbX = x > 0 ? 1.18 : -1.18;
+          const jBox = new Mesh(new BoxGeometry(0.22, 0.24, 0.26), darkSteel);
+          jBox.position.set(jbX, this.wheelRadius, z);
+          bogie.add(jBox);
+          const endCap = new Mesh(new CylinderGeometry(0.065, 0.065, 0.05, 12).rotateZ(Math.PI / 2), wheelSteel);
+          endCap.position.set(jbX + (x > 0 ? 0.12 : -0.12), this.wheelRadius, z);
+          bogie.add(endCap);
+          [-0.1, 0.1].forEach((sz) => {
+            const spring = new Mesh(new CylinderGeometry(0.045, 0.045, 0.26, 10), springMat);
+            spring.position.set(jbX, this.wheelRadius + 0.24, z + sz);
+            bogie.add(spring);
+          });
+          const brakeBlock = new Mesh(new BoxGeometry(0.08, 0.16, 0.08), darkSteel);
+          brakeBlock.position.set(x, this.wheelRadius, z + 0.38);
+          bogie.add(brakeBlock);
         });
         bogie.add(axleGroup);
         this.rotatingWheels.push(axleGroup);
@@ -35979,22 +36737,26 @@ void main() {
       this.buildTrain();
     }
     // ---------------------------------------------------------
-    // Update Wheel Rotations & Dynamic Effects
+    // Update Wheel Rotations, Sensor LEDs & Dynamic Effects
     // ---------------------------------------------------------
-    update(dt, speedMs) {
+    update(dt, speedMs, isTargetDetected = false) {
       const wheelAngularSpeed = speedMs / this.wheelRadius;
       const deltaAngle = wheelAngularSpeed * dt;
       this.rotatingWheels.forEach((w) => {
         w.rotation.x += deltaAngle;
       });
+      if (this.captureNet) {
+        this.captureNet.update(dt, isTargetDetected);
+      }
     }
     // ---------------------------------------------------------
     // Toggle Front Capture Net Deployment (Controlled via js/captureNet.js)
     // ---------------------------------------------------------
-    toggleCaptureNet() {
-      this.captureNetDeployed = !this.captureNetDeployed;
+    toggleCaptureNet(audio = null) {
       if (this.captureNet) {
-        this.captureNet.setDeployed(this.captureNetDeployed);
+        this.captureNetDeployed = this.captureNet.toggle(audio);
+      } else {
+        this.captureNetDeployed = !this.captureNetDeployed;
       }
       return this.captureNetDeployed;
     }
@@ -36483,6 +37245,337 @@ void main() {
     }
   };
 
+  // js/obstacles.js
+  var ObstacleManager = class {
+    constructor(scene, track) {
+      this.scene = scene;
+      this.track = track;
+      this.obstacles = [];
+      this.nextId = 1;
+      this.telemetry = {
+        targetDetected: false,
+        type: null,
+        name: "NONE (TRACK CLEAR)",
+        distance: null,
+        mass: null,
+        canCollect: false,
+        action: "STANDBY",
+        alertMessage: null,
+        alertType: "info",
+        // 'info' | 'deploy' | 'hazard' | 'success'
+        collectedCount: 0,
+        collectedWeight: 0
+      };
+      this.materials = {
+        humanSkin: new MeshStandardMaterial({ color: 13470820, roughness: 0.8 }),
+        humanVest: new MeshStandardMaterial({ color: 16737792, roughness: 0.4 }),
+        // High-vis fluorescent orange
+        humanReflective: new MeshStandardMaterial({ color: 15857145, roughness: 0.2, metalness: 0.6 }),
+        // Silver reflective stripes
+        humanPants: new MeshStandardMaterial({ color: 1981023, roughness: 0.7 }),
+        // Navy blue work trousers
+        humanBoots: new MeshStandardMaterial({ color: 1841431, roughness: 0.9 }),
+        // Black work boots
+        helmetYellow: new MeshStandardMaterial({ color: 16436245, roughness: 0.3, metalness: 0.2 }),
+        // Yellow hard hat
+        animalFur: new MeshStandardMaterial({ color: 10576391, roughness: 0.9 }),
+        // Golden brown fur
+        animalHoof: new MeshStandardMaterial({ color: 2696484, roughness: 0.8 }),
+        cattleBody: new MeshStandardMaterial({ color: 2565930, roughness: 0.85 }),
+        // Dark grey bull hide
+        cattleHorn: new MeshStandardMaterial({ color: 14870768, roughness: 0.4 }),
+        // Pale ivory horns
+        woodCrate: new MeshStandardMaterial({ color: 8736014, roughness: 0.85 }),
+        // Weathered pine wood
+        metalBand: new MeshStandardMaterial({ color: 4674921, roughness: 0.3, metalness: 0.7 })
+      };
+      this.initDefaultObstacles();
+    }
+    // ------------------------------------------------------------------
+    // 3D Model Builders for Human, Animal, Heavy Cattle, Debris
+    // ------------------------------------------------------------------
+    // 1. Human Track Worker / Pedestrian (Mass: 72 kg <= 150 kg -> SCOOPABLE)
+    buildHumanMesh() {
+      const group = new Group();
+      const torso = new Mesh(new BoxGeometry(0.44, 0.62, 0.26), this.materials.humanVest);
+      torso.position.y = 1.05;
+      torso.castShadow = true;
+      group.add(torso);
+      const stripe1 = new Mesh(new BoxGeometry(0.45, 0.06, 0.27), this.materials.humanReflective);
+      stripe1.position.y = 1.15;
+      group.add(stripe1);
+      const stripe2 = new Mesh(new BoxGeometry(0.45, 0.06, 0.27), this.materials.humanReflective);
+      stripe2.position.y = 0.92;
+      group.add(stripe2);
+      const head = new Mesh(new SphereGeometry(0.12, 12, 10), this.materials.humanSkin);
+      head.position.y = 1.48;
+      head.castShadow = true;
+      group.add(head);
+      const helmet = new Mesh(
+        new CylinderGeometry(0.17, 0.17, 0.11, 14),
+        this.materials.helmetYellow
+      );
+      helmet.position.y = 1.56;
+      helmet.castShadow = true;
+      group.add(helmet);
+      [-0.28, 0.28].forEach((x) => {
+        const arm = new Mesh(new CylinderGeometry(0.065, 0.065, 0.55, 8), this.materials.humanVest);
+        arm.position.set(x, 1.02, 0);
+        arm.castShadow = true;
+        group.add(arm);
+        const hand = new Mesh(new SphereGeometry(0.05, 8, 8), this.materials.humanSkin);
+        hand.position.set(x, 0.7, 0);
+        group.add(hand);
+      });
+      [-0.13, 0.13].forEach((x) => {
+        const leg = new Mesh(new CylinderGeometry(0.08, 0.08, 0.72, 8), this.materials.humanPants);
+        leg.position.set(x, 0.45, 0);
+        leg.castShadow = true;
+        group.add(leg);
+        const boot = new Mesh(new BoxGeometry(0.12, 0.1, 0.22), this.materials.humanBoots);
+        boot.position.set(x, 0.05, 0.04);
+        boot.castShadow = true;
+        group.add(boot);
+      });
+      return group;
+    }
+    // 2. Wildlife / Stray Animal (Deer / Stray Calf - Mass: 55 kg <= 150 kg -> SCOOPABLE)
+    buildAnimalMesh() {
+      const group = new Group();
+      const body = new Mesh(new BoxGeometry(0.45, 0.48, 0.95), this.materials.animalFur);
+      body.position.y = 0.65;
+      body.castShadow = true;
+      group.add(body);
+      const neck = new Mesh(new CylinderGeometry(0.12, 0.16, 0.38, 8), this.materials.animalFur);
+      neck.position.set(0, 0.95, 0.38);
+      neck.rotation.x = -0.4;
+      neck.castShadow = true;
+      group.add(neck);
+      const head = new Mesh(new BoxGeometry(0.24, 0.22, 0.35), this.materials.animalFur);
+      head.position.set(0, 1.12, 0.52);
+      head.castShadow = true;
+      group.add(head);
+      [-0.1, 0.1].forEach((x) => {
+        const ear = new Mesh(new ConeGeometry(0.04, 0.15, 6), this.materials.animalFur);
+        ear.position.set(x, 1.25, 0.48);
+        ear.rotation.z = x > 0 ? -0.3 : 0.3;
+        group.add(ear);
+      });
+      [-0.16, 0.16].forEach((x) => {
+        [-0.32, 0.32].forEach((z) => {
+          const leg = new Mesh(new CylinderGeometry(0.045, 0.035, 0.55, 8), this.materials.animalFur);
+          leg.position.set(x, 0.28, z);
+          leg.castShadow = true;
+          group.add(leg);
+          const hoof = new Mesh(new CylinderGeometry(0.04, 0.04, 0.06, 8), this.materials.animalHoof);
+          hoof.position.set(x, 0.03, z);
+          group.add(hoof);
+        });
+      });
+      return group;
+    }
+    // 3. Heavy Cattle / Stray Bull (Mass: 480 kg > 150 kg -> OVERWEIGHT HAZARD)
+    buildHeavyCattleMesh() {
+      const group = new Group();
+      const body = new Mesh(new BoxGeometry(0.95, 0.9, 1.75), this.materials.cattleBody);
+      body.position.y = 0.95;
+      body.castShadow = true;
+      group.add(body);
+      const neck = new Mesh(new BoxGeometry(0.55, 0.65, 0.6), this.materials.cattleBody);
+      neck.position.set(0, 1.15, 0.85);
+      neck.rotation.x = -0.25;
+      neck.castShadow = true;
+      group.add(neck);
+      const head = new Mesh(new BoxGeometry(0.48, 0.45, 0.55), this.materials.cattleBody);
+      head.position.set(0, 1.25, 1.15);
+      head.castShadow = true;
+      group.add(head);
+      [-0.28, 0.28].forEach((x) => {
+        const horn = new Mesh(new ConeGeometry(0.06, 0.42, 8), this.materials.cattleHorn);
+        horn.position.set(x, 1.55, 1.12);
+        horn.rotation.z = x > 0 ? -0.65 : 0.65;
+        horn.rotation.x = 0.2;
+        group.add(horn);
+      });
+      [-0.32, 0.32].forEach((x) => {
+        [-0.6, 0.6].forEach((z) => {
+          const leg = new Mesh(new CylinderGeometry(0.09, 0.08, 0.75, 10), this.materials.cattleBody);
+          leg.position.set(x, 0.38, z);
+          leg.castShadow = true;
+          group.add(leg);
+          const hoof = new Mesh(new CylinderGeometry(0.095, 0.095, 0.08, 8), this.materials.animalHoof);
+          hoof.position.set(x, 0.04, z);
+          group.add(hoof);
+        });
+      });
+      return group;
+    }
+    // 4. Wooden Cargo Crate / Track Debris (Mass: 40 kg <= 150 kg -> SCOOPABLE)
+    buildDebrisMesh() {
+      const group = new Group();
+      const crate = new Mesh(new BoxGeometry(0.75, 0.65, 0.75), this.materials.woodCrate);
+      crate.position.y = 0.325;
+      crate.castShadow = true;
+      group.add(crate);
+      const band1 = new Mesh(new BoxGeometry(0.77, 0.08, 0.77), this.materials.metalBand);
+      band1.position.y = 0.52;
+      group.add(band1);
+      const band2 = new Mesh(new BoxGeometry(0.77, 0.08, 0.77), this.materials.metalBand);
+      band2.position.y = 0.15;
+      group.add(band2);
+      return group;
+    }
+    // ------------------------------------------------------------------
+    // Spawn and Positioning Logic
+    // ------------------------------------------------------------------
+    spawnObstacle(type, trackProgress) {
+      let mesh, name, mass;
+      switch (type) {
+        case "human":
+          mesh = this.buildHumanMesh();
+          name = "Human (Track Worker)";
+          mass = 72;
+          break;
+        case "animal":
+          mesh = this.buildAnimalMesh();
+          name = "Wildlife (Stray Deer/Calf)";
+          mass = 55;
+          break;
+        case "cattle":
+          mesh = this.buildHeavyCattleMesh();
+          name = "Heavy Cattle (Stray Bull)";
+          mass = 480;
+          break;
+        case "debris":
+        default:
+          mesh = this.buildDebrisMesh();
+          name = "Track Debris (Cargo Crate)";
+          mass = 40;
+          break;
+      }
+      const transform = this.track.getTrackTransform(trackProgress, 0);
+      mesh.position.copy(transform.position);
+      mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
+      const obstacleObj = {
+        id: this.nextId++,
+        type,
+        name,
+        mass,
+        mesh,
+        progress: trackProgress,
+        isCollected: false
+      };
+      this.scene.add(mesh);
+      this.obstacles.push(obstacleObj);
+      return obstacleObj;
+    }
+    // Initial scenic obstacles along the route
+    initDefaultObstacles() {
+      this.spawnObstacle("human", 0.045);
+      this.spawnObstacle("animal", 0.12);
+      this.spawnObstacle("human", 0.28);
+      this.spawnObstacle("cattle", 0.45);
+      this.spawnObstacle("animal", 0.6);
+      this.spawnObstacle("debris", 0.74);
+      this.spawnObstacle("human", 0.88);
+    }
+    // Spawn immediately ahead of the train on demand (via HUD test buttons)
+    spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85) {
+      const deltaProgress = distanceMeters / trackLength;
+      const targetProgress = (trainProgress + deltaProgress) % 1;
+      return this.spawnObstacle(type, targetProgress);
+    }
+    // ------------------------------------------------------------------
+    // Main Detection, AI Decision Matrix & Obstacle Scoop Loop
+    // Enforces: Collect ONLY when Mass <= 150 kg AND Speed <= 150 km/h
+    // Net defaults to CLOSED / STOWED; Opens with animation upon detection
+    // ------------------------------------------------------------------
+    update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength) {
+      let closestObstacle = null;
+      let minForwardDist = Infinity;
+      const speedKmh = trainSpeedMs * 3.6;
+      this.obstacles.forEach((obs) => {
+        if (obs.isCollected) return;
+        let diff = obs.progress - trainProgress;
+        if (diff < 0) diff += 1;
+        const forwardMeters = diff * trackLength;
+        if (forwardMeters < minForwardDist && forwardMeters < 140) {
+          minForwardDist = forwardMeters;
+          closestObstacle = obs;
+        }
+      });
+      if (closestObstacle && minForwardDist < 110) {
+        this.telemetry.targetDetected = true;
+        this.telemetry.type = closestObstacle.type;
+        this.telemetry.name = closestObstacle.name;
+        this.telemetry.distance = minForwardDist;
+        this.telemetry.mass = closestObstacle.mass;
+        const isWeightSafe = closestObstacle.mass <= 150;
+        const isSpeedSafe = speedKmh <= 150;
+        const canCollect = isWeightSafe && isSpeedSafe;
+        this.telemetry.canCollect = canCollect;
+        if (canCollect) {
+          this.telemetry.action = "AIRBAG NET RAPID DEPLOY & RESCUE SCOOP";
+          this.telemetry.alertType = "deploy";
+          if (minForwardDist <= 80 && !captureNet.isDeployed) {
+            captureNet.triggerSolenoidDeploy(audio);
+            if (audio) audio.playTargetAcquiredBeep(false);
+            this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED (${closestObstacle.mass}KG \u2264 150KG). AIRBAG NET INFLATING!`;
+          }
+          if (minForwardDist <= 2.5) {
+            this.scene.remove(closestObstacle.mesh);
+            captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+            closestObstacle.isCollected = true;
+            if (audio) audio.playRescueSuccessChime();
+            this.telemetry.collectedCount++;
+            this.telemetry.collectedWeight += closestObstacle.mass;
+            this.telemetry.alertType = "success";
+            this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in scoop cradle. Zero casualties!`;
+          }
+        } else {
+          if (captureNet.isDeployed) {
+            captureNet.setDeployed(false);
+          }
+          const reason = !isWeightSafe ? `OVERWEIGHT (>150KG): ${closestObstacle.mass}KG EXCEEDS NET LIMIT` : `OVERSPEED (>150 KM/H): SPEED ${Math.round(speedKmh)} KM/H TOO HIGH FOR NET`;
+          this.telemetry.action = `${reason} - EMERGENCY BRAKE ONLY`;
+          this.telemetry.alertType = "hazard";
+          this.telemetry.alertMessage = `\u26A0\uFE0F HAZARD: ${closestObstacle.name.toUpperCase()} ON TRACK! NET HELD CLOSED. EMERGENCY BRAKE APPLIED!`;
+          if (minForwardDist <= 95) {
+            if (physics && !physics.emergencyBrake) {
+              physics.setEmergencyBrake(true);
+            }
+            if (audio) {
+              audio.playTargetAcquiredBeep(true);
+              audio.startHorn();
+            }
+          }
+        }
+      } else {
+        this.telemetry.targetDetected = false;
+        this.telemetry.type = null;
+        this.telemetry.name = "NONE (TRACK CLEAR)";
+        this.telemetry.distance = null;
+        this.telemetry.mass = null;
+        this.telemetry.canCollect = false;
+        this.telemetry.action = "STANDBY - SCANNING (LiDAR / RADAR / 4K)";
+        this.telemetry.alertMessage = null;
+        this.telemetry.alertType = "info";
+        if (captureNet.isDeployed && captureNet.collectedList.length === 0) {
+          captureNet.setDeployed(false);
+        }
+      }
+      return this.telemetry;
+    }
+    // Clear all collected obstacles from the net
+    resetCollected(captureNet) {
+      if (captureNet) {
+        captureNet.clearCradle();
+      }
+      this.telemetry.collectedCount = 0;
+      this.telemetry.collectedWeight = 0;
+    }
+  };
+
   // js/main.js
   var SimulatorApp = class {
     constructor() {
@@ -36497,12 +37590,14 @@ void main() {
       this.train = new TrainModel(this.scene);
       this.cab = new CabInterior(this.train.locoCar);
       this.env = new Environment(this.scene, this.track);
+      this.obstacles = new ObstacleManager(this.scene, this.track);
+      this.lastTelemetry = null;
       this.controls = new OrbitControls(this.camera, this.renderer.domElement);
       this.controls.enableDamping = true;
       this.controls.dampingFactor = 0.05;
       this.controls.maxDistance = 120;
       this.controls.minDistance = 3;
-      this.cameraMode = "chase";
+      this.cameraMode = "action";
       this.railfanPos = new Vector3();
       this.railfanLookTarget = new Vector3();
       this.isRailfanInitialized = false;
@@ -36538,11 +37633,26 @@ void main() {
         startBtn: document.getElementById("start-btn"),
         helpModal: document.getElementById("help-modal"),
         btnHelp: document.getElementById("btn-help"),
-        btnCloseHelp: document.getElementById("close-help")
+        btnCloseHelp: document.getElementById("close-help"),
+        // AI Kavach Sensor Fusion & Safety Controller elements
+        kavachCard: document.getElementById("ai-kavach-card"),
+        kavachTargetName: document.getElementById("kavach-target-name"),
+        kavachTargetDist: document.getElementById("kavach-target-dist"),
+        kavachTargetMass: document.getElementById("kavach-target-mass"),
+        kavachAction: document.getElementById("kavach-action"),
+        kavachPayloadVal: document.getElementById("kavach-payload-val"),
+        kavachPayloadBar: document.getElementById("kavach-payload-bar"),
+        btnSpawnHuman: document.getElementById("btn-spawn-human"),
+        btnSpawnAnimal: document.getElementById("btn-spawn-animal"),
+        btnSpawnBull: document.getElementById("btn-spawn-bull"),
+        btnSpawnCrate: document.getElementById("btn-spawn-crate"),
+        btnClearCradle: document.getElementById("btn-clear-cradle"),
+        btnCaptureNet: document.getElementById("btn-capture-net")
       };
       this.initRenderer();
       this.initEventListeners();
       this.initUIControls();
+      this.setCameraMode("action");
       this.animate = this.animate.bind(this);
       requestAnimationFrame(this.animate);
     }
@@ -36608,13 +37718,11 @@ void main() {
             this.train.cycleHeadlight();
             break;
           case "KeyN":
-            const netSt = this.train.toggleCaptureNet();
-            const netBtn = document.getElementById("btn-capture-net");
-            if (netBtn) {
-              netBtn.innerText = `\u{1F6E1}\uFE0F Net: ${netSt ? "DEPLOYED" : "RETRACTED"}`;
-              netBtn.classList.toggle("active", netSt);
+            const netSt = this.train.toggleCaptureNet(this.audio);
+            if (this.dom.btnCaptureNet) {
+              this.dom.btnCaptureNet.innerText = `\u{1F6E1}\uFE0F Net: ${netSt ? "DEPLOYED" : "RETRACTED"}`;
+              this.dom.btnCaptureNet.classList.toggle("active", netSt);
             }
-            this.audio.triggerBrakeHiss(0.3);
             break;
           case "KeyP":
             this.physics.togglePantograph();
@@ -36734,13 +37842,36 @@ void main() {
           this.physics.togglePantograph();
         });
       }
-      const btnCaptureNet = document.getElementById("btn-capture-net");
-      if (btnCaptureNet) {
-        btnCaptureNet.addEventListener("click", () => {
-          const state = this.train.toggleCaptureNet();
-          btnCaptureNet.innerText = `\u{1F6E1}\uFE0F Net: ${state ? "DEPLOYED" : "RETRACTED"}`;
-          btnCaptureNet.classList.toggle("active", state);
-          this.audio.triggerBrakeHiss(0.3);
+      if (this.dom.btnCaptureNet) {
+        this.dom.btnCaptureNet.addEventListener("click", () => {
+          const state = this.train.toggleCaptureNet(this.audio);
+          this.dom.btnCaptureNet.innerText = `\u{1F6E1}\uFE0F Net: ${state ? "DEPLOYED" : "RETRACTED"}`;
+          this.dom.btnCaptureNet.classList.toggle("active", state);
+        });
+      }
+      if (this.dom.btnSpawnHuman) {
+        this.dom.btnSpawnHuman.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human");
+        });
+      }
+      if (this.dom.btnSpawnAnimal) {
+        this.dom.btnSpawnAnimal.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal");
+        });
+      }
+      if (this.dom.btnSpawnBull) {
+        this.dom.btnSpawnBull.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle");
+        });
+      }
+      if (this.dom.btnSpawnCrate) {
+        this.dom.btnSpawnCrate.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris");
+        });
+      }
+      if (this.dom.btnClearCradle) {
+        this.dom.btnClearCradle.addEventListener("click", () => {
+          this.obstacles.resetCollected(this.train.captureNet);
         });
       }
       if (this.dom.btnHelp && this.dom.helpModal) {
@@ -36782,7 +37913,7 @@ void main() {
       }
     }
     cycleCamera() {
-      const modes = ["chase", "cab", "railfan", "window", "drone"];
+      const modes = ["action", "chase", "cab", "railfan", "window", "drone"];
       const idx = modes.indexOf(this.cameraMode);
       const nextMode = modes[(idx + 1) % modes.length];
       this.setCameraMode(nextMode);
@@ -36832,7 +37963,13 @@ void main() {
       const forward = new Vector3(0, 0, 1).applyEuler(locoRot);
       const right = new Vector3(1, 0, 0).applyEuler(locoRot);
       const up = new Vector3(0, 1, 0);
-      if (this.cameraMode === "chase") {
+      if (this.cameraMode === "action") {
+        const fwdDist = this.train.locoLength / 2 + 10.5;
+        const camOffset = forward.clone().multiplyScalar(fwdDist).add(right.clone().multiplyScalar(-5.4)).add(up.clone().multiplyScalar(1.8));
+        const lookTarget = locoPos.clone().add(forward.clone().multiplyScalar(this.train.locoLength / 2 + 0.8)).add(right.clone().multiplyScalar(0.4)).add(up.clone().multiplyScalar(1.7));
+        this.camera.position.copy(locoPos).add(camOffset);
+        this.camera.lookAt(lookTarget);
+      } else if (this.cameraMode === "chase") {
         this.controls.target.copy(locoPos).add(new Vector3(0, 2.5, 0));
         if (this.camera.position.y < locoPos.y + 1.4) {
           this.camera.position.y = locoPos.y + 1.4;
@@ -36914,12 +38051,52 @@ void main() {
         this.dom.aspectYellow1.classList.toggle("lit", sigAspect === "yellow" || sigAspect === "double_yellow");
         this.dom.aspectYellow2.classList.toggle("lit", sigAspect === "double_yellow");
         this.dom.aspectRed.classList.toggle("lit", sigAspect === "red");
-        if (sigAspect === "red") {
-          this.dom.alertBanner.style.display = "block";
-          this.dom.alertBanner.style.background = "rgba(220, 38, 38, 0.85)";
-          this.dom.alertBanner.innerText = "\u{1F534} SIGNAL RED: CAUTION AHEAD";
-        } else {
+        if (!this.lastTelemetry || !this.lastTelemetry.alertMessage) {
           this.dom.alertBanner.style.display = "none";
+        }
+      }
+      if (this.lastTelemetry && this.dom.kavachTargetName) {
+        const t = this.lastTelemetry;
+        this.dom.kavachTargetName.innerText = t.name ? t.name.toUpperCase() : "NONE (TRACK CLEAR)";
+        this.dom.kavachTargetDist.innerText = t.distance !== null ? `${Math.round(t.distance)} m` : "---";
+        if (t.mass !== null) {
+          this.dom.kavachTargetMass.innerText = `${t.mass} kg (${t.canCollect ? "SAFE \u2264 150KG" : "OVERWEIGHT >150KG"})`;
+          this.dom.kavachTargetMass.style.color = t.canCollect ? "#00e676" : "#ff1744";
+        } else {
+          this.dom.kavachTargetMass.innerText = "---";
+          this.dom.kavachTargetMass.style.color = "#f1f5f9";
+        }
+        this.dom.kavachAction.innerText = t.action;
+        this.dom.kavachAction.className = "scanner-status";
+        if (t.alertType === "hazard") {
+          this.dom.kavachAction.classList.add("hazard");
+        } else if (t.alertType === "deploy") {
+          this.dom.kavachAction.classList.add("deploying");
+        } else if (t.alertType === "success") {
+          this.dom.kavachAction.classList.add("collected");
+        }
+        if (this.dom.kavachCard) {
+          this.dom.kavachCard.classList.toggle("target-safe", t.targetDetected && t.canCollect);
+          this.dom.kavachCard.classList.toggle("target-hazard", t.targetDetected && !t.canCollect);
+        }
+        if (this.dom.kavachPayloadVal) {
+          this.dom.kavachPayloadVal.innerText = `${t.collectedWeight} kg (${t.collectedCount} Secured)`;
+          this.dom.kavachPayloadVal.style.color = t.collectedWeight > 0 ? "#00e676" : "#94a3b8";
+        }
+        if (this.dom.kavachPayloadBar) {
+          const payloadPct = Math.min(100, t.collectedWeight / 150 * 100);
+          this.dom.kavachPayloadBar.style.width = `${payloadPct}%`;
+        }
+        if (t.alertMessage) {
+          this.dom.alertBanner.style.display = "block";
+          if (t.alertType === "hazard") {
+            this.dom.alertBanner.style.background = "rgba(220, 38, 38, 0.95)";
+          } else if (t.alertType === "success") {
+            this.dom.alertBanner.style.background = "rgba(16, 185, 129, 0.95)";
+          } else {
+            this.dom.alertBanner.style.background = "rgba(234, 179, 8, 0.95)";
+          }
+          this.dom.alertBanner.innerText = t.alertMessage;
         }
       }
     }
@@ -36942,7 +38119,17 @@ void main() {
         coachGroup.lookAt(coachTransform.position.clone().add(coachTransform.heading));
         cumulativeDist += this.train.coachLength + this.train.couplerGap;
       }
-      this.train.update(dt, this.physics.speedMs);
+      const telemetry = this.obstacles.update(
+        dt,
+        this.physics.trackProgress,
+        this.physics.speedMs,
+        this.train.captureNet,
+        this.audio,
+        this.physics,
+        this.track.totalLength
+      );
+      this.lastTelemetry = telemetry;
+      this.train.update(dt, this.physics.speedMs, telemetry.targetDetected);
       if (this.cab) {
         this.cab.update(this.physics);
       }

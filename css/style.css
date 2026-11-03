@@ -810,8 +810,239 @@ html, body {
   box-shadow: 0 12px 30px rgba(0, 200, 83, 0.6);
 }
 
+/* ================= AI KAVACH SENSOR & SAFETY CONTROLLER HUD ================= */
+.ai-kavach-card {
+  position: absolute;
+  top: 100px;
+  right: 20px;
+  width: 335px;
+  background: rgba(11, 23, 38, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 20px rgba(6, 182, 212, 0.15);
+  z-index: 20;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ai-kavach-card.target-safe {
+  border-color: rgba(250, 204, 21, 0.85);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 24px rgba(250, 204, 21, 0.35);
+}
+
+.ai-kavach-card.target-hazard {
+  border-color: rgba(239, 68, 68, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 28px rgba(239, 68, 68, 0.5);
+  animation: kavachHazardPulse 0.8s infinite alternate;
+}
+
+@keyframes kavachHazardPulse {
+  0% { transform: scale(1.0); }
+  100% { transform: scale(1.02); }
+}
+
+.kavach-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.kavach-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.6px;
+}
+
+.sensor-pulse {
+  width: 9px;
+  height: 9px;
+  background-color: #00e676;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #00e676;
+  animation: pulseGreen 1.4s infinite;
+}
+
+@keyframes pulseGreen {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px #00e676; }
+  100% { transform: scale(0.9); opacity: 0.8; }
+}
+
+.kavach-sub {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 2px;
+  font-family: monospace;
+}
+
+.kavach-sensors-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.sensor-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+}
+
+.sensor-badge.active {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(14, 165, 233, 0.15);
+}
+
+.kavach-scanner-box {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-family: 'Chakra Petch', monospace;
+}
+
+.scanner-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.scanner-row:last-child {
+  margin-bottom: 0;
+}
+
+.scanner-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.scanner-value {
+  color: #f1f5f9;
+  font-weight: 700;
+}
+
+.scanner-status {
+  color: #38bdf8;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.scanner-status.deploying {
+  color: #facc15;
+}
+
+.scanner-status.hazard {
+  color: #ef4444;
+}
+
+.scanner-status.collected {
+  color: #00e676;
+}
+
+.kavach-payload-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.payload-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+.kavach-spawner-header {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.kavach-spawner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.spawn-btn {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.spawn-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.spawn-btn:active {
+  transform: translateY(1px);
+}
+
+.spawn-btn.hazard {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.spawn-btn.hazard:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+}
+
+.spawn-btn.clear {
+  grid-column: span 2;
+  background: rgba(15, 23, 42, 0.9);
+  border-color: rgba(0, 230, 118, 0.3);
+  color: #86efac;
+}
+
+.spawn-btn.clear:hover {
+  background: rgba(0, 230, 118, 0.2);
+  border-color: #00e676;
+}
+
 /* ================= MOBILE / RESPONSIVE TWEAKS ================= */
 @media (max-width: 900px) {
+  .ai-kavach-card {
+    top: auto;
+    bottom: 240px;
+    right: 10px;
+    width: 290px;
+    padding: 10px;
+  }
   .hud-bottom-bar {
     flex-direction: column;
     align-items: stretch;
@@ -823,4 +1054,5 @@ html, body {
     justify-content: center;
   }
 }
+
 

@@ -46,7 +46,8 @@
 
       <!-- Camera & Quick Tools -->
       <div class="quick-tools">
-        <button class="tool-btn active" data-cam="chase" title="Chase Orbit Camera [Key C]">🎥 Orbit</button>
+        <button class="tool-btn active" data-cam="action" title="Low-Angle Front-Quarter Action Camera [Key C]">🎬 Action View</button>
+        <button class="tool-btn" data-cam="chase" title="Chase Orbit Camera [Key C]">🎥 Orbit</button>
         <button class="tool-btn" data-cam="cab" title="Loco Pilot Cockpit View [Key C]">🕹️ Cab View</button>
         <button class="tool-btn" data-cam="railfan" title="Trackside Railfan Flyby [Key C]">📷 Railfan</button>
         <button class="tool-btn" data-cam="window" title="Passenger Coach Window [Key C]">🪟 Window</button>
@@ -57,8 +58,68 @@
       </div>
     </header>
 
-    <!-- CENTER ALERT BANNER -->
-    <div id="alert-banner">⚠️ SPAD PENALTY: EMERGENCY BRAKE APPLIED!</div>
+    <!-- CENTER ALERT BANNER (Only active during obstacle safety rescue events) -->
+    <div id="alert-banner" style="display: none;"></div>
+
+    <!-- AI VISION, LIDAR/RADAR & SAFETY CONTROLLER HUD CARD -->
+    <div class="ai-kavach-card hud-interactive" id="ai-kavach-card">
+      <div class="kavach-header">
+        <div class="kavach-title">
+          <span class="sensor-pulse"></span>
+          <span>AI SENSOR FUSION & SAFETY CONTROLLER</span>
+        </div>
+        <div class="kavach-sub">300m LiDAR • 77GHz Radar • 4K Stereo • Kavach AI Core</div>
+      </div>
+
+      <!-- Active Sensors Status Row -->
+      <div class="kavach-sensors-row">
+        <span class="sensor-badge active" id="badge-cam">📷 4K CAM</span>
+        <span class="sensor-badge active" id="badge-lidar">📡 LiDAR 300m</span>
+        <span class="sensor-badge active" id="badge-radar">🛰️ 77GHz RADAR</span>
+        <span class="sensor-badge active" id="badge-ai">🧠 AI 120FPS</span>
+      </div>
+
+      <!-- Real-Time Target Scanner Box -->
+      <div class="kavach-scanner-box" id="kavach-scanner-box">
+        <div class="scanner-row">
+          <span class="scanner-label">TARGET:</span>
+          <span class="scanner-value" id="kavach-target-name">NONE (TRACK CLEAR)</span>
+        </div>
+        <div class="scanner-row">
+          <span class="scanner-label">DISTANCE:</span>
+          <span class="scanner-value" id="kavach-target-dist">---</span>
+        </div>
+        <div class="scanner-row">
+          <span class="scanner-label">EST. MASS:</span>
+          <span class="scanner-value" id="kavach-target-mass">---</span>
+        </div>
+        <div class="scanner-row">
+          <span class="scanner-label">DECISION:</span>
+          <span class="scanner-status" id="kavach-action">STANDBY SCANNING</span>
+        </div>
+      </div>
+
+      <!-- Scoop Payload Capacity Monitor -->
+      <div class="kavach-payload-box">
+        <div class="payload-header">
+          <span>NET PAYLOAD (MAX 150 KG):</span>
+          <span id="kavach-payload-val">0 kg (0 Secured)</span>
+        </div>
+        <div class="progress-track" style="margin-top: 5px; height: 6px;">
+          <div class="progress-bar" id="kavach-payload-bar" style="width: 0%; background: #00e676;"></div>
+        </div>
+      </div>
+
+      <!-- Interactive Test Spawner Buttons -->
+      <div class="kavach-spawner-header">TEST SENSOR DETECTION & RESCUE SCOOP:</div>
+      <div class="kavach-spawner-grid">
+        <button class="spawn-btn" id="btn-spawn-human" title="Spawn Human Track Worker 85m Ahead (72 kg ≤ 150 kg)">👤 Human (72kg)</button>
+        <button class="spawn-btn" id="btn-spawn-animal" title="Spawn Stray Animal 85m Ahead (55 kg ≤ 150 kg)">🦌 Animal (55kg)</button>
+        <button class="spawn-btn hazard" id="btn-spawn-bull" title="Spawn Heavy Bull 85m Ahead (480 kg > 150 kg - Overweight Hazard!)">🐂 Bull (480kg)</button>
+        <button class="spawn-btn" id="btn-spawn-crate" title="Spawn Cargo Debris 85m Ahead (40 kg ≤ 150 kg)">📦 Crate (40kg)</button>
+        <button class="spawn-btn clear" id="btn-clear-cradle" title="Clear and Release Captured Obstacles">🔄 Clear Net</button>
+      </div>
+    </div>
 
     <!-- BOTTOM INSTRUMENT CONSOLE / DRIVER DESK -->
     <footer class="hud-bottom-bar hud-interactive">

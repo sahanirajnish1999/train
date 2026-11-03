@@ -359,6 +359,97 @@ export class TrainAudio {
   }
 
   // ---------------------------------------------------------
+  // Inflatable Capture Net Rapid Pneumatic Deployment Audio
+  // ---------------------------------------------------------
+  playPneumaticDeploySound() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+      // 1. High-pressure gas burst
+      const bufSize = Math.floor(this.ctx.sampleRate * 0.45);
+      const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.1));
+      }
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buf;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1800, now);
+      filter.Q.setValueAtTime(1.8, now);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.9, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      noise.start(now);
+
+      // 2. Heavy mechanical solenoid valve latch clack
+      const clack = this.ctx.createOscillator();
+      clack.type = 'triangle';
+      clack.frequency.setValueAtTime(220, now);
+      clack.frequency.exponentialRampToValueAtTime(45, now + 0.08);
+      const clackGain = this.ctx.createGain();
+      clackGain.gain.setValueAtTime(0.7, now);
+      clackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      clack.connect(clackGain);
+      clackGain.connect(this.masterGain);
+      clack.start(now);
+      clack.stop(now + 0.09);
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------
+  // AI Sensor Target Acquisition Ping
+  // ---------------------------------------------------------
+  playTargetAcquiredBeep(isHazard = false) {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+      const freq = isHazard ? 880 : 1320;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = isHazard ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.setValueAtTime(freq * 1.25, now + 0.06);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.2);
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------
+  // Obstacle Safely Collected Chime
+  // ---------------------------------------------------------
+  playRescueSuccessChime() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+      [1046.5, 1318.5, 1567.98].forEach((f, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const t = now + idx * 0.1;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.45);
+      });
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------
   // Main Audio Update Loop
   // ---------------------------------------------------------
   update(speedKmh, throttlePercent, brakePercent, isElectric = true) {
