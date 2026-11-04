@@ -678,24 +678,24 @@ export class ObstacleCaptureNet {
     // ================================================================
 
     // \_/ Flared Aerodynamic Scoop Geometry (Sleek, thin, high-strength tubular roll-cage)
-    // Top span: 2.92m (-1.46m to +1.46m at y = 2.15m)
+    // Top span: 2.80m (-1.40m to +1.40m at y = 2.15m)
     // Bottom span: 1.84m (-0.92m to +0.92m at y = 0.46m) sitting safely over rails
     const v = {
       // Rear mounting on locomotive buffer beam (zBase)
-      topL_base:  new THREE.Vector3(-1.38, 2.18, zBase),
-      topR_base:  new THREE.Vector3( 1.38, 2.18, zBase),
-      botL_base:  new THREE.Vector3(-1.08, 0.52, zBase),
-      botR_base:  new THREE.Vector3( 1.08, 0.52, zBase),
+      topL_base:  new THREE.Vector3(-1.40, 2.15, zBase),
+      topR_base:  new THREE.Vector3( 1.40, 2.15, zBase),
+      botL_base:  new THREE.Vector3(-0.92, 0.46, zBase),
+      botR_base:  new THREE.Vector3( 0.92, 0.46, zBase),
 
       // Mid-span outriggers & side struts
-      shoulderL:  new THREE.Vector3(-1.44, 2.16, zBase + 1.25),
-      shoulderR:  new THREE.Vector3( 1.44, 2.16, zBase + 1.25),
-      midBotL:    new THREE.Vector3(-1.00, 0.48, zBase + 1.45),
-      midBotR:    new THREE.Vector3( 1.00, 0.48, zBase + 1.45),
+      shoulderL:  new THREE.Vector3(-1.40, 2.15, zBase + 1.40),
+      shoulderR:  new THREE.Vector3( 1.40, 2.15, zBase + 1.40),
+      midBotL:    new THREE.Vector3(-0.92, 0.46, zBase + 1.45),
+      midBotR:    new THREE.Vector3( 0.92, 0.46, zBase + 1.45),
 
-      // Front Wide-Open Mouth Opening (\_/ Profile: Left \ , Right / , Bottom _ )
-      frontTopL:  new THREE.Vector3(-1.46, 2.15, zTip),
-      frontTopR:  new THREE.Vector3( 1.46, 2.15, zTip),
+      // Front Wide-Open Mouth Opening (Exact coordinates matching front U-frame!)
+      frontTopL:  new THREE.Vector3(-1.40, 2.15, zTip),
+      frontTopR:  new THREE.Vector3( 1.40, 2.15, zTip),
       frontBotL:  new THREE.Vector3(-0.92, 0.46, zTip),
       frontBotR:  new THREE.Vector3( 0.92, 0.46, zTip)
     };
@@ -785,8 +785,8 @@ export class ObstacleCaptureNet {
           // Transverse parabolic sag (max 1.0 at center u = 0.5)
           const transverseSag = Math.sin(u * Math.PI);
 
-          // Longitudinal pocket: deepest in mid-catching zone (v = 0.35 to 0.75)
-          const longitudinalPocket = Math.sin(v * Math.PI * 0.95);
+          // Longitudinal pocket: deepest in mid-catching zone, strictly 0 at front and rear frame pipes
+          const longitudinalPocket = Math.sin(v * Math.PI);
           
           // Up to 15cm deep concave pocket for genuine deceleration & retention!
           const totalSag = transverseSag * (0.15 * longitudinalPocket);
@@ -821,36 +821,33 @@ export class ObstacleCaptureNet {
       return mesh;
     }
 
-    // 1. Continuous Tubular Roll-Cage Frame (Ultra-Thin, Non-Lethal Compliant Frame)
-    // Slender, high-tensile energy-absorbing tubular frame (radius ~0.020m = 40mm diameter)
-    // designed specifically so that any physical contact exerts minimal impact inertia
+    // 1. Continuous Tubular Roll-Cage Frame (Slender High-Tensile Outrigger Booms)
+    // Forward boom endpoints terminate flush against the rear wall of the front U-frame
+    const frontTopL_boom = new THREE.Vector3(-1.40, 2.15, zTip - 0.024);
+    const frontTopR_boom = new THREE.Vector3( 1.40, 2.15, zTip - 0.024);
+    const frontBotL_boom = new THREE.Vector3(-0.92, 0.46, zTip - 0.024);
+    const frontBotR_boom = new THREE.Vector3( 0.92, 0.46, zTip - 0.024);
+
     const tubePairs = [
-      // Rear transverse frames
+      // Rear transverse frames (Mounted on locomotive buffer beam)
       [v.topL_base, v.topR_base, 0.024, accentRedMat],
       [v.botL_base, v.botR_base, 0.022, accentRedMat],
       [v.topL_base, v.botL_base, 0.022, accentRedMat],
       [v.topR_base, v.botR_base, 0.022, accentRedMat],
 
-      // Left flank outriggers (upper & lower)
-      [v.topL_base, v.shoulderL, 0.022, accentRedMat],
-      [v.shoulderL, v.frontTopL, 0.020, accentRedMat],
-      [v.botL_base, v.midBotL, 0.022, accentRedMat],
-      [v.midBotL,   v.frontBotL, 0.020, accentRedMat],
-      [v.shoulderL, v.midBotL, 0.018, accentRedMat],
+      // Left flank outriggers (upper, lower & diagonal brace)
+      [v.topL_base,  v.shoulderL,       0.022, accentRedMat],
+      [v.shoulderL,  frontTopL_boom,     0.022, accentRedMat],
+      [v.botL_base,  v.midBotL,         0.022, accentRedMat],
+      [v.midBotL,    frontBotL_boom,     0.022, accentRedMat],
+      [v.shoulderL,  v.midBotL,         0.018, accentRedMat],
 
-      // Right flank outriggers (upper & lower)
-      [v.topR_base, v.shoulderR, 0.022, accentRedMat],
-      [v.shoulderR, v.frontTopR, 0.020, accentRedMat],
-      [v.botR_base, v.midBotR, 0.022, accentRedMat],
-      [v.midBotR,   v.frontBotR, 0.020, accentRedMat],
-      [v.shoulderR, v.midBotR, 0.018, accentRedMat],
-
-      // Front mouth opening perimeter framing (\_/ Flared Profile: Left \ , Right / , Bottom _ )
-      // Slender impact-safe tubular frame (radius 0.018m - 0.020m)
-      [v.frontTopL, v.frontTopR, 0.020, accentRedMat],   // Upper front arched header
-      [v.frontBotL, v.frontBotR, 0.018, accentRedMat],   // Lower front track clearance bar (_)
-      [v.frontTopL, v.frontBotL, 0.020, accentRedMat],   // Left flared pillar (\)
-      [v.frontTopR, v.frontBotR, 0.020, accentRedMat]    // Right flared pillar (/)
+      // Right flank outriggers (upper, lower & diagonal brace)
+      [v.topR_base,  v.shoulderR,       0.022, accentRedMat],
+      [v.shoulderR,  frontTopR_boom,     0.022, accentRedMat],
+      [v.botR_base,  v.midBotR,         0.022, accentRedMat],
+      [v.midBotR,    frontBotR_boom,     0.020, accentRedMat],
+      [v.shoulderR,  v.midBotR,         0.018, accentRedMat]
     ];
 
     tubePairs.forEach(p => {
@@ -858,67 +855,128 @@ export class ObstacleCaptureNet {
       if (tube) this.deployableScoop.add(tube);
     });
 
-    // Spherical Knuckles at all structural corner vertices (matched to thin 20-25mm tubes)
-    Object.entries(v).forEach(([name, pt]) => {
+    // Spherical Knuckles at rear locomotive base and mid-span structural nodes
+    [
+      v.topL_base, v.topR_base, v.botL_base, v.botR_base,
+      v.shoulderL, v.shoulderR, v.midBotL, v.midBotR
+    ].forEach(pt => {
       this.deployableScoop.add(createKnuckle(pt, 0.025, accentRedMat));
     });
 
-    // 2. Soft Impact-Absorbing Polyurethane Foam Bumpers along Front Mouth Perimeter
-    // Sheaths the front perimeter with energy-absorbing shock foam so that any contact
-    // cushions and deflects without injury or blunt trauma
-    [
-      [v.frontTopL, v.frontTopR],
-      [v.frontTopL, v.frontBotL],
-      [v.frontTopR, v.frontBotR]
-    ].forEach(([pA, pB]) => {
-      const dir = pB.clone().sub(pA);
-      const len = dir.length();
-      const foamGeo = new THREE.CylinderGeometry(0.028, 0.028, len * 0.90, 16);
-      foamGeo.rotateX(Math.PI / 2);
-      const foamMesh = new THREE.Mesh(foamGeo, impactFoamMat);
-      foamMesh.position.copy(pA.clone().add(pB).multiplyScalar(0.5));
-      foamMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.normalize());
-      this.deployableScoop.add(foamMesh);
+    // ================================================================
+    // 2. CONTINUOUS SEAMLESS U-SHAPE RESCUE FRAME (Front Mouth Opening)
+    // Continuous tubular frame with smooth radiused U-bends at all 4 corners
+    // and precision-aligned straight upright pillars and header/footer bars.
+    // Perfectly matches the netting perimeter with 0 gap and no jagged knuckles.
+    // ================================================================
+    const zF = zTip;
+    const rFillet = 0.12;
+
+    const pTL = v.frontTopL;
+    const pTR = v.frontTopR;
+    const pBR = v.frontBotR;
+    const pBL = v.frontBotL;
+
+    // Tangent vectors and corner fillet control points
+    const dirRight = pBR.clone().sub(pTR).normalize();
+    const dirLeft  = pTL.clone().sub(pBL).normalize();
+
+    const pTopR_start = new THREE.Vector3( 1.40 - rFillet, 2.15, zF);
+    const pTopR_end   = pTR.clone().add(dirRight.clone().multiplyScalar(rFillet));
+
+    const pBotR_start = pBR.clone().sub(dirRight.clone().multiplyScalar(rFillet));
+    const pBotR_end   = new THREE.Vector3( 0.92 - rFillet, 0.46, zF);
+
+    const pBotL_start = new THREE.Vector3(-0.92 + rFillet, 0.46, zF);
+    const pBotL_end   = pBL.clone().add(dirLeft.clone().multiplyScalar(rFillet));
+
+    const pTopL_start = pTL.clone().sub(dirLeft.clone().multiplyScalar(rFillet));
+    const pTopL_end   = new THREE.Vector3(-1.40 + rFillet, 2.15, zF);
+
+    const uPath = new THREE.CurvePath();
+    // 1. Top header bar (straight along top net border)
+    uPath.add(new THREE.LineCurve3(pTopL_end, pTopR_start));
+    // 2. Top-right smooth radiused U-bend fillet
+    uPath.add(new THREE.QuadraticBezierCurve3(pTopR_start, pTR, pTopR_end));
+    // 3. Right upright pillar (straight along exact side net front edge)
+    uPath.add(new THREE.LineCurve3(pTopR_end, pBotR_start));
+    // 4. Bottom-right smooth radiused U-bend fillet
+    uPath.add(new THREE.QuadraticBezierCurve3(pBotR_start, pBR, pBotR_end));
+    // 5. Bottom clearance bar (straight along exact hammock front edge)
+    uPath.add(new THREE.LineCurve3(pBotR_end, pBotL_start));
+    // 6. Bottom-left smooth radiused U-bend fillet
+    uPath.add(new THREE.QuadraticBezierCurve3(pBotL_start, pBL, pBotL_end));
+    // 7. Left upright pillar (straight along exact side net front edge)
+    uPath.add(new THREE.LineCurve3(pBotL_end, pTopL_start));
+    // 8. Top-left smooth radiused U-bend fillet
+    uPath.add(new THREE.QuadraticBezierCurve3(pTopL_start, pTL, pTopL_end));
+
+    const uFrameGeo = new THREE.TubeGeometry(uPath, 128, 0.024, 16, true);
+    const uFrameMesh = new THREE.Mesh(uFrameGeo, accentOrangeMat);
+    uFrameMesh.castShadow = true;
+    this.deployableScoop.add(uFrameMesh);
+
+    // ================================================================
+    // 3. CONTINUOUS KEVLAR PERIMETER BOLTROPE & TIGHT MECHANICAL FASTENERS
+    // Securely fastens the net mesh directly into the orange U-frame with zero gap
+    // ================================================================
+    const boltropeMat = new THREE.MeshStandardMaterial({
+      color: 0xc2410c, // Deep reinforced safety orange Kevlar boltrope
+      roughness: 0.40,
+      metalness: 0.15
     });
 
-    // 3. Sleek Precision Chrome Collar Rings at mouth corners
     [
-      v.frontTopL,
-      v.frontTopR,
-      v.frontBotL,
-      v.frontBotR
-    ].forEach((pt) => {
-      const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.027, 0.005, 12, 24), metalMat);
-      collarMesh.position.copy(pt);
-      this.deployableScoop.add(collarMesh);
+      [pTL, pTR], // Top header border
+      [pTR, pBR], // Right upright pillar border
+      [pBR, pBL], // Bottom clearance lip border
+      [pBL, pTL]  // Left upright pillar border
+    ].forEach(([pA, pB]) => {
+      const rope = createTube(pA, pB, 0.007, boltropeMat);
+      if (rope) this.deployableScoop.add(rope);
     });
 
-    // 4. Polished Stainless Steel Joint Sleeves & Retroreflective Bands along thin red pipes
-    [
-      [v.frontTopL, v.frontTopR],
-      [v.frontTopL, v.frontBotL],
-      [v.frontTopR, v.frontBotR],
-      [v.frontBotL, v.frontBotR]
-    ].forEach(([pA, pB]) => {
-      [0.33, 0.67].forEach(frac => {
-        const pos = pA.clone().lerp(pB, frac);
-        const ringGeo = new THREE.CylinderGeometry(0.023, 0.023, 0.035, 16);
-        ringGeo.rotateX(Math.PI / 2);
-        const ring = new THREE.Mesh(ringGeo, metalMat);
-        ring.position.copy(pos);
-        const dir = pB.clone().sub(pA).normalize();
-        ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+    // Precision Stainless Steel Cinch Rings Wrapping Snugly around U-Frame & Boltrope
+    const cinchRingGeo = new THREE.TorusGeometry(0.0255, 0.0035, 12, 24);
+    const cinchMat = metalMat;
+
+    // Rings along Left and Right Upright Pillars (6 per side)
+    [-1, 1].forEach(side => {
+      const pBot = side === -1 ? pBL : pBR;
+      const pTop = side === -1 ? pTL : pTR;
+      const pillarDir = pTop.clone().sub(pBot).normalize();
+
+      [0.10, 0.25, 0.40, 0.55, 0.70, 0.85].forEach(tFrac => {
+        const ring = new THREE.Mesh(cinchRingGeo, cinchMat);
+        ring.position.copy(pBot.clone().lerp(pTop, tFrac));
+        ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), pillarDir);
         this.deployableScoop.add(ring);
       });
     });
 
-    // 4. Ultra-Thin Low-Profile Emergency LED Strobe Bar along Top Red Header
-    const lightBarHousing = new THREE.Mesh(new THREE.BoxGeometry(2.20, 0.035, 0.04), darkHousingMat);
-    lightBarHousing.position.set(0, 2.18, zTip + 0.055);
+    // Rings along Top Header Bar (7 rings)
+    [0.15, 0.26, 0.38, 0.50, 0.62, 0.74, 0.85].forEach(tFrac => {
+      const ring = new THREE.Mesh(cinchRingGeo, cinchMat);
+      ring.position.copy(pTL.clone().lerp(pTR, tFrac));
+      ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0));
+      this.deployableScoop.add(ring);
+    });
+
+    // Rings along Bottom Clearance Bar (5 rings)
+    [0.20, 0.35, 0.50, 0.65, 0.80].forEach(tFrac => {
+      const ring = new THREE.Mesh(cinchRingGeo, cinchMat);
+      ring.position.copy(pBL.clone().lerp(pBR, tFrac));
+      ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0));
+      this.deployableScoop.add(ring);
+    });
+
+    // 4. Ultra-Thin Low-Profile Emergency LED Strobe Bar along Top Header
+    const lightBarHousing = new THREE.Mesh(new THREE.BoxGeometry(2.20, 0.032, 0.038), darkHousingMat);
+    lightBarHousing.position.set(0, 2.18, zTip + 0.025);
     this.deployableScoop.add(lightBarHousing);
 
-    const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.010, 0.045), metalMat);
-    bezel.position.set(0, 2.20, zTip + 0.055);
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.008, 0.040), metalMat);
+    bezel.position.set(0, 2.20, zTip + 0.025);
     this.deployableScoop.add(bezel);
 
     const strobeLeds = [];
@@ -932,45 +990,28 @@ export class ObstacleCaptureNet {
         transparent: true,
         opacity: 0.95
       });
-      const ledLens = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.022, 0.015), ledMat);
-      ledLens.position.set(lx, 2.18, zTip + 0.078);
+      const ledLens = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.020, 0.012), ledMat);
+      ledLens.position.set(lx, 2.18, zTip + 0.046);
       this.deployableScoop.add(ledLens);
       strobeLeds.push(ledLens);
     }
     this.strobeLeds = strobeLeds;
 
-    // 5. High-Pressure Flexible Pneumatic Equalizer Bypass Hoses & Brass Couplers
-    [-1, 1].forEach(side => {
-      const topPt = new THREE.Vector3(side * 1.40, 2.12, zTip - 0.10);
-      const botPt = new THREE.Vector3(side * 0.90, 0.52, zTip - 0.10);
-      const midPt = new THREE.Vector3(side * 1.20, 1.35, zTip - 0.20);
-      const hoseCurve = new THREE.CatmullRomCurve3([topPt, midPt, botPt]);
-      const hoseGeo = new THREE.TubeGeometry(hoseCurve, 16, 0.014, 8, false);
-      const hose = new THREE.Mesh(hoseGeo, hoseMat);
-      this.deployableScoop.add(hose);
-
-      [topPt, botPt].forEach(p => {
-        const brassFitting = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.05, 8).rotateX(Math.PI / 2), brassMat);
-        brassFitting.position.copy(p);
-        this.deployableScoop.add(brassFitting);
-      });
-    });
-
-    // 6. Real-World Low-Clearance Ground Scooper Chute & Beveled Pick-up Lip
+    // 5. Real-World Low-Clearance Ground Scooper Chute & Beveled Pick-up Lip
     // Extends forward and down to 3cm above rails (y = 0.35m) to smoothly glide under obstacles
     const rampGeo = new THREE.BufferGeometry();
     const rPos = [
       // Segment 1: Low-clearance beveled pick-up lip (y = 0.35m, right above 0.32m rail head)
-      -0.90, 0.35, zTip + 0.28,
-       0.90, 0.35, zTip + 0.28,
+      -0.92, 0.35, zTip + 0.28,
+       0.92, 0.35, zTip + 0.28,
        0.92, 0.46, zTip,
       -0.92, 0.46, zTip,
 
       // Segment 2: Transition chute over clearance bar dropping into concave hammock bed
       -0.92, 0.46, zTip,
        0.92, 0.46, zTip,
-       0.92, 0.42, zTip - 0.40,
-      -0.92, 0.42, zTip - 0.40
+       0.92, 0.45, zTip - 0.40,
+      -0.92, 0.45, zTip - 0.40
     ];
     const rIndices = [
       0, 1, 2,  0, 2, 3,       // Front pick-up lip
@@ -989,9 +1030,9 @@ export class ObstacleCaptureNet {
 
     // Beveled Vulcanized Rubber Pick-up Lip Runner Bar along the very front edge
     const lipBar = createTube(
-      new THREE.Vector3(-0.90, 0.35, zTip + 0.28),
-      new THREE.Vector3( 0.90, 0.35, zTip + 0.28),
-      0.025,
+      new THREE.Vector3(-0.92, 0.35, zTip + 0.28),
+      new THREE.Vector3( 0.92, 0.35, zTip + 0.28),
+      0.024,
       rubberMat
     );
     if (lipBar) this.deployableScoop.add(lipBar);
@@ -1007,37 +1048,39 @@ export class ObstacleCaptureNet {
       this.deployableScoop.add(rollerWheel);
     });
 
-    // High-Tensile Webbing Tabs & Silver Eyelet Rings with Red Tension Lacing along Main Booms
-    const eyeletGeo = new THREE.TorusGeometry(0.024, 0.007, 8, 12);
+    // High-Tensile Webbing Tabs & Silver Eyelet Rings with Tension Lacing along Main Booms
+    const eyeletGeo = new THREE.TorusGeometry(0.024, 0.005, 10, 16);
     const eyeletMat = metalMat;
     const lacingMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.25 }); // Orange nylon tension cord
 
     [
-      [v.topL_base, v.frontTopL],
-      [v.topR_base, v.frontTopR],
-      [v.botL_base, v.frontBotL],
-      [v.botR_base, v.frontBotR]
+      [v.topL_base, frontTopL_boom],
+      [v.topR_base, frontTopR_boom],
+      [v.botL_base, frontBotL_boom],
+      [v.botR_base, frontBotR_boom]
     ].forEach(([pA, pB]) => {
       const segs = 8;
+      const boomDir = pB.clone().sub(pA).normalize();
       for (let s = 1; s < segs; s++) {
         const frac = s / segs;
         const pt = pA.clone().lerp(pB, frac);
         const eyelet = new THREE.Mesh(eyeletGeo, eyeletMat);
         eyelet.position.copy(pt);
+        eyelet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), boomDir);
         this.deployableScoop.add(eyelet);
 
         // Small tension lacing cord segment
         const cordPts = [
           pt.clone(),
-          pt.clone().add(new THREE.Vector3(0, s % 2 === 0 ? 0.03 : -0.03, 0.04))
+          pt.clone().add(new THREE.Vector3(0, s % 2 === 0 ? 0.025 : -0.025, 0.035))
         ];
-        const cordGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cordPts), 4, 0.006, 6, false);
+        const cordGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cordPts), 4, 0.005, 6, false);
         const cord = new THREE.Mesh(cordGeo, lacingMat);
         this.deployableScoop.add(cord);
       }
     });
 
-    // 7. High-Tensile Kevlar Braided Safety Netting Enclosure (Aero-Elastic Dynamic Panels)
+    // 6. High-Tensile Kevlar Braided Safety Netting Enclosure (Aero-Elastic Dynamic Panels)
     // Top Safety Roof Screen (Spans over top arch, preventing deflection over train)
     this.topMesh = createSubdividedPanel(v.topL_base, v.topR_base, v.frontTopR, v.frontTopL, 8, 6, 8, 6, netMeshMat);
     this.topBasePos = new Float32Array(this.topMesh.geometry.attributes.position.array);
@@ -1048,8 +1091,8 @@ export class ObstacleCaptureNet {
     this.sideBasePosL = new Float32Array(this.sideMeshL.geometry.attributes.position.array);
     this.deployableScoop.add(this.sideMeshL);
 
-    // Right Flank Protective Side Net Wall
-    this.sideMeshR = createSubdividedPanel(v.topR_base, v.botR_base, v.frontBotR, v.frontTopR, 8, 6, 8, 6, netMeshMat);
+    // Right Flank Protective Side Net Wall (Symmetric coordinates & parameters)
+    this.sideMeshR = createSubdividedPanel(v.topR_base, v.frontTopR, v.frontBotR, v.botR_base, 8, 6, 8, 6, netMeshMat);
     this.sideBasePosR = new Float32Array(this.sideMeshR.geometry.attributes.position.array);
     this.deployableScoop.add(this.sideMeshR);
 

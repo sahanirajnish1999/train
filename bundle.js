@@ -35625,18 +35625,18 @@ void main() {
       });
       const v = {
         // Rear mounting on locomotive buffer beam (zBase)
-        topL_base: new Vector3(-1.38, 2.18, zBase),
-        topR_base: new Vector3(1.38, 2.18, zBase),
-        botL_base: new Vector3(-1.08, 0.52, zBase),
-        botR_base: new Vector3(1.08, 0.52, zBase),
+        topL_base: new Vector3(-1.4, 2.15, zBase),
+        topR_base: new Vector3(1.4, 2.15, zBase),
+        botL_base: new Vector3(-0.92, 0.46, zBase),
+        botR_base: new Vector3(0.92, 0.46, zBase),
         // Mid-span outriggers & side struts
-        shoulderL: new Vector3(-1.44, 2.16, zBase + 1.25),
-        shoulderR: new Vector3(1.44, 2.16, zBase + 1.25),
-        midBotL: new Vector3(-1, 0.48, zBase + 1.45),
-        midBotR: new Vector3(1, 0.48, zBase + 1.45),
-        // Front Wide-Open Mouth Opening (\_/ Profile: Left \ , Right / , Bottom _ )
-        frontTopL: new Vector3(-1.46, 2.15, zTip),
-        frontTopR: new Vector3(1.46, 2.15, zTip),
+        shoulderL: new Vector3(-1.4, 2.15, zBase + 1.4),
+        shoulderR: new Vector3(1.4, 2.15, zBase + 1.4),
+        midBotL: new Vector3(-0.92, 0.46, zBase + 1.45),
+        midBotR: new Vector3(0.92, 0.46, zBase + 1.45),
+        // Front Wide-Open Mouth Opening (Exact coordinates matching front U-frame!)
+        frontTopL: new Vector3(-1.4, 2.15, zTip),
+        frontTopR: new Vector3(1.4, 2.15, zTip),
         frontBotL: new Vector3(-0.92, 0.46, zTip),
         frontBotR: new Vector3(0.92, 0.46, zTip)
       };
@@ -35708,7 +35708,7 @@ void main() {
             const u = i / segsX;
             const pt = leftPt.clone().lerp(rightPt, u);
             const transverseSag = Math.sin(u * Math.PI);
-            const longitudinalPocket = Math.sin(v2 * Math.PI * 0.95);
+            const longitudinalPocket = Math.sin(v2 * Math.PI);
             const totalSag = transverseSag * (0.15 * longitudinalPocket);
             pt.y -= totalSag;
             positions.push(pt.x, pt.y, pt.z);
@@ -35735,88 +35735,123 @@ void main() {
         mesh.receiveShadow = true;
         return mesh;
       }
+      const frontTopL_boom = new Vector3(-1.4, 2.15, zTip - 0.024);
+      const frontTopR_boom = new Vector3(1.4, 2.15, zTip - 0.024);
+      const frontBotL_boom = new Vector3(-0.92, 0.46, zTip - 0.024);
+      const frontBotR_boom = new Vector3(0.92, 0.46, zTip - 0.024);
       const tubePairs = [
-        // Rear transverse frames
+        // Rear transverse frames (Mounted on locomotive buffer beam)
         [v.topL_base, v.topR_base, 0.024, accentRedMat],
         [v.botL_base, v.botR_base, 0.022, accentRedMat],
         [v.topL_base, v.botL_base, 0.022, accentRedMat],
         [v.topR_base, v.botR_base, 0.022, accentRedMat],
-        // Left flank outriggers (upper & lower)
+        // Left flank outriggers (upper, lower & diagonal brace)
         [v.topL_base, v.shoulderL, 0.022, accentRedMat],
-        [v.shoulderL, v.frontTopL, 0.02, accentRedMat],
+        [v.shoulderL, frontTopL_boom, 0.022, accentRedMat],
         [v.botL_base, v.midBotL, 0.022, accentRedMat],
-        [v.midBotL, v.frontBotL, 0.02, accentRedMat],
+        [v.midBotL, frontBotL_boom, 0.022, accentRedMat],
         [v.shoulderL, v.midBotL, 0.018, accentRedMat],
-        // Right flank outriggers (upper & lower)
+        // Right flank outriggers (upper, lower & diagonal brace)
         [v.topR_base, v.shoulderR, 0.022, accentRedMat],
-        [v.shoulderR, v.frontTopR, 0.02, accentRedMat],
+        [v.shoulderR, frontTopR_boom, 0.022, accentRedMat],
         [v.botR_base, v.midBotR, 0.022, accentRedMat],
-        [v.midBotR, v.frontBotR, 0.02, accentRedMat],
-        [v.shoulderR, v.midBotR, 0.018, accentRedMat],
-        // Front mouth opening perimeter framing (\_/ Flared Profile: Left \ , Right / , Bottom _ )
-        // Slender impact-safe tubular frame (radius 0.018m - 0.020m)
-        [v.frontTopL, v.frontTopR, 0.02, accentRedMat],
-        // Upper front arched header
-        [v.frontBotL, v.frontBotR, 0.018, accentRedMat],
-        // Lower front track clearance bar (_)
-        [v.frontTopL, v.frontBotL, 0.02, accentRedMat],
-        // Left flared pillar (\)
-        [v.frontTopR, v.frontBotR, 0.02, accentRedMat]
-        // Right flared pillar (/)
+        [v.midBotR, frontBotR_boom, 0.02, accentRedMat],
+        [v.shoulderR, v.midBotR, 0.018, accentRedMat]
       ];
       tubePairs.forEach((p) => {
         const tube = createTube(p[0], p[1], p[2], p[3]);
         if (tube) this.deployableScoop.add(tube);
       });
-      Object.entries(v).forEach(([name, pt]) => {
+      [
+        v.topL_base,
+        v.topR_base,
+        v.botL_base,
+        v.botR_base,
+        v.shoulderL,
+        v.shoulderR,
+        v.midBotL,
+        v.midBotR
+      ].forEach((pt) => {
         this.deployableScoop.add(createKnuckle(pt, 0.025, accentRedMat));
       });
-      [
-        [v.frontTopL, v.frontTopR],
-        [v.frontTopL, v.frontBotL],
-        [v.frontTopR, v.frontBotR]
-      ].forEach(([pA, pB]) => {
-        const dir = pB.clone().sub(pA);
-        const len = dir.length();
-        const foamGeo = new CylinderGeometry(0.028, 0.028, len * 0.9, 16);
-        foamGeo.rotateX(Math.PI / 2);
-        const foamMesh = new Mesh(foamGeo, impactFoamMat);
-        foamMesh.position.copy(pA.clone().add(pB).multiplyScalar(0.5));
-        foamMesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir.normalize());
-        this.deployableScoop.add(foamMesh);
+      const zF = zTip;
+      const rFillet = 0.12;
+      const pTL = v.frontTopL;
+      const pTR = v.frontTopR;
+      const pBR = v.frontBotR;
+      const pBL = v.frontBotL;
+      const dirRight = pBR.clone().sub(pTR).normalize();
+      const dirLeft = pTL.clone().sub(pBL).normalize();
+      const pTopR_start = new Vector3(1.4 - rFillet, 2.15, zF);
+      const pTopR_end = pTR.clone().add(dirRight.clone().multiplyScalar(rFillet));
+      const pBotR_start = pBR.clone().sub(dirRight.clone().multiplyScalar(rFillet));
+      const pBotR_end = new Vector3(0.92 - rFillet, 0.46, zF);
+      const pBotL_start = new Vector3(-0.92 + rFillet, 0.46, zF);
+      const pBotL_end = pBL.clone().add(dirLeft.clone().multiplyScalar(rFillet));
+      const pTopL_start = pTL.clone().sub(dirLeft.clone().multiplyScalar(rFillet));
+      const pTopL_end = new Vector3(-1.4 + rFillet, 2.15, zF);
+      const uPath = new CurvePath();
+      uPath.add(new LineCurve3(pTopL_end, pTopR_start));
+      uPath.add(new QuadraticBezierCurve3(pTopR_start, pTR, pTopR_end));
+      uPath.add(new LineCurve3(pTopR_end, pBotR_start));
+      uPath.add(new QuadraticBezierCurve3(pBotR_start, pBR, pBotR_end));
+      uPath.add(new LineCurve3(pBotR_end, pBotL_start));
+      uPath.add(new QuadraticBezierCurve3(pBotL_start, pBL, pBotL_end));
+      uPath.add(new LineCurve3(pBotL_end, pTopL_start));
+      uPath.add(new QuadraticBezierCurve3(pTopL_start, pTL, pTopL_end));
+      const uFrameGeo = new TubeGeometry(uPath, 128, 0.024, 16, true);
+      const uFrameMesh = new Mesh(uFrameGeo, accentOrangeMat);
+      uFrameMesh.castShadow = true;
+      this.deployableScoop.add(uFrameMesh);
+      const boltropeMat = new MeshStandardMaterial({
+        color: 12730636,
+        // Deep reinforced safety orange Kevlar boltrope
+        roughness: 0.4,
+        metalness: 0.15
       });
       [
-        v.frontTopL,
-        v.frontTopR,
-        v.frontBotL,
-        v.frontBotR
-      ].forEach((pt) => {
-        const collarMesh = new Mesh(new TorusGeometry(0.027, 5e-3, 12, 24), metalMat);
-        collarMesh.position.copy(pt);
-        this.deployableScoop.add(collarMesh);
-      });
-      [
-        [v.frontTopL, v.frontTopR],
-        [v.frontTopL, v.frontBotL],
-        [v.frontTopR, v.frontBotR],
-        [v.frontBotL, v.frontBotR]
+        [pTL, pTR],
+        // Top header border
+        [pTR, pBR],
+        // Right upright pillar border
+        [pBR, pBL],
+        // Bottom clearance lip border
+        [pBL, pTL]
+        // Left upright pillar border
       ].forEach(([pA, pB]) => {
-        [0.33, 0.67].forEach((frac) => {
-          const pos = pA.clone().lerp(pB, frac);
-          const ringGeo = new CylinderGeometry(0.023, 0.023, 0.035, 16);
-          ringGeo.rotateX(Math.PI / 2);
-          const ring = new Mesh(ringGeo, metalMat);
-          ring.position.copy(pos);
-          const dir = pB.clone().sub(pA).normalize();
-          ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir);
+        const rope = createTube(pA, pB, 7e-3, boltropeMat);
+        if (rope) this.deployableScoop.add(rope);
+      });
+      const cinchRingGeo = new TorusGeometry(0.0255, 35e-4, 12, 24);
+      const cinchMat = metalMat;
+      [-1, 1].forEach((side) => {
+        const pBot = side === -1 ? pBL : pBR;
+        const pTop = side === -1 ? pTL : pTR;
+        const pillarDir = pTop.clone().sub(pBot).normalize();
+        [0.1, 0.25, 0.4, 0.55, 0.7, 0.85].forEach((tFrac) => {
+          const ring = new Mesh(cinchRingGeo, cinchMat);
+          ring.position.copy(pBot.clone().lerp(pTop, tFrac));
+          ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), pillarDir);
           this.deployableScoop.add(ring);
         });
       });
-      const lightBarHousing = new Mesh(new BoxGeometry(2.2, 0.035, 0.04), darkHousingMat);
-      lightBarHousing.position.set(0, 2.18, zTip + 0.055);
+      [0.15, 0.26, 0.38, 0.5, 0.62, 0.74, 0.85].forEach((tFrac) => {
+        const ring = new Mesh(cinchRingGeo, cinchMat);
+        ring.position.copy(pTL.clone().lerp(pTR, tFrac));
+        ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(1, 0, 0));
+        this.deployableScoop.add(ring);
+      });
+      [0.2, 0.35, 0.5, 0.65, 0.8].forEach((tFrac) => {
+        const ring = new Mesh(cinchRingGeo, cinchMat);
+        ring.position.copy(pBL.clone().lerp(pBR, tFrac));
+        ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(1, 0, 0));
+        this.deployableScoop.add(ring);
+      });
+      const lightBarHousing = new Mesh(new BoxGeometry(2.2, 0.032, 0.038), darkHousingMat);
+      lightBarHousing.position.set(0, 2.18, zTip + 0.025);
       this.deployableScoop.add(lightBarHousing);
-      const bezel = new Mesh(new BoxGeometry(2.22, 0.01, 0.045), metalMat);
-      bezel.position.set(0, 2.2, zTip + 0.055);
+      const bezel = new Mesh(new BoxGeometry(2.22, 8e-3, 0.04), metalMat);
+      bezel.position.set(0, 2.2, zTip + 0.025);
       this.deployableScoop.add(bezel);
       const strobeLeds = [];
       const ledCount = 8;
@@ -35829,33 +35864,19 @@ void main() {
           transparent: true,
           opacity: 0.95
         });
-        const ledLens = new Mesh(new BoxGeometry(0.14, 0.022, 0.015), ledMat);
-        ledLens.position.set(lx, 2.18, zTip + 0.078);
+        const ledLens = new Mesh(new BoxGeometry(0.14, 0.02, 0.012), ledMat);
+        ledLens.position.set(lx, 2.18, zTip + 0.046);
         this.deployableScoop.add(ledLens);
         strobeLeds.push(ledLens);
       }
       this.strobeLeds = strobeLeds;
-      [-1, 1].forEach((side) => {
-        const topPt = new Vector3(side * 1.4, 2.12, zTip - 0.1);
-        const botPt = new Vector3(side * 0.9, 0.52, zTip - 0.1);
-        const midPt = new Vector3(side * 1.2, 1.35, zTip - 0.2);
-        const hoseCurve = new CatmullRomCurve3([topPt, midPt, botPt]);
-        const hoseGeo = new TubeGeometry(hoseCurve, 16, 0.014, 8, false);
-        const hose = new Mesh(hoseGeo, hoseMat);
-        this.deployableScoop.add(hose);
-        [topPt, botPt].forEach((p) => {
-          const brassFitting = new Mesh(new CylinderGeometry(0.024, 0.024, 0.05, 8).rotateX(Math.PI / 2), brassMat);
-          brassFitting.position.copy(p);
-          this.deployableScoop.add(brassFitting);
-        });
-      });
       const rampGeo = new BufferGeometry();
       const rPos = [
         // Segment 1: Low-clearance beveled pick-up lip (y = 0.35m, right above 0.32m rail head)
-        -0.9,
+        -0.92,
         0.35,
         zTip + 0.28,
-        0.9,
+        0.92,
         0.35,
         zTip + 0.28,
         0.92,
@@ -35872,10 +35893,10 @@ void main() {
         0.46,
         zTip,
         0.92,
-        0.42,
+        0.45,
         zTip - 0.4,
         -0.92,
-        0.42,
+        0.45,
         zTip - 0.4
       ];
       const rIndices = [
@@ -35919,9 +35940,9 @@ void main() {
       const rampMesh = new Mesh(rampGeo, apronMat);
       this.deployableScoop.add(rampMesh);
       const lipBar = createTube(
-        new Vector3(-0.9, 0.35, zTip + 0.28),
-        new Vector3(0.9, 0.35, zTip + 0.28),
-        0.025,
+        new Vector3(-0.92, 0.35, zTip + 0.28),
+        new Vector3(0.92, 0.35, zTip + 0.28),
+        0.024,
         rubberMat
       );
       if (lipBar) this.deployableScoop.add(lipBar);
@@ -35933,27 +35954,29 @@ void main() {
         rollerWheel.position.set(sx, 0.36, zTip - 0.08);
         this.deployableScoop.add(rollerWheel);
       });
-      const eyeletGeo = new TorusGeometry(0.024, 7e-3, 8, 12);
+      const eyeletGeo = new TorusGeometry(0.024, 5e-3, 10, 16);
       const eyeletMat = metalMat;
       const lacingMat = new MeshStandardMaterial({ color: 15357964, roughness: 0.25 });
       [
-        [v.topL_base, v.frontTopL],
-        [v.topR_base, v.frontTopR],
-        [v.botL_base, v.frontBotL],
-        [v.botR_base, v.frontBotR]
+        [v.topL_base, frontTopL_boom],
+        [v.topR_base, frontTopR_boom],
+        [v.botL_base, frontBotL_boom],
+        [v.botR_base, frontBotR_boom]
       ].forEach(([pA, pB]) => {
         const segs = 8;
+        const boomDir = pB.clone().sub(pA).normalize();
         for (let s = 1; s < segs; s++) {
           const frac = s / segs;
           const pt = pA.clone().lerp(pB, frac);
           const eyelet = new Mesh(eyeletGeo, eyeletMat);
           eyelet.position.copy(pt);
+          eyelet.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), boomDir);
           this.deployableScoop.add(eyelet);
           const cordPts = [
             pt.clone(),
-            pt.clone().add(new Vector3(0, s % 2 === 0 ? 0.03 : -0.03, 0.04))
+            pt.clone().add(new Vector3(0, s % 2 === 0 ? 0.025 : -0.025, 0.035))
           ];
-          const cordGeo = new TubeGeometry(new CatmullRomCurve3(cordPts), 4, 6e-3, 6, false);
+          const cordGeo = new TubeGeometry(new CatmullRomCurve3(cordPts), 4, 5e-3, 6, false);
           const cord = new Mesh(cordGeo, lacingMat);
           this.deployableScoop.add(cord);
         }
@@ -35964,7 +35987,7 @@ void main() {
       this.sideMeshL = createSubdividedPanel(v.topL_base, v.frontTopL, v.frontBotL, v.botL_base, 8, 6, 8, 6, netMeshMat);
       this.sideBasePosL = new Float32Array(this.sideMeshL.geometry.attributes.position.array);
       this.deployableScoop.add(this.sideMeshL);
-      this.sideMeshR = createSubdividedPanel(v.topR_base, v.botR_base, v.frontBotR, v.frontTopR, 8, 6, 8, 6, netMeshMat);
+      this.sideMeshR = createSubdividedPanel(v.topR_base, v.frontTopR, v.frontBotR, v.botR_base, 8, 6, 8, 6, netMeshMat);
       this.sideBasePosR = new Float32Array(this.sideMeshR.geometry.attributes.position.array);
       this.deployableScoop.add(this.sideMeshR);
       const hammockBed = createConcaveHammock(
