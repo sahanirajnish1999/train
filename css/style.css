@@ -194,26 +194,41 @@ html, body {
   box-shadow: 0 0 16px rgba(201, 24, 24, 0.5);
 }
 
-/* ================= CENTER NOTIFICATION / SPAD ================= */
+/* ================= TOP NOTIFICATION PILL / ALERT BANNER ================= */
 #alert-banner {
-  align-self: center;
-  background: rgba(201, 24, 24, 0.95);
-  border: 2px solid #ff5252;
-  color: white;
-  padding: 12px 28px;
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 620px;
+  width: auto;
+  padding: 6px 20px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px solid #ff5252;
+  color: #ffffff;
   border-radius: 30px;
   font-family: 'Chakra Petch', sans-serif;
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 1px;
-  box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+  letter-spacing: 0.8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 1000;
+  pointer-events: auto;
+  cursor: pointer;
   display: none;
-  animation: pulse 1s infinite alternate;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: fadeInAlert 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); opacity: 0.9; }
-  100% { transform: scale(1.05); opacity: 1; }
+@keyframes fadeInAlert {
+  from { opacity: 0; transform: translate(-50%, -8px) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
 /* ================= BOTTOM INSTRUMENT PANEL / CAB DESK ================= */

@@ -16,7 +16,7 @@ export class TrainPhysics {
     // Locomotive Power
     this.maxPowerWatts = 4740000; // 6,350 HP = 4.74 MW (WAP-7)
     this.maxStartingTE = 460000;  // 460 kN starting tractive effort
-    this.maxSpeedKmh = 140;       // Service speed ceiling
+    this.maxSpeedKmh = 160;       // Service speed ceiling (Upgraded to 160 km/h Indian Railways semi-high speed standard)
 
     // Dynamic State
     this.speedMs = 0;             // Speed in meters / second

@@ -1229,9 +1229,9 @@ export class TrainModel {
     const flasherColor = pulse > 0.45 ? 0xf59e0b : 0x78350f;
     this.flasherLamps.forEach(m => m.color.setHex(flasherColor));
 
-    // Update Capture Net rapid inflation animation & active sensor suite
+    // Update Capture Net rapid inflation animation, aero-elastic fabric physics & active sensor suite
     if (this.captureNet) {
-      this.captureNet.update(dt, isTargetDetected);
+      this.captureNet.update(dt, isTargetDetected, speedMs);
     }
   }
 

@@ -457,7 +457,7 @@ export class TrainAudio {
 
     this.isElectric = isElectric;
     const now = this.ctx.currentTime;
-    const speedRatio = Math.min(speedKmh / 140, 1.2);
+    const speedRatio = Math.min(speedKmh / 160, 1.2);
 
     // 1. Motor / Engine Sound Updates
     if (this.isElectric) {

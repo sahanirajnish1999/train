@@ -34,7 +34,10 @@ export class ObstacleCaptureNet {
 
     // Collected Cargo Payloads inside the net cradle
     this.collectedList = [];
+    this.activeCaptures = [];
     this.totalPayloadWeight = 0;
+    this.cradlePayloadSag = 0;
+    this.cradlePayloadSagVel = 0;
 
     // Cache procedural textures
     this.textures = this.createProceduralTextures();
@@ -59,6 +62,24 @@ export class ObstacleCaptureNet {
     this.lidarBeam = null;
     this.lidarSweepAngle = 0;
 
+    // Dynamic Aero-Elastic Mesh Physics State (Mathematical Hooke's Law & Navier-Stokes Aero Pressure)
+    this.hammockMesh = null;
+    this.hammockGeo = null;
+    this.hammockBasePos = null;
+    this.hammockSegsX = 14;
+    this.hammockSegsZ = 18;
+
+    this.topMesh = null;
+    this.topBasePos = null;
+    this.sideMeshL = null;
+    this.sideBasePosL = null;
+    this.sideMeshR = null;
+    this.sideBasePosR = null;
+
+    this.aeroTime = 0;
+    this.cradlePayloadSag = 0;
+    this.cradlePayloadSagVel = 0;
+
     // Build static sensors and deployable capture net
     this.build();
 
@@ -74,87 +95,95 @@ export class ObstacleCaptureNet {
   // High-Fidelity Procedural Textures
   // ------------------------------------------------------------------
   createProceduralTextures() {
-    // 1. Braided High-Tensile Diamond Kevlar Safety Netting Texture (512 x 512)
+    // 1. Heavy-Duty 5-Ton Rated Kevlar Rescue Webbing Matrix Texture (512 x 512)
+    // Features tight, interwoven high-tenacity safety orange straps with reflective silver tracers,
+    // double-stitched reinforced borders, and heavy box-X cross stitches at all intersections
     const canvasNet = document.createElement('canvas');
     canvasNet.width = 512;
     canvasNet.height = 512;
     const ctxNet = canvasNet.getContext('2d');
     ctxNet.clearRect(0, 0, 512, 512);
 
-    // Deep crimson/black contact shadow underneath cords for genuine 3D depth & relief
-    ctxNet.lineWidth = 26;
-    ctxNet.strokeStyle = '#380404'; // Deep crimson maroon shadow
+    const strapCoords = [64, 192, 320, 448];
+
+    // Layer A: Deep 3D Contact Drop Shadows underneath all straps
+    ctxNet.lineWidth = 32;
+    ctxNet.strokeStyle = 'rgba(26, 8, 2, 0.75)';
     ctxNet.beginPath();
-    ctxNet.moveTo(0, 260); ctxNet.lineTo(512, 260);
-    ctxNet.moveTo(260, 0); ctxNet.lineTo(260, 512);
+    strapCoords.forEach(c => {
+      ctxNet.moveTo(0, c + 3); ctxNet.lineTo(512, c + 3);
+      ctxNet.moveTo(c + 3, 0); ctxNet.lineTo(c + 3, 512);
+    });
     ctxNet.stroke();
 
-    // Secondary diagonal cord drop shadows
-    ctxNet.lineWidth = 14;
-    ctxNet.strokeStyle = 'rgba(56, 4, 4, 0.45)';
+    // Layer B: Heavy High-Tensile Rescue Orange Webbing Belts (Width 24px)
+    ctxNet.lineWidth = 24;
+    ctxNet.strokeStyle = '#ea580c'; // Vibrant High-Visibility Rescue Safety Orange
     ctxNet.beginPath();
-    ctxNet.moveTo(0, 0); ctxNet.lineTo(512, 512);
-    ctxNet.moveTo(512, 0); ctxNet.lineTo(0, 512);
+    strapCoords.forEach(c => {
+      ctxNet.moveTo(0, c); ctxNet.lineTo(512, c);
+      ctxNet.moveTo(c, 0); ctxNet.lineTo(c, 512);
+    });
     ctxNet.stroke();
 
-    // Main vibrant safety rescue red braided core cords
-    ctxNet.lineWidth = 20;
-    ctxNet.strokeStyle = '#dc2626'; // High-visibility Rescue Safety Red
-    ctxNet.beginPath();
-    ctxNet.moveTo(0, 256); ctxNet.lineTo(512, 256);
-    ctxNet.moveTo(256, 0); ctxNet.lineTo(256, 512);
-    ctxNet.stroke();
-
-    // Diagonal support cords
-    ctxNet.lineWidth = 10;
-    ctxNet.strokeStyle = '#b91c1c'; // Deep Crimson Red
-    ctxNet.beginPath();
-    ctxNet.moveTo(0, 0); ctxNet.lineTo(512, 512);
-    ctxNet.moveTo(512, 0); ctxNet.lineTo(0, 512);
-    ctxNet.stroke();
-
-    // Upper rope twist fiber highlight glints
-    ctxNet.lineWidth = 6;
-    ctxNet.strokeStyle = '#f87171'; // Light coral / red silk fiber sheen
-    ctxNet.beginPath();
-    ctxNet.moveTo(0, 250); ctxNet.lineTo(512, 250);
-    ctxNet.moveTo(250, 0); ctxNet.lineTo(250, 512);
-    ctxNet.stroke();
-
-    // Braided rope twist notches (spiraling cord texture)
-    ctxNet.strokeStyle = '#7f1d1d';
-    ctxNet.lineWidth = 4;
-    for (let i = 0; i < 512; i += 28) {
+    // Layer C: Woven Edge Border Shading
+    ctxNet.lineWidth = 2.5;
+    ctxNet.strokeStyle = '#9a3412';
+    strapCoords.forEach(c => {
       ctxNet.beginPath();
-      ctxNet.moveTo(i, 244); ctxNet.lineTo(i + 12, 268);
+      ctxNet.moveTo(0, c - 11); ctxNet.lineTo(512, c - 11);
+      ctxNet.moveTo(0, c + 11); ctxNet.lineTo(512, c + 11);
+      ctxNet.moveTo(c - 11, 0); ctxNet.lineTo(c - 11, 512);
+      ctxNet.moveTo(c + 11, 0); ctxNet.lineTo(c + 11, 512);
       ctxNet.stroke();
-      ctxNet.beginPath();
-      ctxNet.moveTo(244, i); ctxNet.lineTo(268, i + 12);
-      ctxNet.stroke();
-    }
+    });
 
-    // Heavy round woven knot & brass reinforcement grommet at intersection
-    ctxNet.fillStyle = '#380404';
+    // Layer D: Central Retroreflective 3M Silver Tracer Threads (Width 4.5px)
+    ctxNet.lineWidth = 4.5;
+    ctxNet.strokeStyle = '#f8fafc'; // Gleaming silver-white reflective tracer
     ctxNet.beginPath();
-    ctxNet.arc(256, 256, 28, 0, Math.PI * 2);
-    ctxNet.fill();
+    strapCoords.forEach(c => {
+      ctxNet.moveTo(0, c); ctxNet.lineTo(512, c);
+      ctxNet.moveTo(c, 0); ctxNet.lineTo(c, 512);
+    });
+    ctxNet.stroke();
 
-    ctxNet.fillStyle = '#ef4444'; // Bright emergency red knot
-    ctxNet.beginPath();
-    ctxNet.arc(256, 256, 22, 0, Math.PI * 2);
-    ctxNet.fill();
+    // Layer E: Heavy Box-X Stitched Reinforcement Joints at every intersection (16 joints)
+    strapCoords.forEach(x => {
+      strapCoords.forEach(y => {
+        // Reinforced square backing patch
+        ctxNet.fillStyle = '#7c2d12';
+        ctxNet.fillRect(x - 14, y - 14, 28, 28);
 
-    ctxNet.fillStyle = '#fee2e2'; // Gloss highlight
-    ctxNet.beginPath();
-    ctxNet.arc(250, 250, 10, 0, Math.PI * 2);
-    ctxNet.fill();
+        // Box perimeter stitch
+        ctxNet.strokeStyle = '#fef08a';
+        ctxNet.lineWidth = 2.0;
+        ctxNet.strokeRect(x - 11, y - 11, 22, 22);
+
+        // Diagonal X-stitches
+        ctxNet.beginPath();
+        ctxNet.moveTo(x - 10, y - 10); ctxNet.lineTo(x + 10, y + 10);
+        ctxNet.moveTo(x + 10, y - 10); ctxNet.lineTo(x - 10, y + 10);
+        ctxNet.stroke();
+
+        // Center stainless rivet / grommet
+        ctxNet.fillStyle = '#1e293b';
+        ctxNet.beginPath();
+        ctxNet.arc(x, y, 4.5, 0, Math.PI * 2);
+        ctxNet.fill();
+        ctxNet.fillStyle = '#e2e8f0';
+        ctxNet.beginPath();
+        ctxNet.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctxNet.fill();
+      });
+    });
 
     const captureNetMeshTex = new THREE.CanvasTexture(canvasNet);
     captureNetMeshTex.wrapS = THREE.RepeatWrapping;
     captureNetMeshTex.wrapT = THREE.RepeatWrapping;
     captureNetMeshTex.repeat.set(1, 1);
 
-    // 2. Ultra-HD Rescue Red Inflatable Pipe Texture (1024 x 512)
+    // 2. Ultra-HD Rescue Orange Inflatable Pipe Texture (1024 x 512)
     // Features 3D rounded specular volume, 3M retroreflective silver bands,
     // diagonal safety hazard chevrons, technical stenciling, and vulcanized seam tape
     const canvasRedPipe = document.createElement('canvas');
@@ -162,12 +191,12 @@ export class ObstacleCaptureNet {
     canvasRedPipe.height = 512;
     const ctxRed = canvasRedPipe.getContext('2d');
 
-    // Deep vibrant rescue safety red base
-    ctxRed.fillStyle = '#dc2626';
+    // Deep vibrant rescue safety orange base
+    ctxRed.fillStyle = '#ea580c';
     ctxRed.fillRect(0, 0, 1024, 512);
 
     // Micro-ripstop Hypalon rubber texture weave
-    ctxRed.strokeStyle = 'rgba(153, 27, 27, 0.40)';
+    ctxRed.strokeStyle = 'rgba(124, 45, 18, 0.40)';
     ctxRed.lineWidth = 1.5;
     for (let i = 0; i < 1024; i += 16) {
       ctxRed.beginPath();
@@ -251,7 +280,7 @@ export class ObstacleCaptureNet {
     ctxRed.restore();
 
     // Heat-welded longitudinal center seam line
-    ctxRed.fillStyle = '#7f1d1d';
+    ctxRed.fillStyle = '#7c2d12';
     ctxRed.fillRect(0, 252, 1024, 6);
 
     const redPipeTex = new THREE.CanvasTexture(canvasRedPipe);
@@ -265,33 +294,39 @@ export class ObstacleCaptureNet {
     canvasApron.height = 512;
     const ctxApron = canvasApron.getContext('2d');
 
-    ctxApron.fillStyle = '#dc2626';
+    // Tough vulcanized orange composite apron base
+    ctxApron.fillStyle = '#ea580c';
     ctxApron.fillRect(0, 0, 512, 512);
+
+    // Dark rubberized pickup lip border at bottom
+    ctxApron.fillStyle = '#0f172a';
+    ctxApron.fillRect(0, 470, 512, 42);
 
     // Reflective white chevron arrows pointing inward up the scoop
     ctxApron.fillStyle = '#ffffff';
-    for (let cy = 60; cy < 480; cy += 120) {
+    for (let cy = 70; cy < 450; cy += 110) {
       ctxApron.beginPath();
       ctxApron.moveTo(256, cy - 35);
-      ctxApron.lineTo(440, cy + 30);
-      ctxApron.lineTo(400, cy + 50);
+      ctxApron.lineTo(450, cy + 25);
+      ctxApron.lineTo(410, cy + 45);
       ctxApron.lineTo(256, cy);
-      ctxApron.lineTo(112, cy + 50);
-      ctxApron.lineTo(72, cy + 30);
+      ctxApron.lineTo(102, cy + 45);
+      ctxApron.lineTo(62, cy + 25);
       ctxApron.closePath();
       ctxApron.fill();
     }
 
-    ctxApron.font = 'bold 24px monospace';
+    ctxApron.font = 'bold 22px "Courier New", monospace';
     ctxApron.fillStyle = '#ffffff';
     ctxApron.textAlign = 'center';
-    ctxApron.fillText('RESCUE CRADLE ZONE', 256, 490);
+    ctxApron.fillText('✦ HUMAN RESCUE CRADLE ✦', 256, 40);
+    ctxApron.fillText('MAX 150 KG • DECELERATION ZONE', 256, 495);
 
     const apronTex = new THREE.CanvasTexture(canvasApron);
     apronTex.wrapS = THREE.ClampToEdgeWrapping;
     apronTex.wrapT = THREE.ClampToEdgeWrapping;
 
-    // 4. High-Grade Rescue Orange & Graphite PVC / Hypalon Fabric Texture (512 x 512)
+    // 4. High-Grade Rescue Orange PVC / Hypalon Fabric Texture (512 x 512)
     const canvasCushion = document.createElement('canvas');
     canvasCushion.width = 512;
     canvasCushion.height = 512;
@@ -302,7 +337,7 @@ export class ObstacleCaptureNet {
     ctxCushion.fillRect(0, 0, 512, 512);
 
     // Micro-ripstop diamond weave
-    ctxCushion.strokeStyle = 'rgba(154, 52, 18, 0.4)';
+    ctxCushion.strokeStyle = 'rgba(124, 45, 18, 0.45)';
     ctxCushion.lineWidth = 1.5;
     for (let i = 0; i < 512; i += 16) {
       ctxCushion.beginPath();
@@ -311,40 +346,28 @@ export class ObstacleCaptureNet {
       ctxCushion.stroke();
     }
 
-    // Cylindrical bolster volume shading & welded seam bands
-    for (let bx = 0; bx < 512; bx += 128) {
-      const gradH = ctxCushion.createLinearGradient(bx, 0, bx + 64, 0);
-      gradH.addColorStop(0, 'rgba(255, 237, 213, 0.16)');
-      gradH.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-      ctxCushion.fillStyle = gradH;
-      ctxCushion.fillRect(bx + 12, 0, 52, 512);
-
-      const gradS = ctxCushion.createLinearGradient(bx + 64, 0, bx + 128, 0);
-      gradS.addColorStop(0, 'rgba(0, 0, 0, 0.0)');
-      gradS.addColorStop(1, 'rgba(30, 41, 59, 0.45)');
-      ctxCushion.fillStyle = gradS;
-      ctxCushion.fillRect(bx + 64, 0, 64, 512);
-
-      // Welded seam tape line
-      ctxCushion.fillStyle = '#7c2d12';
-      ctxCushion.fillRect(bx + 124, 0, 8, 512);
+    // Horizontal quilted bolster seam bands with silver double-stitching
+    for (let by = 64; by < 512; by += 128) {
+      // Welded rubber seam tape line
+      ctxCushion.fillStyle = '#9a3412';
+      ctxCushion.fillRect(0, by - 4, 512, 8);
 
       // Double-stitched high-tensile silver/white thread
-      ctxCushion.fillStyle = '#f1f5f9';
-      for (let y = 6; y < 512; y += 16) {
-        ctxCushion.fillRect(bx + 121, y, 2.5, 7);
-        ctxCushion.fillRect(bx + 132, y, 2.5, 7);
+      ctxCushion.fillStyle = '#f8fafc';
+      for (let x = 6; x < 512; x += 16) {
+        ctxCushion.fillRect(x, by - 6, 7, 2.5);
+        ctxCushion.fillRect(x, by + 4, 7, 2.5);
       }
     }
 
     // Stencil Technical Markings
     ctxCushion.save();
-    ctxCushion.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctxCushion.fillStyle = 'rgba(255, 255, 255, 0.90)';
     ctxCushion.font = 'bold 20px "Courier New", monospace';
     ctxCushion.textAlign = 'center';
-    ctxCushion.fillText('OBSTACLE SCOOP • MAX 150KG', 256, 120);
+    ctxCushion.fillText('✦ AI KAVACH IMPACT SCOOP ✦', 256, 120);
     ctxCushion.font = 'bold 16px "Courier New", monospace';
-    ctxCushion.fillText('AIRBAG INFLATION WP: 12 BAR', 256, 380);
+    ctxCushion.fillText('MAX 150 KG • DECELERATION BACKSTOP', 256, 380);
     ctxCushion.restore();
 
     const captureCushionTex = new THREE.CanvasTexture(canvasCushion);
@@ -447,11 +470,20 @@ export class ObstacleCaptureNet {
       metalness: 0.08
     });
 
-    const accentRedMat = new THREE.MeshStandardMaterial({
-      map: this.textures.redPipeTex,
-      color: 0xffffff, // Full texture fidelity with stencils, chevrons & reflective silver bands
-      roughness: 0.32,
-      metalness: 0.12
+    const accentOrangeMat = new THREE.MeshPhysicalMaterial({
+      color: 0xea580c, // High-gloss Indian Railways Safety Rescue Vibrant Orange
+      roughness: 0.16,
+      metalness: 0.24,
+      clearcoat: 0.95,
+      clearcoatRoughness: 0.08,
+      reflectivity: 0.85
+    });
+    const accentRedMat = accentOrangeMat; // Universal alias for rescue orange frame components
+
+    const impactFoamMat = new THREE.MeshStandardMaterial({
+      color: 0xf97316, // High-visibility safety rescue orange shock foam padding
+      roughness: 0.88,
+      metalness: 0.04
     });
 
     const apronMat = new THREE.MeshStandardMaterial({
@@ -489,6 +521,7 @@ export class ObstacleCaptureNet {
       metalness: 0.75
     });
 
+    
     const glassLensMat = new THREE.MeshPhysicalMaterial({
       color: 0x0284c7, // AR coated optical lens
       roughness: 0.04,
@@ -644,28 +677,27 @@ export class ObstacleCaptureNet {
     // (Contained in this.deployableScoop for dynamic inflation animation)
     // ================================================================
 
-    // \_/ Flared Inflatable Capture Scoop Geometry (Front opening forms: \_/ )
-    // Thick heavy-duty pneumatic pontoons with commanding industrial presence:
-    // Top span: 3.16m (-1.58m to +1.58m at y = 2.22m)
-    // Bottom span: 2.04m (-1.02m to +1.02m at y = 0.54m) sitting safely over rails
+    // \_/ Flared Aerodynamic Scoop Geometry (Sleek, thin, high-strength tubular roll-cage)
+    // Top span: 2.92m (-1.46m to +1.46m at y = 2.15m)
+    // Bottom span: 1.84m (-0.92m to +0.92m at y = 0.46m) sitting safely over rails
     const v = {
       // Rear mounting on locomotive buffer beam (zBase)
-      topL_base:  new THREE.Vector3(-1.46, 2.24, zBase),
-      topR_base:  new THREE.Vector3( 1.46, 2.24, zBase),
-      botL_base:  new THREE.Vector3(-1.14, 0.58, zBase),
-      botR_base:  new THREE.Vector3( 1.14, 0.58, zBase),
+      topL_base:  new THREE.Vector3(-1.38, 2.18, zBase),
+      topR_base:  new THREE.Vector3( 1.38, 2.18, zBase),
+      botL_base:  new THREE.Vector3(-1.08, 0.52, zBase),
+      botR_base:  new THREE.Vector3( 1.08, 0.52, zBase),
 
       // Mid-span outriggers & side struts
-      shoulderL:  new THREE.Vector3(-1.52, 2.20, zBase + 1.25),
-      shoulderR:  new THREE.Vector3( 1.52, 2.20, zBase + 1.25),
-      midBotL:    new THREE.Vector3(-1.08, 0.55, zBase + 1.45),
-      midBotR:    new THREE.Vector3( 1.08, 0.55, zBase + 1.45),
+      shoulderL:  new THREE.Vector3(-1.44, 2.16, zBase + 1.25),
+      shoulderR:  new THREE.Vector3( 1.44, 2.16, zBase + 1.25),
+      midBotL:    new THREE.Vector3(-1.00, 0.48, zBase + 1.45),
+      midBotR:    new THREE.Vector3( 1.00, 0.48, zBase + 1.45),
 
       // Front Wide-Open Mouth Opening (\_/ Profile: Left \ , Right / , Bottom _ )
-      frontTopL:  new THREE.Vector3(-1.58, 2.22, zTip),
-      frontTopR:  new THREE.Vector3( 1.58, 2.22, zTip),
-      frontBotL:  new THREE.Vector3(-1.02, 0.54, zTip),
-      frontBotR:  new THREE.Vector3( 1.02, 0.54, zTip)
+      frontTopL:  new THREE.Vector3(-1.46, 2.15, zTip),
+      frontTopR:  new THREE.Vector3( 1.46, 2.15, zTip),
+      frontBotL:  new THREE.Vector3(-0.92, 0.46, zTip),
+      frontBotR:  new THREE.Vector3( 0.92, 0.46, zTip)
     };
 
     function createTube(pA, pB, radius, mat) {
@@ -689,58 +721,136 @@ export class ObstacleCaptureNet {
       return mesh;
     }
 
-    function createQuadPanel(p0, p1, p2, p3, uvScaleU, uvScaleV, mat) {
+    // Subdivided Elastic Membrane Panel Generator
+    // Creates a subdivided vertex grid that can realistically deform under aerodynamic pressure
+    function createSubdividedPanel(p0, p1, p2, p3, segsU = 8, segsV = 6, uvScaleU = 8, uvScaleV = 6, mat) {
       const geom = new THREE.BufferGeometry();
-      const positions = [
-        p0.x, p0.y, p0.z,
-        p1.x, p1.y, p1.z,
-        p2.x, p2.y, p2.z,
-        p3.x, p3.y, p3.z
-      ];
-      const uvs = [
-        0, uvScaleV,
-        uvScaleU, uvScaleV,
-        uvScaleU, 0,
-        0, 0
-      ];
-      const indices = [0, 1, 2, 0, 2, 3];
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let j = 0; j <= segsV; j++) {
+        const v = j / segsV;
+        const leftPt = p0.clone().lerp(p3, v);
+        const rightPt = p1.clone().lerp(p2, v);
+
+        for (let i = 0; i <= segsU; i++) {
+          const u = i / segsU;
+          const pt = leftPt.clone().lerp(rightPt, u);
+          positions.push(pt.x, pt.y, pt.z);
+          uvs.push(u * uvScaleU, (1 - v) * uvScaleV);
+        }
+      }
+
+      const rowSize = segsU + 1;
+      for (let j = 0; j < segsV; j++) {
+        for (let i = 0; i < segsU; i++) {
+          const a = j * rowSize + i;
+          const b = j * rowSize + (i + 1);
+          const c = (j + 1) * rowSize + i;
+          const d = (j + 1) * rowSize + (i + 1);
+          indices.push(a, b, c);
+          indices.push(b, d, c);
+        }
+      }
+
       geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
       geom.setIndex(indices);
       geom.computeVertexNormals();
+
       const mesh = new THREE.Mesh(geom, mat);
       mesh.castShadow = true;
+      mesh.receiveShadow = true;
       return mesh;
     }
 
-    // 1. Continuous Inflatable Tubular Roll-Cage Frame (Thick Heavy-Duty Pontoons)
+    // High-Fidelity Concave Hammock Net Bed Generator
+    // Sags down in the center (15cm pocket) with raised side edges and front retention ridge
+    function createConcaveHammock(pRearL, pRearR, pFrontR, pFrontL, segsX = 14, segsZ = 18, mat) {
+      const geom = new THREE.BufferGeometry();
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let j = 0; j <= segsZ; j++) {
+        const v = j / segsZ; // 0 = Rear (base), 1 = Front (lip)
+        const leftPt = pRearL.clone().lerp(pFrontL, v);
+        const rightPt = pRearR.clone().lerp(pFrontR, v);
+
+        for (let i = 0; i <= segsX; i++) {
+          const u = i / segsX; // 0 = Left edge, 1 = Right edge
+          const pt = leftPt.clone().lerp(rightPt, u);
+
+          // Transverse parabolic sag (max 1.0 at center u = 0.5)
+          const transverseSag = Math.sin(u * Math.PI);
+
+          // Longitudinal pocket: deepest in mid-catching zone (v = 0.35 to 0.75)
+          const longitudinalPocket = Math.sin(v * Math.PI * 0.95);
+          
+          // Up to 15cm deep concave pocket for genuine deceleration & retention!
+          const totalSag = transverseSag * (0.15 * longitudinalPocket);
+          pt.y -= totalSag;
+
+          positions.push(pt.x, pt.y, pt.z);
+          uvs.push(u * 5.0, v * 7.0);
+        }
+      }
+
+      const rowSize = segsX + 1;
+      for (let j = 0; j < segsZ; j++) {
+        for (let i = 0; i < segsX; i++) {
+          const a = j * rowSize + i;
+          const b = j * rowSize + (i + 1);
+          const c = (j + 1) * rowSize + i;
+          const d = (j + 1) * rowSize + (i + 1);
+
+          indices.push(a, c, b);
+          indices.push(b, c, d);
+        }
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // 1. Continuous Tubular Roll-Cage Frame (Ultra-Thin, Non-Lethal Compliant Frame)
+    // Slender, high-tensile energy-absorbing tubular frame (radius ~0.020m = 40mm diameter)
+    // designed specifically so that any physical contact exerts minimal impact inertia
     const tubePairs = [
       // Rear transverse frames
-      [v.topL_base, v.topR_base, 0.20, accentRedMat],
-      [v.botL_base, v.botR_base, 0.18, boomOrangeMat],
-      [v.topL_base, v.botL_base, 0.18, boomOrangeMat],
-      [v.topR_base, v.botR_base, 0.18, boomOrangeMat],
+      [v.topL_base, v.topR_base, 0.024, accentRedMat],
+      [v.botL_base, v.botR_base, 0.022, accentRedMat],
+      [v.topL_base, v.botL_base, 0.022, accentRedMat],
+      [v.topR_base, v.botR_base, 0.022, accentRedMat],
 
       // Left flank outriggers (upper & lower)
-      [v.topL_base, v.shoulderL, 0.18, boomOrangeMat],
-      [v.shoulderL, v.frontTopL, 0.20, boomOrangeMat],
-      [v.botL_base, v.midBotL, 0.18, boomOrangeMat],
-      [v.midBotL,   v.frontBotL, 0.18, boomOrangeMat],
-      [v.shoulderL, v.midBotL, 0.16, boomOrangeMat],
+      [v.topL_base, v.shoulderL, 0.022, accentRedMat],
+      [v.shoulderL, v.frontTopL, 0.020, accentRedMat],
+      [v.botL_base, v.midBotL, 0.022, accentRedMat],
+      [v.midBotL,   v.frontBotL, 0.020, accentRedMat],
+      [v.shoulderL, v.midBotL, 0.018, accentRedMat],
 
       // Right flank outriggers (upper & lower)
-      [v.topR_base, v.shoulderR, 0.18, boomOrangeMat],
-      [v.shoulderR, v.frontTopR, 0.20, boomOrangeMat],
-      [v.botR_base, v.midBotR, 0.18, boomOrangeMat],
-      [v.midBotR,   v.frontBotR, 0.18, boomOrangeMat],
-      [v.shoulderR, v.midBotR, 0.16, boomOrangeMat],
+      [v.topR_base, v.shoulderR, 0.022, accentRedMat],
+      [v.shoulderR, v.frontTopR, 0.020, accentRedMat],
+      [v.botR_base, v.midBotR, 0.022, accentRedMat],
+      [v.midBotR,   v.frontBotR, 0.020, accentRedMat],
+      [v.shoulderR, v.midBotR, 0.018, accentRedMat],
 
       // Front mouth opening perimeter framing (\_/ Flared Profile: Left \ , Right / , Bottom _ )
-      // Thick heavy-duty pneumatic pontoons for maximum impact absorption
-      [v.frontTopL, v.frontTopR, 0.22, accentRedMat],   // Upper front arched header (0.44m diameter)
-      [v.frontBotL, v.frontBotR, 0.20, accentRedMat],   // Lower front track clearance bar (_) (0.40m diameter)
-      [v.frontTopL, v.frontBotL, 0.22, accentRedMat],   // Left flared pillar (\) (0.44m diameter)
-      [v.frontTopR, v.frontBotR, 0.22, accentRedMat]    // Right flared pillar (/) (0.44m diameter)
+      // Slender impact-safe tubular frame (radius 0.018m - 0.020m)
+      [v.frontTopL, v.frontTopR, 0.020, accentRedMat],   // Upper front arched header
+      [v.frontBotL, v.frontBotR, 0.018, accentRedMat],   // Lower front track clearance bar (_)
+      [v.frontTopL, v.frontBotL, 0.020, accentRedMat],   // Left flared pillar (\)
+      [v.frontTopR, v.frontBotR, 0.020, accentRedMat]    // Right flared pillar (/)
     ];
 
     tubePairs.forEach(p => {
@@ -748,130 +858,128 @@ export class ObstacleCaptureNet {
       if (tube) this.deployableScoop.add(tube);
     });
 
-    // Spherical Knuckles at all structural corner vertices (matched to thick pontoons)
+    // Spherical Knuckles at all structural corner vertices (matched to thin 20-25mm tubes)
     Object.entries(v).forEach(([name, pt]) => {
-      const isRed = name.startsWith('front') || name.startsWith('top');
-      this.deployableScoop.add(createKnuckle(pt, 0.245, isRed ? accentRedMat : boomOrangeMat));
+      this.deployableScoop.add(createKnuckle(pt, 0.025, accentRedMat));
     });
 
-    // High-Vis Red Reinforcement Straps & Retroreflective Hoop Sleeves along main booms
+    // 2. Soft Impact-Absorbing Polyurethane Foam Bumpers along Front Mouth Perimeter
+    // Sheaths the front perimeter with energy-absorbing shock foam so that any contact
+    // cushions and deflects without injury or blunt trauma
     [
-      [v.topL_base, v.shoulderL],
-      [v.topR_base, v.shoulderR],
-      [v.shoulderL, v.frontTopL],
-      [v.shoulderR, v.frontTopR],
-      [v.botL_base, v.midBotL],
-      [v.botR_base, v.midBotR],
-      [v.midBotL, v.frontBotL],
-      [v.midBotR, v.frontBotR]
+      [v.frontTopL, v.frontTopR],
+      [v.frontTopL, v.frontBotL],
+      [v.frontTopR, v.frontBotR]
     ].forEach(([pA, pB]) => {
-      [0.35, 0.70].forEach(frac => {
-        const pos = pA.clone().lerp(pB, frac);
-        const strapGeo = new THREE.CylinderGeometry(0.235, 0.235, 0.20, 20);
-        strapGeo.rotateX(Math.PI / 2);
-        const strap = new THREE.Mesh(strapGeo, accentRedMat);
-        strap.position.copy(pos);
-        const dir = pB.clone().sub(pA).normalize();
-        strap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-        this.deployableScoop.add(strap);
-
-        // Stainless steel clamp ring around strap
-        const clampRing = new THREE.Mesh(new THREE.TorusGeometry(0.245, 0.016, 8, 20), metalMat);
-        clampRing.position.copy(pos);
-        clampRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
-        this.deployableScoop.add(clampRing);
-      });
+      const dir = pB.clone().sub(pA);
+      const len = dir.length();
+      const foamGeo = new THREE.CylinderGeometry(0.028, 0.028, len * 0.90, 16);
+      foamGeo.rotateX(Math.PI / 2);
+      const foamMesh = new THREE.Mesh(foamGeo, impactFoamMat);
+      foamMesh.position.copy(pA.clone().add(pB).multiplyScalar(0.5));
+      foamMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.normalize());
+      this.deployableScoop.add(foamMesh);
     });
 
-    // 2. Heavy-Duty Mechanical Flanged Collar Cuffs with Hex Bolts at all 4 mouth corners
+    // 3. Sleek Precision Chrome Collar Rings at mouth corners
     [
       v.frontTopL,
       v.frontTopR,
       v.frontBotL,
       v.frontBotR
     ].forEach((pt) => {
-      // Polished stainless steel retention collar ring
-      const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.255, 0.022, 10, 24), metalMat);
+      const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.027, 0.005, 12, 24), metalMat);
       collarMesh.position.copy(pt);
       this.deployableScoop.add(collarMesh);
-
-      // Radial hex socket bolt heads around collar
-      for (let b = 0; b < 6; b++) {
-        const ang = (b / 6) * Math.PI * 2;
-        const bx = pt.x + Math.cos(ang) * 0.255;
-        const by = pt.y + Math.sin(ang) * 0.255;
-        const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.035, 6).rotateX(Math.PI / 2), metalMat);
-        bolt.position.set(bx, by, pt.z + 0.03);
-        this.deployableScoop.add(bolt);
-      }
     });
 
-    // Tough Vulcanized Rubber Impact Skid Bumper Pads at Bottom Corners
+    // 4. Polished Stainless Steel Joint Sleeves & Retroreflective Bands along thin red pipes
     [
-      v.frontBotL,
-      v.frontBotR
-    ].forEach((pt) => {
-      const skidPad = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), rubberMat);
-      skidPad.position.set(pt.x, pt.y - 0.08, pt.z + 0.06);
-      this.deployableScoop.add(skidPad);
+      [v.frontTopL, v.frontTopR],
+      [v.frontTopL, v.frontBotL],
+      [v.frontTopR, v.frontBotR],
+      [v.frontBotL, v.frontBotR]
+    ].forEach(([pA, pB]) => {
+      [0.33, 0.67].forEach(frac => {
+        const pos = pA.clone().lerp(pB, frac);
+        const ringGeo = new THREE.CylinderGeometry(0.023, 0.023, 0.035, 16);
+        ringGeo.rotateX(Math.PI / 2);
+        const ring = new THREE.Mesh(ringGeo, metalMat);
+        ring.position.copy(pos);
+        const dir = pB.clone().sub(pA).normalize();
+        ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+        this.deployableScoop.add(ring);
+      });
     });
 
-    // 3. Aerodynamic Emergency Rescue LED Strobe Light Bar along Top Red Header Bar
-    const lightBarHousing = new THREE.Mesh(new THREE.BoxGeometry(2.40, 0.07, 0.08), darkHousingMat);
-    lightBarHousing.position.set(0, 2.26, zTip + 0.20);
+    // 4. Ultra-Thin Low-Profile Emergency LED Strobe Bar along Top Red Header
+    const lightBarHousing = new THREE.Mesh(new THREE.BoxGeometry(2.20, 0.035, 0.04), darkHousingMat);
+    lightBarHousing.position.set(0, 2.18, zTip + 0.055);
     this.deployableScoop.add(lightBarHousing);
 
-    const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.018, 0.085), metalMat);
-    bezel.position.set(0, 2.295, zTip + 0.20);
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.010, 0.045), metalMat);
+    bezel.position.set(0, 2.20, zTip + 0.055);
     this.deployableScoop.add(bezel);
 
     const strobeLeds = [];
     const ledCount = 8;
-    const ledSpacing = 2.2 / ledCount;
+    const ledSpacing = 2.0 / ledCount;
     for (let s = 0; s < ledCount; s++) {
-      const lx = -1.1 + (s + 0.5) * ledSpacing;
+      const lx = -1.0 + (s + 0.5) * ledSpacing;
       const isAmber = (s === 1 || s === 6 || s === 2 || s === 5);
       const ledMat = new THREE.MeshBasicMaterial({
         color: isAmber ? 0xf59e0b : 0xf8fafc,
         transparent: true,
         opacity: 0.95
       });
-      const ledLens = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.042, 0.02), ledMat);
-      ledLens.position.set(lx, 2.26, zTip + 0.245);
+      const ledLens = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.022, 0.015), ledMat);
+      ledLens.position.set(lx, 2.18, zTip + 0.078);
       this.deployableScoop.add(ledLens);
       strobeLeds.push(ledLens);
     }
     this.strobeLeds = strobeLeds;
 
-    // 4. High-Pressure Flexible Pneumatic Equalizer Bypass Hoses & Brass Couplers
+    // 5. High-Pressure Flexible Pneumatic Equalizer Bypass Hoses & Brass Couplers
     [-1, 1].forEach(side => {
-      const topPt = new THREE.Vector3(side * 1.48, 2.18, zTip - 0.15);
-      const botPt = new THREE.Vector3(side * 0.98, 0.60, zTip - 0.15);
-      const midPt = new THREE.Vector3(side * 1.30, 1.40, zTip - 0.28);
+      const topPt = new THREE.Vector3(side * 1.40, 2.12, zTip - 0.10);
+      const botPt = new THREE.Vector3(side * 0.90, 0.52, zTip - 0.10);
+      const midPt = new THREE.Vector3(side * 1.20, 1.35, zTip - 0.20);
       const hoseCurve = new THREE.CatmullRomCurve3([topPt, midPt, botPt]);
-      const hoseGeo = new THREE.TubeGeometry(hoseCurve, 16, 0.022, 8, false);
+      const hoseGeo = new THREE.TubeGeometry(hoseCurve, 16, 0.014, 8, false);
       const hose = new THREE.Mesh(hoseGeo, hoseMat);
       this.deployableScoop.add(hose);
 
       [topPt, botPt].forEach(p => {
-        const brassFitting = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 8).rotateX(Math.PI / 2), brassMat);
+        const brassFitting = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.05, 8).rotateX(Math.PI / 2), brassMat);
         brassFitting.position.copy(p);
         this.deployableScoop.add(brassFitting);
       });
     });
 
-    // 5. High-Visibility Rescue Chevron Ground-Clearance Scooper Ramp / Deflection Apron
-    // Spans across the entire bottom opening between frontBotL (-1.02m) and frontBotR (+1.02m)
-    // Printed with bright reflective chevron arrows guiding upward into the deep catching net cradle!
+    // 6. Real-World Low-Clearance Ground Scooper Chute & Beveled Pick-up Lip
+    // Extends forward and down to 3cm above rails (y = 0.35m) to smoothly glide under obstacles
     const rampGeo = new THREE.BufferGeometry();
     const rPos = [
-      -1.02, 0.54, zTip,          // Left front lip
-       1.02, 0.54, zTip,          // Right front lip
-       1.02, 0.58, zTip - 0.45,   // Right ramp incline
-      -1.02, 0.58, zTip - 0.45    // Left ramp incline
+      // Segment 1: Low-clearance beveled pick-up lip (y = 0.35m, right above 0.32m rail head)
+      -0.90, 0.35, zTip + 0.28,
+       0.90, 0.35, zTip + 0.28,
+       0.92, 0.46, zTip,
+      -0.92, 0.46, zTip,
+
+      // Segment 2: Transition chute over clearance bar dropping into concave hammock bed
+      -0.92, 0.46, zTip,
+       0.92, 0.46, zTip,
+       0.92, 0.42, zTip - 0.40,
+      -0.92, 0.42, zTip - 0.40
     ];
-    const rIndices = [0, 1, 2,  0, 2, 3];
-    const rUvs = [0, 1,  1, 1,  1, 0,  0, 0];
+    const rIndices = [
+      0, 1, 2,  0, 2, 3,       // Front pick-up lip
+      4, 5, 6,  4, 6, 7        // Transition chute into cradle
+    ];
+    const rUvs = [
+      0, 1,    1, 1,    1, 0.5,  0, 0.5,
+      0, 0.5,  1, 0.5,  1, 0,    0, 0
+    ];
     rampGeo.setAttribute('position', new THREE.Float32BufferAttribute(rPos, 3));
     rampGeo.setAttribute('uv', new THREE.Float32BufferAttribute(rUvs, 2));
     rampGeo.setIndex(rIndices);
@@ -879,21 +987,30 @@ export class ObstacleCaptureNet {
     const rampMesh = new THREE.Mesh(rampGeo, apronMat);
     this.deployableScoop.add(rampMesh);
 
+    // Beveled Vulcanized Rubber Pick-up Lip Runner Bar along the very front edge
+    const lipBar = createTube(
+      new THREE.Vector3(-0.90, 0.35, zTip + 0.28),
+      new THREE.Vector3( 0.90, 0.35, zTip + 0.28),
+      0.025,
+      rubberMat
+    );
+    if (lipBar) this.deployableScoop.add(lipBar);
+
     // Stainless Steel Track Guide Roller Skids (Keep the scoop gliding smoothly over rails & turnouts)
     [-0.84, -0.28, 0.28, 0.84].forEach(sx => {
-      const skidBracket = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.14, 0.34), darkHousingMat);
-      skidBracket.position.set(sx, 0.46, zTip - 0.10);
+      const skidBracket = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.10, 0.28), darkHousingMat);
+      skidBracket.position.set(sx, 0.40, zTip - 0.10);
       this.deployableScoop.add(skidBracket);
 
-      const rollerWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.06, 16).rotateZ(Math.PI / 2), metalMat);
-      rollerWheel.position.set(sx, 0.42, zTip - 0.08);
+      const rollerWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.05, 16).rotateZ(Math.PI / 2), metalMat);
+      rollerWheel.position.set(sx, 0.36, zTip - 0.08);
       this.deployableScoop.add(rollerWheel);
     });
 
     // High-Tensile Webbing Tabs & Silver Eyelet Rings with Red Tension Lacing along Main Booms
     const eyeletGeo = new THREE.TorusGeometry(0.024, 0.007, 8, 12);
     const eyeletMat = metalMat;
-    const lacingMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 }); // Red nylon tension cord
+    const lacingMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.25 }); // Orange nylon tension cord
 
     [
       [v.topL_base, v.frontTopL],
@@ -912,7 +1029,7 @@ export class ObstacleCaptureNet {
         // Small tension lacing cord segment
         const cordPts = [
           pt.clone(),
-          pt.clone().add(new THREE.Vector3(0, s % 2 === 0 ? 0.04 : -0.04, 0.05))
+          pt.clone().add(new THREE.Vector3(0, s % 2 === 0 ? 0.03 : -0.03, 0.04))
         ];
         const cordGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cordPts), 4, 0.006, 6, false);
         const cord = new THREE.Mesh(cordGeo, lacingMat);
@@ -920,49 +1037,94 @@ export class ObstacleCaptureNet {
       }
     });
 
-    // 3. High-Tensile Kevlar Braided Safety Netting Enclosure
+    // 7. High-Tensile Kevlar Braided Safety Netting Enclosure (Aero-Elastic Dynamic Panels)
     // Top Safety Roof Screen (Spans over top arch, preventing deflection over train)
-    this.deployableScoop.add(createQuadPanel(v.topL_base, v.topR_base, v.frontTopR, v.frontTopL, 16, 12, netMeshMat));
+    this.topMesh = createSubdividedPanel(v.topL_base, v.topR_base, v.frontTopR, v.frontTopL, 8, 6, 8, 6, netMeshMat);
+    this.topBasePos = new Float32Array(this.topMesh.geometry.attributes.position.array);
+    this.deployableScoop.add(this.topMesh);
 
     // Left Flank Protective Side Net Wall
-    this.deployableScoop.add(createQuadPanel(v.topL_base, v.frontTopL, v.frontBotL, v.botL_base, 14, 10, netMeshMat));
+    this.sideMeshL = createSubdividedPanel(v.topL_base, v.frontTopL, v.frontBotL, v.botL_base, 8, 6, 8, 6, netMeshMat);
+    this.sideBasePosL = new Float32Array(this.sideMeshL.geometry.attributes.position.array);
+    this.deployableScoop.add(this.sideMeshL);
 
     // Right Flank Protective Side Net Wall
-    this.deployableScoop.add(createQuadPanel(v.topR_base, v.botR_base, v.frontBotR, v.frontTopR, 14, 10, netMeshMat));
+    this.sideMeshR = createSubdividedPanel(v.topR_base, v.botR_base, v.frontBotR, v.frontTopR, 8, 6, 8, 6, netMeshMat);
+    this.sideBasePosR = new Float32Array(this.sideMeshR.geometry.attributes.position.array);
+    this.deployableScoop.add(this.sideMeshR);
 
-    // Bottom Rescue Cradle Net Bed (Deep catching hammock suspended between pontoons)
-    this.deployableScoop.add(createQuadPanel(v.botL_base, v.botR_base, v.frontBotR, v.frontBotL, 16, 14, netMeshMat));
+    // 8. Deep Concave Deceleration Hammock Net Bed (True Real-World Human Catching Cradle)
+    // Sags into an 18cm deep pocket that decelerates and safely retains humans/obstacles!
+    const hammockBed = createConcaveHammock(
+      v.botL_base,
+      v.botR_base,
+      v.frontBotR,
+      v.frontBotL,
+      14, // 14 transverse segments
+      18, // 18 longitudinal segments
+      netMeshMat
+    );
+    this.hammockMesh = hammockBed;
+    this.hammockGeo = hammockBed.geometry;
+    this.hammockBasePos = new Float32Array(hammockBed.geometry.attributes.position.array);
+    this.hammockSegsX = 14;
+    this.hammockSegsZ = 18;
+    this.deployableScoop.add(hammockBed);
 
-    // 4. Multi-Bolster Quilted Pneumatic Cushion Mattress (6 Vertical Bolsters)
-    const bolsterCount = 6;
-    const bW = 2.45 / bolsterCount;
+    // 9. Multi-Bolster Quilted Pneumatic Cushion Mattress (Padded Inflatable Deceleration Backstop)
+    // Fully shields the locomotive buffer beam so obstacles decelerate into soft pneumatic cushions!
+    const bolsterCount = 7;
+    const bW = 2.50 / bolsterCount;
     for (let i = 0; i < bolsterCount; i++) {
-      const bx = -1.225 + (i + 0.5) * bW;
-      const bGeo = new THREE.CylinderGeometry(bW * 0.46, bW * 0.46, 1.52, 18);
-      const bolster = new THREE.Mesh(bGeo, boomOrangeMat);
-      bolster.position.set(bx, 1.46, zBase + 0.12);
+      const bx = -1.25 + (i + 0.5) * bW;
+      const bGeo = new THREE.CylinderGeometry(bW * 0.48, bW * 0.48, 1.55, 18);
+      const bolster = new THREE.Mesh(bGeo, accentRedMat);
+      bolster.position.set(bx, 1.45, zBase + 0.12);
       bolster.castShadow = true;
       this.deployableScoop.add(bolster);
 
-      // Overpressure relief dump valves on bolsters (from real prototype photo)
-      if (i === 1 || i === 4) {
-        const valveRing = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.04, 16).rotateX(Math.PI / 2), metalMat);
-        valveRing.position.set(bx, 1.46, zBase + 0.24);
+      // Overpressure relief dump valves on bolsters
+      if (i === 1 || i === 3 || i === 5) {
+        const valveRing = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.03, 16).rotateX(Math.PI / 2), metalMat);
+        valveRing.position.set(bx, 1.45, zBase + 0.22);
         this.deployableScoop.add(valveRing);
-        const valveCap = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 8), darkHousingMat);
-        valveCap.position.set(bx, 1.46, zBase + 0.26);
+        const valveCap = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 8), darkHousingMat);
+        valveCap.position.set(bx, 1.45, zBase + 0.24);
         this.deployableScoop.add(valveCap);
       }
     }
 
-    const topPadGeo = new THREE.CylinderGeometry(0.18, 0.18, 2.85, 20);
+    // High-Density Deceleration Impact Caps over Locomotive Buffer Discs
+    // Shields the protruding steel buffer heads with thick impact-absorbing cushions
+    [-0.95, 0.95].forEach(bx => {
+      const bufferCapGeo = new THREE.CylinderGeometry(0.26, 0.26, 0.16, 24);
+      bufferCapGeo.rotateX(Math.PI / 2);
+      const bufferCap = new THREE.Mesh(bufferCapGeo, accentRedMat);
+      bufferCap.position.set(bx, 0.95, zBase + 0.34);
+      bufferCap.castShadow = true;
+      this.deployableScoop.add(bufferCap);
+
+      const rimGeo = new THREE.TorusGeometry(0.26, 0.012, 8, 24);
+      const rim = new THREE.Mesh(rimGeo, metalMat);
+      rim.position.set(bx, 0.95, zBase + 0.42);
+      this.deployableScoop.add(rim);
+    });
+
+    // Thick Lower Lumbar & Buffer Beam Protective Cushion Bar (Spans full beam width)
+    const bufferPadGeo = new THREE.CylinderGeometry(0.22, 0.22, 2.65, 24);
+    bufferPadGeo.rotateZ(Math.PI / 2);
+    const bufferPad = new THREE.Mesh(bufferPadGeo, accentRedMat);
+    bufferPad.position.set(0, 0.95, zBase + 0.30);
+    this.deployableScoop.add(bufferPad);
+
+    const topPadGeo = new THREE.CylinderGeometry(0.09, 0.09, 2.70, 20);
     topPadGeo.rotateZ(Math.PI / 2);
     const topPad = new THREE.Mesh(topPadGeo, accentRedMat);
-    topPad.position.set(0, 2.24, zBase + 0.12);
+    topPad.position.set(0, 2.18, zBase + 0.12);
     this.deployableScoop.add(topPad);
 
-    [-1.20, 1.20].forEach(px => {
-      const pocketGeo = new THREE.BoxGeometry(0.08, 0.42, 0.52);
+    [-1.15, 1.15].forEach(px => {
+      const pocketGeo = new THREE.BoxGeometry(0.05, 0.30, 0.42);
       const pocket = new THREE.Mesh(pocketGeo, accentRedMat);
       pocket.position.set(px, 1.35, zBase + 0.45);
       this.deployableScoop.add(pocket);
@@ -1011,7 +1173,7 @@ export class ObstacleCaptureNet {
     });
 
     // Position cradle cargo anchor point
-    this.cradleCargoGroup.position.set(0, 0.62, zBase + 1.55);
+    this.cradleCargoGroup.position.set(0, 0.52, zBase + 1.55);
   }
 
   // ------------------------------------------------------------------
@@ -1072,20 +1234,46 @@ export class ObstacleCaptureNet {
   // Obstacle Collection / Scoop into Bottom Cradle Net
   // ------------------------------------------------------------------
   collectObstacle(obstacleMesh, obstacleInfo) {
-    // Add to cradle group
-    obstacleMesh.position.set(0, 0, (this.collectedList.length * 0.45) - 0.3);
-    // Rotate to lie down or sit comfortably in the net cradle
-    if (obstacleInfo.type === 'human') {
-      obstacleMesh.rotation.x = -Math.PI / 2.8; // Sitting / reclining back safely into orange cushion
-      obstacleMesh.position.y = -0.15;
-    } else if (obstacleInfo.type === 'animal') {
-      obstacleMesh.rotation.z = Math.PI / 6;
-      obstacleMesh.position.y = -0.10;
-    }
+    this.beginCaptureSequence(obstacleMesh, obstacleInfo);
+  }
 
+  beginCaptureSequence(obstacleMesh, obstacleInfo) {
+    const zOffset = (this.collectedList.length * 0.40) - 0.20;
     this.cradleCargoGroup.add(obstacleMesh);
     this.collectedList.push(obstacleInfo);
     this.totalPayloadWeight += obstacleInfo.mass;
+
+    // Start position: right at the front scoop mouth entrance lip (z = 1.55m in cradleCargoGroup local space)
+    const isHuman = obstacleInfo.type === 'human';
+    const isAnimal = obstacleInfo.type === 'animal';
+
+    obstacleMesh.position.set(0, isHuman ? -0.32 : (isAnimal ? -0.16 : -0.15), 1.55);
+    obstacleMesh.rotation.set(0, 0, 0);
+
+    const targetPos = new THREE.Vector3(
+      0,
+      isHuman ? -0.38 : (isAnimal ? -0.22 : -0.15),
+      isHuman ? zOffset - 0.05 : (isAnimal ? zOffset + 0.08 : zOffset)
+    );
+
+    const targetRotX = isHuman ? -0.16 : (isAnimal ? -0.25 : 0);
+    const targetRotZ = isAnimal ? 0.12 : 0;
+
+    const animItem = {
+      mesh: obstacleMesh,
+      info: obstacleInfo,
+      time: 0,
+      duration: 0.75, // simulation seconds (stretches realistically in slow-motion)
+      startPos: new THREE.Vector3(0, isHuman ? -0.32 : (isAnimal ? -0.16 : -0.15), 1.55),
+      targetPos: targetPos,
+      targetRotX: targetRotX,
+      targetRotZ: targetRotZ,
+      settled: false,
+      userData: obstacleMesh.userData || {}
+    };
+
+    this.activeCaptures.push(animItem);
+    this.cradlePayloadSagVel = -0.65;
   }
 
   clearCradle() {
@@ -1093,27 +1281,310 @@ export class ObstacleCaptureNet {
       this.cradleCargoGroup.remove(this.cradleCargoGroup.children[0]);
     }
     this.collectedList = [];
+    this.activeCaptures = [];
     this.totalPayloadWeight = 0;
   }
 
   // ------------------------------------------------------------------
-  // Real-Time Frame Update (Deployment physics, LiDAR beam, LEDs)
+  // Real-Time Frame Update (Deployment physics, Aero-Elastic Fabric Dynamics, LiDAR beam, LEDs)
+  // Mathematical Navier-Stokes dynamic pressure q = 0.5 * rho * v^2 and Hooke's membrane elasticity
   // ------------------------------------------------------------------
-  update(dt, isTargetDetected = false) {
+  update(dt, isTargetDetected = false, speedMs = 0) {
+    this.aeroTime += dt;
+
     // 1. Elastic Pneumatic Inflation Interpolation
     if (Math.abs(this.deployProgress - this.targetDeploy) > 0.001) {
       this.deployProgress += (this.targetDeploy - this.deployProgress) * Math.min(dt * this.deploySpeed * 4.0, 1.0);
       this.applyDeployTransform(this.deployProgress);
     }
 
-    // 2. LiDAR Scanning Beam Sweep Rotation & Optical Pulse
+    // 2. Real-World Aero-Elastic Fabric Mechanics (Calculated for up to 160 km/h)
+    // Speed: 160 km/h = 44.44 m/s. Stagnation pressure q = 1/2 * rho * v^2 = 1.21 kPa
+    const vNorm = Math.min(Math.abs(speedMs) / 44.44, 1.25);
+    const qFactor = vNorm * vNorm; // Strictly quadratic dynamic pressure response
+
+    // Strouhal vortex shedding frequency for webbing straps (fs = St * v / d)
+    const flutterFreq = 8.0 + 26.0 * vNorm;
+    const flutterAmp = 0.024 * Math.pow(vNorm, 1.5);
+
+    // Dynamic Payload Catenary Sag (Hooke's spring-mass damping oscillation)
+    const targetPayloadSag = (this.totalPayloadWeight / 150) * -0.09;
+    const kSpring = 24.0;
+    const cDamp = 6.2;
+    const sagAcc = (targetPayloadSag - this.cradlePayloadSag) * kSpring - this.cradlePayloadSagVel * cDamp;
+    this.cradlePayloadSagVel += sagAcc * dt;
+    this.cradlePayloadSag += this.cradlePayloadSagVel * dt;
+
+    // A. Modulate Hammock Elastic Net Bed
+    if (this.hammockMesh && this.hammockBasePos) {
+      const posAttr = this.hammockMesh.geometry.attributes.position;
+      const pos = posAttr.array;
+      const base = this.hammockBasePos;
+      const segsX = this.hammockSegsX;
+      const segsZ = this.hammockSegsZ;
+
+      let idx = 0;
+      for (let j = 0; j <= segsZ; j++) {
+        const v = j / segsZ; // 0 = base (rear), 1 = lip (front)
+        for (let i = 0; i <= segsX; i++) {
+          const u = i / segsX; // 0 = left edge, 1 = right edge
+
+          // Fixed boundary condition at steel roll-cage edges (strictly 0 at perimeter)
+          const edgeWeight = Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
+
+          // Aerodynamic backward billow deflection (wind pushes elastic fabric toward locomotive)
+          const deltaZ_aero = -0.13 * qFactor * edgeWeight;
+
+          // Aerodynamic downward suction sag & payload stretch
+          const deltaY_aero = (-0.06 * qFactor + this.cradlePayloadSag) * edgeWeight;
+
+          // Aero-elastic high-speed traveling ripple / flutter wave (Strouhal vortex shedding)
+          const ripple = flutterAmp * Math.sin(3.5 * Math.PI * v - flutterFreq * this.aeroTime) * Math.cos(2.0 * Math.PI * u) * edgeWeight;
+
+          pos[idx]     = base[idx];
+          pos[idx + 1] = base[idx + 1] + deltaY_aero + ripple;
+          pos[idx + 2] = base[idx + 2] + deltaZ_aero + ripple * 0.6;
+
+          idx += 3;
+        }
+      }
+      posAttr.needsUpdate = true;
+      if (Math.floor(this.aeroTime * 30) % 3 === 0) {
+        this.hammockMesh.geometry.computeVertexNormals();
+      }
+    }
+
+    // B. Modulate Side Flank Elastic Net Walls (Internal scoop airflow bulges outward)
+    [
+      { mesh: this.sideMeshL, base: this.sideBasePosL, sign: -1 },
+      { mesh: this.sideMeshR, base: this.sideBasePosR, sign:  1 }
+    ].forEach(({ mesh, base, sign }) => {
+      if (!mesh || !base) return;
+        const posAttr = mesh.geometry.attributes.position;
+        const pos = posAttr.array;
+        const segsU = 8;
+        const segsV = 6;
+        let idx = 0;
+        for (let j = 0; j <= segsV; j++) {
+          const v = j / segsV;
+          for (let i = 0; i <= segsU; i++) {
+            const u = i / segsU;
+            const edgeWeight = Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
+            const bulgeX = sign * 0.08 * qFactor * edgeWeight;
+            const ripple = sign * flutterAmp * 0.7 * Math.sin(2.8 * Math.PI * u - flutterFreq * this.aeroTime) * edgeWeight;
+
+            pos[idx]     = base[idx] + bulgeX + ripple;
+            pos[idx + 1] = base[idx + 1];
+            pos[idx + 2] = base[idx + 2];
+            idx += 3;
+          }
+        }
+        posAttr.needsUpdate = true;
+      });
+
+      // C. Modulate Top Roof Safety Screen (Upward deflection from bow wave)
+      if (this.topMesh && this.topBasePos) {
+        const posAttr = this.topMesh.geometry.attributes.position;
+        const pos = posAttr.array;
+        const base = this.topBasePos;
+        const segsU = 8;
+        const segsV = 6;
+        let idx = 0;
+        for (let j = 0; j <= segsV; j++) {
+          const v = j / segsV;
+          for (let i = 0; i <= segsU; i++) {
+            const u = i / segsU;
+            const edgeWeight = Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
+            const billowY = 0.07 * qFactor * edgeWeight;
+            const ripple = flutterAmp * 0.6 * Math.sin(3.0 * Math.PI * v - flutterFreq * this.aeroTime) * edgeWeight;
+
+            pos[idx]     = base[idx];
+            pos[idx + 1] = base[idx + 1] + billowY + ripple;
+            pos[idx + 2] = base[idx + 2];
+            idx += 3;
+          }
+        }
+        posAttr.needsUpdate = true;
+      }
+
+      // D. Dynamic Obstacle Cradling Response (Inertia, dynamic payload settling & rail vibration)
+      const zBase = this.locoLength / 2 + 0.35;
+      const railVibe = 0.005 * vNorm * Math.sin(this.aeroTime * 28.0);
+      this.cradleCargoGroup.position.y = 0.52 + this.cradlePayloadSag + railVibe;
+      this.cradleCargoGroup.position.z = zBase + 1.55 - 0.05 * qFactor;
+
+      // E. Dynamic Obstacle Scoop & Deceleration Kinematics
+      for (let i = 0; i < this.activeCaptures.length; i++) {
+        const cap = this.activeCaptures[i];
+        if (!cap.settled) {
+          cap.time += dt;
+          const p = Math.min(1.0, cap.time / cap.duration);
+
+          // Cubic deceleration trajectory along track direction (s: 0 -> 1)
+          const s = 1.0 - Math.pow(1.0 - p, 3.0);
+          const curZ = THREE.MathUtils.lerp(cap.startPos.z, cap.targetPos.z, s);
+
+          // Vertical scoop trajectory:
+          // - Ramp glide over pick-up lip (p: 0 to 0.35)
+          const rampHump = 0.14 * Math.sin(Math.min(1.0, p / 0.35) * Math.PI);
+          // - Deceleration kinetic depression into elastic netting (p: 0.30 to 0.85)
+          const elasticDip = -0.16 * Math.sin(Math.max(0.0, Math.min(1.0, (p - 0.30) / 0.55)) * Math.PI);
+          const baseCurY = THREE.MathUtils.lerp(cap.startPos.y, cap.targetPos.y, s);
+          const curY = baseCurY + rampHump + elasticDip;
+
+          cap.mesh.position.set(0, curY, curZ);
+
+          // Reclining rotation into supportive safety hammock
+          const rotS = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1.0, p / 0.75));
+          cap.mesh.rotation.x = THREE.MathUtils.lerp(0, cap.targetRotX, rotS);
+          cap.mesh.rotation.z = THREE.MathUtils.lerp(0, cap.targetRotZ, rotS);
+
+          // Biomechanical joint articulation during scoop
+          const ud = cap.userData;
+          if (ud.type === 'human') {
+            // Torso reclines back comfortably against rear safety cushion
+            if (ud.torsoGroup) {
+              ud.torsoGroup.rotation.x = THREE.MathUtils.lerp(0, -0.38, rotS);
+            }
+            // Hips flex forward into sitting hammock posture (thighs lifted)
+            if (ud.legL) ud.legL.rotation.x = THREE.MathUtils.lerp(0, 1.25, rotS);
+            if (ud.legR) ud.legR.rotation.x = THREE.MathUtils.lerp(0, 1.15, rotS);
+            // Knees bend deeply to sit naturally in elastic hammock
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = THREE.MathUtils.lerp(0, -1.65, rotS);
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = THREE.MathUtils.lerp(0, -1.55, rotS);
+
+            // Arms reach up and grasp the high-vis safety orange net straps
+            if (ud.armL) {
+              ud.armL.rotation.x = THREE.MathUtils.lerp(0, -0.45, rotS);
+              ud.armL.rotation.y = THREE.MathUtils.lerp(0, 0.15, rotS);
+              ud.armL.rotation.z = THREE.MathUtils.lerp(0, -0.48, rotS);
+            }
+            if (ud.armR) {
+              ud.armR.rotation.x = THREE.MathUtils.lerp(0, -0.40, rotS);
+              ud.armR.rotation.y = THREE.MathUtils.lerp(0, -0.12, rotS);
+              ud.armR.rotation.z = THREE.MathUtils.lerp(0, 0.45, rotS);
+            }
+            if (ud.forearmL) ud.forearmL.rotation.x = THREE.MathUtils.lerp(-0.22, -1.12, rotS);
+            if (ud.forearmR) ud.forearmR.rotation.x = THREE.MathUtils.lerp(-0.22, -1.08, rotS);
+
+            // Head nods forward slightly to protect cervical vertebrae then looks alertly out front
+            if (ud.headGroup) ud.headGroup.rotation.x = THREE.MathUtils.lerp(0, -0.25, rotS);
+          } else if (ud.type === 'animal') {
+            // Quadruped safely curls legs under body in recumbent shelter posture
+            if (ud.legs) {
+              ud.legs.forEach(leg => {
+                leg.group.rotation.x = THREE.MathUtils.lerp(0, leg.isFront ? 1.30 : -1.05, rotS);
+                if (leg.kneeGroup) {
+                  leg.kneeGroup.rotation.x = THREE.MathUtils.lerp(0, leg.isFront ? -1.80 : 1.70, rotS);
+                }
+              });
+            }
+            if (ud.headGroup) {
+              ud.headGroup.rotation.x = THREE.MathUtils.lerp(0, -0.20, rotS);
+            }
+          }
+
+          // Net deformation impulse at peak impact (p around 0.50)
+          if (p > 0.40 && p < 0.65) {
+            this.cradlePayloadSag = -0.16 * Math.sin(((p - 0.40) / 0.25) * Math.PI);
+          }
+
+          if (p >= 1.0) {
+            cap.settled = true;
+            cap.mesh.position.copy(cap.targetPos);
+            cap.mesh.rotation.x = cap.targetRotX;
+            cap.mesh.rotation.z = cap.targetRotZ;
+          }
+        } else {
+          // Continuous, dynamic, organic living behavior inside the rescue net cradle
+          const ud = cap.userData;
+          const t = this.aeroTime;
+
+          if (ud.type === 'human') {
+            // 1. Deep, rhythmic relief breathing with periodic relief sigh
+            const breath = Math.sin(t * 2.8);
+            const deepReliefSigh = Math.pow(Math.max(0, Math.sin(t * 0.45)), 4.0) * 0.08;
+            if (ud.torsoGroup) {
+              const exp = 0.038 * breath + deepReliefSigh;
+              ud.torsoGroup.scale.set(1.0 + exp, 1.0 + exp * 0.6, 1.0 + exp);
+              ud.torsoGroup.rotation.x = -0.38 + 0.025 * breath;
+            }
+
+            // 2. Head looking around: scanning driver cab, tracks below, and passing scenery
+            if (ud.headGroup) {
+              const lookUp = -0.28 + 0.06 * Math.sin(t * 1.6);
+              const lookYaw = 0.28 * Math.sin(t * 0.7) + 0.12 * Math.sin(t * 1.8);
+              const nod = 0.03 * Math.sin(t * 3.2);
+              ud.headGroup.rotation.set(lookUp + nod, lookYaw, 0.04 * Math.sin(t * 0.9));
+            }
+
+            // 3. Hands gripping and adjusting on the high-vis safety orange net ropes
+            if (ud.armL && ud.forearmL) {
+              ud.armL.rotation.set(-0.45 + 0.03 * Math.sin(t * 2.0), 0.15, -0.48 + 0.04 * Math.cos(t * 1.7));
+              ud.forearmL.rotation.x = -1.12 + 0.07 * Math.sin(t * 2.3);
+            }
+            if (ud.armR && ud.forearmR) {
+              ud.armR.rotation.set(-0.40 + 0.03 * Math.cos(t * 1.9), -0.12, 0.45 + 0.04 * Math.sin(t * 2.1));
+              ud.forearmR.rotation.x = -1.08 + 0.06 * Math.cos(t * 2.2);
+            }
+
+            // 4. Legs resting in natural sitting posture with track vibration damping
+            const railBump = 0.03 * Math.sin(t * 22.0) * vNorm;
+            if (ud.legL) ud.legL.rotation.x = 1.25 + 0.02 * Math.sin(t * 1.5);
+            if (ud.legR) ud.legR.rotation.x = 1.15 + 0.02 * Math.cos(t * 1.4);
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -1.65 + railBump;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -1.55 + railBump;
+
+            // 5. Gentle whole-body hammock sway from train inertia and aerodynamic draft
+            cap.mesh.rotation.z = 0.025 * Math.sin(t * 3.2) * vNorm;
+            cap.mesh.rotation.x = cap.targetRotX + 0.018 * Math.cos(t * 3.8) * vNorm;
+
+          } else if (ud.type === 'animal') {
+            // Continuous living behavior for rescued quadruped in the net
+            const breathAnim = Math.sin(t * 4.2);
+            if (ud.body) {
+              ud.body.scale.set(0.92 + 0.045 * breathAnim, 1.15 + 0.035 * breathAnim, 1.0);
+            }
+
+            // Head looks around alertly
+            if (ud.headGroup) {
+              ud.headGroup.rotation.y = Math.sin(t * 1.4) * 0.35;
+              ud.headGroup.rotation.x = -0.18 + Math.sin(t * 2.4) * 0.08;
+            }
+
+            // Ears twitching independently
+            if (ud.ears && ud.ears.length >= 2) {
+              ud.ears[0].rotation.z = -0.55 + Math.sin(t * 7.5) * 0.25;
+              ud.ears[1].rotation.z = 0.55 + Math.sin(t * 6.0 + 1.2) * 0.25;
+            }
+
+            // Tail swishes against orange net webbing
+            if (ud.tail) {
+              ud.tail.rotation.z = Math.sin(t * 4.5) * 0.55;
+              ud.tail.rotation.x = 0.35 + Math.abs(Math.sin(t * 2.2)) * 0.25;
+            }
+
+            // Maintain comfortable recumbent curled posture
+            if (ud.legs) {
+              ud.legs.forEach(leg => {
+                leg.group.rotation.x = leg.isFront ? 1.30 : -1.05;
+                if (leg.kneeGroup) {
+                  leg.kneeGroup.rotation.x = leg.isFront ? -1.80 : 1.70;
+                }
+              });
+            }
+          }
+        }
+    }
+
+    // 3. LiDAR Scanning Beam Sweep Rotation & Optical Pulse
     if (this.lidarBeam) {
       this.lidarSweepAngle += dt * 3.5;
       this.lidarBeam.rotation.z = Math.sin(this.lidarSweepAngle) * 0.12;
       this.lidarBeam.material.opacity = 0.08 + Math.abs(Math.sin(this.lidarSweepAngle * 2.0)) * 0.08;
     }
 
-    // 3. AI Processor & Sensor LED Activity Blinks
+    // 4. AI Processor & Sensor LED Activity Blinks
     const timeSec = performance.now() * 0.001;
     if (this.leds.lidar) {
       this.leds.lidar.material.color.setHex((Math.floor(timeSec * 8) % 2 === 0) ? 0x06b6d4 : 0x0284c7);
@@ -1130,7 +1601,7 @@ export class ObstacleCaptureNet {
       }
     }
 
-    // 4. Emergency Rescue Strobe Flasher Animation along Top Red Pipe Header
+    // 5. Emergency Rescue Strobe Flasher Animation along Top Red Pipe Header
     if (this.strobeLeds && this.strobeLeds.length > 0) {
       const flashCycle = Math.floor(timeSec * 16) % 6;
       const isFlash = (flashCycle === 0 || flashCycle === 2);

@@ -31,6 +31,14 @@ class SimulatorApp {
     this.obstacles = new ObstacleManager(this.scene, this.track);
     this.lastTelemetry = null;
 
+    // Cinematic Slow-Motion Time-Warp State (Does not alter true train speed)
+    this.timeScale = 1.0;
+    this.timeScales = [1.0, 0.5, 0.25, 0.1];
+    this.timeScaleIndex = 0;
+    this.autoSlowMo = true;
+    this.isRescueSlowMo = false;
+    this.rescueSlowMoTimer = 0;
+
     // Orbit Controls for Chase Camera
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -38,7 +46,7 @@ class SimulatorApp {
     this.controls.maxDistance = 120;
     this.controls.minDistance = 3;
 
-    // Camera Modes: 'action', 'chase', 'cab', 'railfan', 'window', 'drone'
+    // Camera Modes: 'action', 'net', 'chase', 'cab', 'railfan', 'window', 'drone'
     this.cameraMode = 'action';
     this.railfanPos = new THREE.Vector3();
     this.railfanLookTarget = new THREE.Vector3();
@@ -168,13 +176,19 @@ class SimulatorApp {
         case 'KeyC':
           this.cycleCamera();
           break;
+        case 'KeyN':
+          this.setCameraMode('net');
+          break;
+        case 'KeyZ':
+          this.cycleSlowMotion();
+          break;
         case 'KeyT':
           this.switchTrainType();
           break;
         case 'KeyL':
           this.train.cycleHeadlight();
           break;
-        case 'KeyN':
+        case 'KeyO':
           const netSt = this.train.toggleCaptureNet(this.audio);
           if (this.dom.btnCaptureNet) {
             this.dom.btnCaptureNet.innerText = `🛡️ Net: ${netSt ? 'DEPLOYED' : 'RETRACTED'}`;
@@ -263,6 +277,30 @@ class SimulatorApp {
         this.setCameraMode(btn.dataset.cam);
       });
     });
+
+    // Slow Motion quick tool button
+    const btnSlowMo = document.getElementById('btn-slow-mo');
+    if (btnSlowMo) {
+      btnSlowMo.addEventListener('click', () => {
+        this.cycleSlowMotion();
+      });
+    }
+
+    // Kavach Card Slow-Mo button
+    const btnKavachSlowmo = document.getElementById('btn-kavach-slowmo');
+    if (btnKavachSlowmo) {
+      btnKavachSlowmo.addEventListener('click', () => {
+        this.cycleSlowMotion();
+      });
+    }
+
+    // Kavach Card Net Cam button
+    const btnKavachNetcam = document.getElementById('btn-kavach-netcam');
+    if (btnKavachNetcam) {
+      btnKavachNetcam.addEventListener('click', () => {
+        this.setCameraMode('net');
+      });
+    }
 
     // Train switch button
     const btnTrainSwitch = document.getElementById('btn-train-switch');
@@ -357,10 +395,18 @@ class SimulatorApp {
       });
     }
 
-    // Help modal
+    // Close help modal
     if (this.dom.btnHelp && this.dom.helpModal) {
       this.dom.btnHelp.addEventListener('click', () => this.dom.helpModal.classList.add('open'));
       this.dom.btnCloseHelp.addEventListener('click', () => this.dom.helpModal.classList.remove('open'));
+    }
+
+    // Dismiss alert pill on click
+    if (this.dom.alertBanner) {
+      this.dom.alertBanner.addEventListener('click', () => {
+        this.dom.alertBanner.style.display = 'none';
+        clearTimeout(this.alertBannerTimeout);
+      });
     }
 
     // Throttle click/drag on HUD
@@ -406,10 +452,56 @@ class SimulatorApp {
   }
 
   cycleCamera() {
-    const modes = ['action', 'chase', 'cab', 'railfan', 'window', 'drone'];
+    const modes = ['action', 'net', 'chase', 'cab', 'railfan', 'window', 'drone'];
     const idx = modes.indexOf(this.cameraMode);
     const nextMode = modes[(idx + 1) % modes.length];
     this.setCameraMode(nextMode);
+  }
+
+  // ---------------------------------------------------------
+  // Slow-Motion Time-Warp Controls (Preserves Train Speed)
+  // ---------------------------------------------------------
+  cycleSlowMotion() {
+    this.timeScaleIndex = (this.timeScaleIndex + 1) % this.timeScales.length;
+    this.timeScale = this.timeScales[this.timeScaleIndex];
+    this.isRescueSlowMo = false;
+    this.updateSlowMoUI();
+  }
+
+  setSlowMotion(scale) {
+    this.timeScale = scale;
+    this.timeScaleIndex = this.timeScales.indexOf(scale);
+    if (this.timeScaleIndex === -1) this.timeScaleIndex = 0;
+    this.isRescueSlowMo = false;
+    this.updateSlowMoUI();
+  }
+
+  updateSlowMoUI() {
+    const activeScale = this.isRescueSlowMo ? 0.25 : this.timeScale;
+    const isSlow = activeScale < 1.0;
+    const label = isSlow ? `⏱️ SLOW-MO: ${activeScale}x` : '⏱️ SLOW-MO: 1x';
+
+    const btnTop = document.getElementById('btn-slow-mo');
+    const btnKavach = document.getElementById('btn-kavach-slowmo');
+    const badge = document.getElementById('slowmo-badge');
+
+    if (btnTop) {
+      btnTop.innerText = label;
+      btnTop.classList.toggle('active', isSlow);
+      btnTop.style.background = isSlow ? '#0284c7' : 'rgba(3, 105, 161, 0.4)';
+    }
+    if (btnKavach) {
+      btnKavach.innerText = label;
+      btnKavach.style.background = isSlow ? '#0284c7' : '#0369a1';
+    }
+    if (badge) {
+      badge.style.display = isSlow ? 'block' : 'none';
+      if (this.isRescueSlowMo) {
+        badge.innerText = `⚡ AI KAVACH RESCUE CAM (0.25x SLOW-MO) • SPEED: ${Math.round(this.physics.speedKmh)} KM/H`;
+      } else {
+        badge.innerText = `⏱️ SLOW MOTION (${activeScale}x) • TRAIN SPEED: ${Math.round(this.physics.speedKmh)} KM/H`;
+      }
+    }
   }
 
   // ---------------------------------------------------------
@@ -475,6 +567,21 @@ class SimulatorApp {
         .add(forward.clone().multiplyScalar(this.train.locoLength / 2 + 0.8))
         .add(right.clone().multiplyScalar(0.4))
         .add(up.clone().multiplyScalar(1.7));
+      this.camera.position.copy(locoPos).add(camOffset);
+      this.camera.lookAt(lookTarget);
+
+    } else if (this.cameraMode === 'net') {
+      // Dedicated Close-Up Capture Net & Rescue Scoop Action Cam
+      // Intimate, dramatic view positioned just ahead and to the left of the scoop opening,
+      // looking right into the hammock cradle, pick-up lip, and oncoming track
+      const fwdDist = this.train.locoLength / 2 + 4.9;
+      const camOffset = forward.clone().multiplyScalar(fwdDist)
+        .add(right.clone().multiplyScalar(-2.5))
+        .add(up.clone().multiplyScalar(1.2));
+      const lookTarget = locoPos.clone()
+        .add(forward.clone().multiplyScalar(this.train.locoLength / 2 + 1.6))
+        .add(right.clone().multiplyScalar(0.1))
+        .add(up.clone().multiplyScalar(0.7));
       this.camera.position.copy(locoPos).add(camOffset);
       this.camera.lookAt(lookTarget);
 
@@ -603,7 +710,9 @@ class SimulatorApp {
 
       // Signal aspect lamps updated (Cab Signal cluster displays status cleanly without blocking view)
       if (!this.lastTelemetry || !this.lastTelemetry.alertMessage) {
-        this.dom.alertBanner.style.display = 'none';
+        if (!this.lastDisplayedAlert) {
+          this.dom.alertBanner.style.display = 'none';
+        }
       }
     }
 
@@ -647,17 +756,35 @@ class SimulatorApp {
         this.dom.kavachPayloadBar.style.width = `${payloadPct}%`;
       }
 
-      // Dynamic Alert Banner for AI Detection & Rescue Events
+      // Dynamic Alert Notification Pill for AI Detection & Rescue Events (Sleek, unobtrusive top pill)
       if (t.alertMessage) {
-        this.dom.alertBanner.style.display = 'block';
-        if (t.alertType === 'hazard') {
-          this.dom.alertBanner.style.background = 'rgba(220, 38, 38, 0.95)';
-        } else if (t.alertType === 'success') {
-          this.dom.alertBanner.style.background = 'rgba(16, 185, 129, 0.95)';
-        } else {
-          this.dom.alertBanner.style.background = 'rgba(234, 179, 8, 0.95)';
+        if (t.alertMessage !== this.lastDisplayedAlert) {
+          this.lastDisplayedAlert = t.alertMessage;
+          this.dom.alertBanner.style.display = 'block';
+          this.dom.alertBanner.style.opacity = '1';
+          if (t.alertType === 'hazard') {
+            this.dom.alertBanner.style.background = 'rgba(185, 28, 28, 0.92)';
+            this.dom.alertBanner.style.borderColor = '#ef4444';
+          } else if (t.alertType === 'success') {
+            this.dom.alertBanner.style.background = 'rgba(5, 150, 105, 0.92)';
+            this.dom.alertBanner.style.borderColor = '#10b981';
+          } else {
+            this.dom.alertBanner.style.background = 'rgba(180, 83, 9, 0.92)';
+            this.dom.alertBanner.style.borderColor = '#f59e0b';
+          }
+          this.dom.alertBanner.innerText = t.alertMessage;
+
+          // Auto-hide after 3.8s so it never stays permanently across screen
+          clearTimeout(this.alertBannerTimeout);
+          this.alertBannerTimeout = setTimeout(() => {
+            if (this.dom.alertBanner) {
+              this.dom.alertBanner.style.opacity = '0';
+              setTimeout(() => {
+                if (this.dom.alertBanner) this.dom.alertBanner.style.display = 'none';
+              }, 300);
+            }
+          }, 3800);
         }
-        this.dom.alertBanner.innerText = t.alertMessage;
       }
     }
   }
@@ -668,7 +795,28 @@ class SimulatorApp {
   animate() {
     requestAnimationFrame(this.animate);
 
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const rawDt = Math.min(this.clock.getDelta(), 0.1);
+
+    // Automated Cinematic Slow-Motion Trigger during close-range rescue events
+    if (this.autoSlowMo && this.lastTelemetry && this.lastTelemetry.targetDetected && this.lastTelemetry.canCollect) {
+      if (this.lastTelemetry.distance <= 48 && !this.isRescueSlowMo) {
+        this.isRescueSlowMo = true;
+        this.rescueSlowMoTimer = 3.2; // Hold slow motion for 3.2s so player clearly observes scoop
+        this.updateSlowMoUI();
+      }
+    }
+
+    if (this.isRescueSlowMo) {
+      this.rescueSlowMoTimer -= rawDt;
+      if (this.rescueSlowMoTimer <= 0) {
+        this.isRescueSlowMo = false;
+        this.updateSlowMoUI();
+      }
+    }
+
+    // Effective time-warp scale (manual scale or automated rescue slow-mo)
+    const effectiveTimeScale = this.isRescueSlowMo ? 0.25 : this.timeScale;
+    const dt = rawDt * effectiveTimeScale;
 
     // 1. Get track curvature and transform for Locomotive (center and bogies)
     const locoTransform = this.track.getCarTransform(this.physics.trackProgress, this.train.locoLength, 0);
