@@ -39,6 +39,7 @@ export class TrainModel {
     // Lighting
     this.headlightBeam = null;
     this.headlightState = 'bright';
+    this.flasherLamps = [];
 
     this.buildTrain();
   }
@@ -519,6 +520,7 @@ export class TrainModel {
     this.rotatingWheels = [];
     this.wipers = [];
     this.radiatorFans = [];
+    this.flasherLamps = [];
 
     // 1. Build Locomotive Car Group (Independent Top-Level Group)
     this.locoCar = new THREE.Group();
@@ -686,9 +688,49 @@ export class TrainModel {
       });
 
       // Center Amber Flasher Light (Safety Beacon above Headlights)
-      const flasher = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 14).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf59e0b }));
+      const flasherMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const flasher = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.05, 14).rotateX(Math.PI / 2), flasherMat);
       flasher.position.set(0, 3.48, cabLen + 0.22);
       cabGroup.add(flasher);
+      this.flasherLamps.push(flasherMat);
+
+      // Modern Indian Railways WAP-7 Roof-Mounted Cab Air Conditioner Unit
+      const acUnit = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.28, 1.8), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.35, metalness: 0.3 }));
+      acUnit.position.set(0, 3.82, cabLen * 0.45);
+      acUnit.castShadow = true;
+      cabGroup.add(acUnit);
+
+      // Dual Condenser Fan Exhaust Grilles on AC unit
+      [-0.45, 0.45].forEach(fz => {
+        const fanBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.04, 16), materials.darkSteel);
+        fanBezel.position.set(0, 3.97, cabLen * 0.45 + fz);
+        cabGroup.add(fanBezel);
+        const fanBlades = new THREE.Mesh(new THREE.CircleGeometry(0.21, 8).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+        fanBlades.position.set(0, 3.99, cabLen * 0.45 + fz);
+        cabGroup.add(fanBlades);
+      });
+
+      // RTIS Satellite Antenna Dome
+      const rtisDome = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.08, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+      rtisDome.position.set(-0.65, 3.82, cabLen * 0.15);
+      cabGroup.add(rtisDome);
+
+      // Wireless Radio Blade Antenna
+      const bladeAnt = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.22, 0.12), materials.darkSteel);
+      bladeAnt.position.set(0.65, 3.86, cabLen * 0.15);
+      cabGroup.add(bladeAnt);
+
+      // Stainless Steel Cab Corner Handrails (Vertical grab irons)
+      [-1.54, 1.54].forEach(hx => {
+        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.6), materials.chrome);
+        rail.position.set(hx, 1.85, cabLen - 0.1);
+        cabGroup.add(rail);
+
+        // Lower Shunter Footboard / Step at buffer beam corner
+        const step = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.04, 0.28), materials.darkSteel);
+        step.position.set(hx, 0.52, cabLen + 0.15);
+        cabGroup.add(step);
+      });
 
       // Twin Red Tail / Marker Lights (Lower Corners)
       [-1.15, 1.15].forEach(mx => {
@@ -988,6 +1030,11 @@ export class TrainModel {
         const brakeBlock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.08), darkSteel);
         brakeBlock.position.set(x, this.wheelRadius, z + 0.38);
         bogie.add(brakeBlock);
+
+        // Wheel Sanding Pipe & Nozzle (aimed at rail contact point)
+        const sandPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.40).rotateX(x > 0 ? 0.35 : -0.35), darkSteel);
+        sandPipe.position.set(x * 0.95, this.wheelRadius - 0.18, z + (x > 0 ? 0.52 : -0.52));
+        bogie.add(sandPipe);
       });
 
       bogie.add(axleGroup);
@@ -1176,6 +1223,11 @@ export class TrainModel {
     this.rotatingWheels.forEach(w => {
       w.rotation.x += deltaAngle;
     });
+
+    // Pulse Amber Cab Flasher Lamps
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.008);
+    const flasherColor = pulse > 0.45 ? 0xf59e0b : 0x78350f;
+    this.flasherLamps.forEach(m => m.color.setHex(flasherColor));
 
     // Update Capture Net rapid inflation animation & active sensor suite
     if (this.captureNet) {

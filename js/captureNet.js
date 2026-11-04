@@ -53,8 +53,9 @@ export class ObstacleCaptureNet {
     this.cradleCargoGroup.name = 'cradleCargoGroup';
     this.deployableScoop.add(this.cradleCargoGroup);
 
-    // Dynamic LED indicators and LiDAR beam references
+    // Dynamic LED indicators, Strobe Light Bar, and LiDAR beam references
     this.leds = {};
+    this.strobeLeds = [];
     this.lidarBeam = null;
     this.lidarSweepAngle = 0;
 
@@ -80,9 +81,9 @@ export class ObstacleCaptureNet {
     const ctxNet = canvasNet.getContext('2d');
     ctxNet.clearRect(0, 0, 512, 512);
 
-    // Deep contact shadow underneath cords for genuine 3D depth & relief
+    // Deep crimson/black contact shadow underneath cords for genuine 3D depth & relief
     ctxNet.lineWidth = 26;
-    ctxNet.strokeStyle = '#451a03'; // Deep amber shadow
+    ctxNet.strokeStyle = '#380404'; // Deep crimson maroon shadow
     ctxNet.beginPath();
     ctxNet.moveTo(0, 260); ctxNet.lineTo(512, 260);
     ctxNet.moveTo(260, 0); ctxNet.lineTo(260, 512);
@@ -90,15 +91,15 @@ export class ObstacleCaptureNet {
 
     // Secondary diagonal cord drop shadows
     ctxNet.lineWidth = 14;
-    ctxNet.strokeStyle = 'rgba(69, 26, 3, 0.45)';
+    ctxNet.strokeStyle = 'rgba(56, 4, 4, 0.45)';
     ctxNet.beginPath();
     ctxNet.moveTo(0, 0); ctxNet.lineTo(512, 512);
     ctxNet.moveTo(512, 0); ctxNet.lineTo(0, 512);
     ctxNet.stroke();
 
-    // Main vibrant safety yellow / golden Kevlar braided core
+    // Main vibrant safety rescue red braided core cords
     ctxNet.lineWidth = 20;
-    ctxNet.strokeStyle = '#eab308'; // Safety Yellow
+    ctxNet.strokeStyle = '#dc2626'; // High-visibility Rescue Safety Red
     ctxNet.beginPath();
     ctxNet.moveTo(0, 256); ctxNet.lineTo(512, 256);
     ctxNet.moveTo(256, 0); ctxNet.lineTo(256, 512);
@@ -106,7 +107,7 @@ export class ObstacleCaptureNet {
 
     // Diagonal support cords
     ctxNet.lineWidth = 10;
-    ctxNet.strokeStyle = '#ca8a04';
+    ctxNet.strokeStyle = '#b91c1c'; // Deep Crimson Red
     ctxNet.beginPath();
     ctxNet.moveTo(0, 0); ctxNet.lineTo(512, 512);
     ctxNet.moveTo(512, 0); ctxNet.lineTo(0, 512);
@@ -114,14 +115,14 @@ export class ObstacleCaptureNet {
 
     // Upper rope twist fiber highlight glints
     ctxNet.lineWidth = 6;
-    ctxNet.strokeStyle = '#fef08a'; // Bright lemon fiber glint
+    ctxNet.strokeStyle = '#f87171'; // Light coral / red silk fiber sheen
     ctxNet.beginPath();
     ctxNet.moveTo(0, 250); ctxNet.lineTo(512, 250);
     ctxNet.moveTo(250, 0); ctxNet.lineTo(250, 512);
     ctxNet.stroke();
 
     // Braided rope twist notches (spiraling cord texture)
-    ctxNet.strokeStyle = '#a16207';
+    ctxNet.strokeStyle = '#7f1d1d';
     ctxNet.lineWidth = 4;
     for (let i = 0; i < 512; i += 28) {
       ctxNet.beginPath();
@@ -133,17 +134,17 @@ export class ObstacleCaptureNet {
     }
 
     // Heavy round woven knot & brass reinforcement grommet at intersection
-    ctxNet.fillStyle = '#451a03';
+    ctxNet.fillStyle = '#380404';
     ctxNet.beginPath();
     ctxNet.arc(256, 256, 28, 0, Math.PI * 2);
     ctxNet.fill();
 
-    ctxNet.fillStyle = '#eab308';
+    ctxNet.fillStyle = '#ef4444'; // Bright emergency red knot
     ctxNet.beginPath();
     ctxNet.arc(256, 256, 22, 0, Math.PI * 2);
     ctxNet.fill();
 
-    ctxNet.fillStyle = '#fef08a';
+    ctxNet.fillStyle = '#fee2e2'; // Gloss highlight
     ctxNet.beginPath();
     ctxNet.arc(250, 250, 10, 0, Math.PI * 2);
     ctxNet.fill();
@@ -153,18 +154,155 @@ export class ObstacleCaptureNet {
     captureNetMeshTex.wrapT = THREE.RepeatWrapping;
     captureNetMeshTex.repeat.set(1, 1);
 
-    // 2. High-Grade Rescue Orange PVC / Hypalon Fabric Texture (512 x 512)
+    // 2. Ultra-HD Rescue Red Inflatable Pipe Texture (1024 x 512)
+    // Features 3D rounded specular volume, 3M retroreflective silver bands,
+    // diagonal safety hazard chevrons, technical stenciling, and vulcanized seam tape
+    const canvasRedPipe = document.createElement('canvas');
+    canvasRedPipe.width = 1024;
+    canvasRedPipe.height = 512;
+    const ctxRed = canvasRedPipe.getContext('2d');
+
+    // Deep vibrant rescue safety red base
+    ctxRed.fillStyle = '#dc2626';
+    ctxRed.fillRect(0, 0, 1024, 512);
+
+    // Micro-ripstop Hypalon rubber texture weave
+    ctxRed.strokeStyle = 'rgba(153, 27, 27, 0.40)';
+    ctxRed.lineWidth = 1.5;
+    for (let i = 0; i < 1024; i += 16) {
+      ctxRed.beginPath();
+      ctxRed.moveTo(i, 0); ctxRed.lineTo(i, 512);
+      ctxRed.stroke();
+    }
+    for (let j = 0; j < 512; j += 16) {
+      ctxRed.beginPath();
+      ctxRed.moveTo(0, j); ctxRed.lineTo(1024, j);
+      ctxRed.stroke();
+    }
+
+    // Cylindrical volume specular sheen (gives 3D rounded puffiness to pneumatic tubes)
+    const gradPipeH = ctxRed.createLinearGradient(0, 0, 0, 190);
+    gradPipeH.addColorStop(0.0, 'rgba(255, 255, 255, 0.38)');
+    gradPipeH.addColorStop(0.4, 'rgba(255, 255, 255, 0.14)');
+    gradPipeH.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+    ctxRed.fillStyle = gradPipeH;
+    ctxRed.fillRect(0, 0, 1024, 190);
+
+    const gradPipeS = ctxRed.createLinearGradient(0, 340, 0, 512);
+    gradPipeS.addColorStop(0.0, 'rgba(0, 0, 0, 0.0)');
+    gradPipeS.addColorStop(1.0, 'rgba(0, 0, 0, 0.48)');
+    ctxRed.fillStyle = gradPipeS;
+    ctxRed.fillRect(0, 340, 1024, 172);
+
+    // High-visibility 3M Retroreflective Silver Bands & Hazard Chevron Collars
+    const bandPositions = [140, 480, 820];
+    bandPositions.forEach(bx => {
+      // Vulcanized black rubber collar borders
+      ctxRed.fillStyle = '#1e293b';
+      ctxRed.fillRect(bx - 12, 0, 104, 512);
+
+      // Bright retroreflective silver center band
+      ctxRed.fillStyle = '#f8fafc';
+      ctxRed.fillRect(bx, 0, 80, 512);
+
+      // Black diagonal safety hazard stripes
+      ctxRed.fillStyle = '#0f172a';
+      for (let y = -40; y < 512; y += 40) {
+        ctxRed.beginPath();
+        ctxRed.moveTo(bx, y);
+        ctxRed.lineTo(bx + 40, y + 40);
+        ctxRed.lineTo(bx + 40, y + 60);
+        ctxRed.lineTo(bx, y + 20);
+        ctxRed.closePath();
+        ctxRed.fill();
+
+        ctxRed.beginPath();
+        ctxRed.moveTo(bx + 40, y + 40);
+        ctxRed.lineTo(bx + 80, y);
+        ctxRed.lineTo(bx + 80, y + 20);
+        ctxRed.lineTo(bx + 40, y + 60);
+        ctxRed.closePath();
+        ctxRed.fill();
+      }
+
+      // Welded rubber seam lines with double stitch marks
+      ctxRed.fillStyle = '#cbd5e1';
+      for (let y = 6; y < 512; y += 14) {
+        ctxRed.fillRect(bx - 6, y, 2.5, 6);
+        ctxRed.fillRect(bx + 84, y, 2.5, 6);
+      }
+    });
+
+    // Technical Rescue Stencil Typography between bands
+    ctxRed.save();
+    ctxRed.fillStyle = '#ffffff';
+    ctxRed.font = 'bold 22px "Courier New", monospace';
+    ctxRed.textAlign = 'center';
+    ctxRed.fillText('✦ KAVACH IMPACT SCOOP ✦', 310, 240);
+    ctxRed.font = 'bold 15px "Courier New", monospace';
+    ctxRed.fillText('RAPID PNEUMATIC RESCUE • 150 KG MAX', 310, 275);
+    ctxRed.fillText('WP: 15 BAR • HIGH-TENSILE HYPALON', 310, 305);
+
+    ctxRed.font = 'bold 22px "Courier New", monospace';
+    ctxRed.fillText('▶▶ RESCUE BED ▶▶', 650, 240);
+    ctxRed.font = 'bold 15px "Courier New", monospace';
+    ctxRed.fillText('HIGH-STRENGTH IMPACT SCOOP', 650, 275);
+    ctxRed.fillText('IR-RDSO SPECIFIED SAFETY PROTOCOL', 650, 305);
+    ctxRed.restore();
+
+    // Heat-welded longitudinal center seam line
+    ctxRed.fillStyle = '#7f1d1d';
+    ctxRed.fillRect(0, 252, 1024, 6);
+
+    const redPipeTex = new THREE.CanvasTexture(canvasRedPipe);
+    redPipeTex.wrapS = THREE.RepeatWrapping;
+    redPipeTex.wrapT = THREE.RepeatWrapping;
+    redPipeTex.repeat.set(2, 1);
+
+    // 3. High-Visibility Rescue Deflection Apron Texture (512 x 512)
+    const canvasApron = document.createElement('canvas');
+    canvasApron.width = 512;
+    canvasApron.height = 512;
+    const ctxApron = canvasApron.getContext('2d');
+
+    ctxApron.fillStyle = '#dc2626';
+    ctxApron.fillRect(0, 0, 512, 512);
+
+    // Reflective white chevron arrows pointing inward up the scoop
+    ctxApron.fillStyle = '#ffffff';
+    for (let cy = 60; cy < 480; cy += 120) {
+      ctxApron.beginPath();
+      ctxApron.moveTo(256, cy - 35);
+      ctxApron.lineTo(440, cy + 30);
+      ctxApron.lineTo(400, cy + 50);
+      ctxApron.lineTo(256, cy);
+      ctxApron.lineTo(112, cy + 50);
+      ctxApron.lineTo(72, cy + 30);
+      ctxApron.closePath();
+      ctxApron.fill();
+    }
+
+    ctxApron.font = 'bold 24px monospace';
+    ctxApron.fillStyle = '#ffffff';
+    ctxApron.textAlign = 'center';
+    ctxApron.fillText('RESCUE CRADLE ZONE', 256, 490);
+
+    const apronTex = new THREE.CanvasTexture(canvasApron);
+    apronTex.wrapS = THREE.ClampToEdgeWrapping;
+    apronTex.wrapT = THREE.ClampToEdgeWrapping;
+
+    // 4. High-Grade Rescue Orange & Graphite PVC / Hypalon Fabric Texture (512 x 512)
     const canvasCushion = document.createElement('canvas');
     canvasCushion.width = 512;
     canvasCushion.height = 512;
     const ctxCushion = canvasCushion.getContext('2d');
 
-    // Base high-vis rescue orange
-    ctxCushion.fillStyle = '#f97316';
+    // Rich saturated rescue safety orange
+    ctxCushion.fillStyle = '#ea580c';
     ctxCushion.fillRect(0, 0, 512, 512);
 
     // Micro-ripstop diamond weave
-    ctxCushion.strokeStyle = 'rgba(194, 65, 12, 0.4)';
+    ctxCushion.strokeStyle = 'rgba(154, 52, 18, 0.4)';
     ctxCushion.lineWidth = 1.5;
     for (let i = 0; i < 512; i += 16) {
       ctxCushion.beginPath();
@@ -176,14 +314,14 @@ export class ObstacleCaptureNet {
     // Cylindrical bolster volume shading & welded seam bands
     for (let bx = 0; bx < 512; bx += 128) {
       const gradH = ctxCushion.createLinearGradient(bx, 0, bx + 64, 0);
-      gradH.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+      gradH.addColorStop(0, 'rgba(255, 237, 213, 0.16)');
       gradH.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
       ctxCushion.fillStyle = gradH;
       ctxCushion.fillRect(bx + 12, 0, 52, 512);
 
       const gradS = ctxCushion.createLinearGradient(bx + 64, 0, bx + 128, 0);
       gradS.addColorStop(0, 'rgba(0, 0, 0, 0.0)');
-      gradS.addColorStop(1, 'rgba(0, 0, 0, 0.50)');
+      gradS.addColorStop(1, 'rgba(30, 41, 59, 0.45)');
       ctxCushion.fillStyle = gradS;
       ctxCushion.fillRect(bx + 64, 0, 64, 512);
 
@@ -191,8 +329,8 @@ export class ObstacleCaptureNet {
       ctxCushion.fillStyle = '#7c2d12';
       ctxCushion.fillRect(bx + 124, 0, 8, 512);
 
-      // Double-stitched high-tensile gold thread
-      ctxCushion.fillStyle = '#fef08a';
+      // Double-stitched high-tensile silver/white thread
+      ctxCushion.fillStyle = '#f1f5f9';
       for (let y = 6; y < 512; y += 16) {
         ctxCushion.fillRect(bx + 121, y, 2.5, 7);
         ctxCushion.fillRect(bx + 132, y, 2.5, 7);
@@ -201,7 +339,7 @@ export class ObstacleCaptureNet {
 
     // Stencil Technical Markings
     ctxCushion.save();
-    ctxCushion.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctxCushion.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctxCushion.font = 'bold 20px "Courier New", monospace';
     ctxCushion.textAlign = 'center';
     ctxCushion.fillText('OBSTACLE SCOOP • MAX 150KG', 256, 120);
@@ -212,9 +350,9 @@ export class ObstacleCaptureNet {
     const captureCushionTex = new THREE.CanvasTexture(canvasCushion);
     captureCushionTex.wrapS = THREE.RepeatWrapping;
     captureCushionTex.wrapT = THREE.RepeatWrapping;
-    captureCushionTex.repeat.set(2, 2);
+    captureCushionTex.repeat.set(1, 1);
 
-    // 3. Precision Industrial Pressure Gauge Dial Face (256 x 256)
+    // 5. Precision Industrial Pressure Gauge Dial Face (256 x 256)
     const canvasGauge = document.createElement('canvas');
     canvasGauge.width = 256;
     canvasGauge.height = 256;
@@ -287,6 +425,8 @@ export class ObstacleCaptureNet {
     const gaugeDialTex = new THREE.CanvasTexture(canvasGauge);
 
     return {
+      redPipeTex,
+      apronTex,
       captureNetMeshTex,
       captureCushionTex,
       gaugeDialTex
@@ -307,10 +447,19 @@ export class ObstacleCaptureNet {
       metalness: 0.08
     });
 
-    const tipYellowMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15, // High-visibility warning yellow canvas
-      roughness: 0.35,
+    const accentRedMat = new THREE.MeshStandardMaterial({
+      map: this.textures.redPipeTex,
+      color: 0xffffff, // Full texture fidelity with stencils, chevrons & reflective silver bands
+      roughness: 0.32,
       metalness: 0.12
+    });
+
+    const apronMat = new THREE.MeshStandardMaterial({
+      map: this.textures.apronTex,
+      color: 0xffffff,
+      roughness: 0.38,
+      metalness: 0.10,
+      side: THREE.DoubleSide
     });
 
     const netMeshMat = new THREE.MeshStandardMaterial({
@@ -495,28 +644,35 @@ export class ObstacleCaptureNet {
     // (Contained in this.deployableScoop for dynamic inflation animation)
     // ================================================================
 
+    // \_/ Flared Inflatable Capture Scoop Geometry (Front opening forms: \_/ )
+    // Thick heavy-duty pneumatic pontoons with commanding industrial presence:
+    // Top span: 3.16m (-1.58m to +1.58m at y = 2.22m)
+    // Bottom span: 2.04m (-1.02m to +1.02m at y = 0.54m) sitting safely over rails
     const v = {
-      topL_base: new THREE.Vector3(-1.32, 2.20, zBase),
-      topR_base: new THREE.Vector3( 1.32, 2.20, zBase),
-      botL_base: new THREE.Vector3(-1.32, 0.72, zBase),
-      botR_base: new THREE.Vector3( 1.32, 0.72, zBase),
+      // Rear mounting on locomotive buffer beam (zBase)
+      topL_base:  new THREE.Vector3(-1.46, 2.24, zBase),
+      topR_base:  new THREE.Vector3( 1.46, 2.24, zBase),
+      botL_base:  new THREE.Vector3(-1.14, 0.58, zBase),
+      botR_base:  new THREE.Vector3( 1.14, 0.58, zBase),
 
-      shoulderL: new THREE.Vector3(-1.18, 2.00, zBase + 0.95),
-      shoulderR: new THREE.Vector3( 1.18, 2.00, zBase + 0.95),
-      midBotL:   new THREE.Vector3(-1.08, 0.62, zBase + 1.15),
-      midBotR:   new THREE.Vector3( 1.08, 0.62, zBase + 1.15),
+      // Mid-span outriggers & side struts
+      shoulderL:  new THREE.Vector3(-1.52, 2.20, zBase + 1.25),
+      shoulderR:  new THREE.Vector3( 1.52, 2.20, zBase + 1.25),
+      midBotL:    new THREE.Vector3(-1.08, 0.55, zBase + 1.45),
+      midBotR:    new THREE.Vector3( 1.08, 0.55, zBase + 1.45),
 
-      noseTopL:  new THREE.Vector3(-0.24, 0.68, zTip - 0.35),
-      noseTopR:  new THREE.Vector3( 0.24, 0.68, zTip - 0.35),
-      noseBotL:  new THREE.Vector3(-0.18, 0.46, zTip),
-      noseBotR:  new THREE.Vector3( 0.18, 0.46, zTip)
+      // Front Wide-Open Mouth Opening (\_/ Profile: Left \ , Right / , Bottom _ )
+      frontTopL:  new THREE.Vector3(-1.58, 2.22, zTip),
+      frontTopR:  new THREE.Vector3( 1.58, 2.22, zTip),
+      frontBotL:  new THREE.Vector3(-1.02, 0.54, zTip),
+      frontBotR:  new THREE.Vector3( 1.02, 0.54, zTip)
     };
 
     function createTube(pA, pB, radius, mat) {
       const dir = pB.clone().sub(pA);
       const len = dir.length();
       if (len < 0.001) return null;
-      const geom = new THREE.CylinderGeometry(radius, radius, len, 16);
+      const geom = new THREE.CylinderGeometry(radius, radius, len, 20);
       geom.rotateX(Math.PI / 2);
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.copy(pA.clone().add(pB).multiplyScalar(0.5));
@@ -526,7 +682,7 @@ export class ObstacleCaptureNet {
     }
 
     function createKnuckle(pos, radius, mat) {
-      const geom = new THREE.SphereGeometry(radius, 14, 10);
+      const geom = new THREE.SphereGeometry(radius, 16, 12);
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.copy(pos);
       mesh.castShadow = true;
@@ -557,26 +713,34 @@ export class ObstacleCaptureNet {
       return mesh;
     }
 
-    // 1. Continuous Inflatable Tubular Roll-Cage Frame (18 interconnected segments)
+    // 1. Continuous Inflatable Tubular Roll-Cage Frame (Thick Heavy-Duty Pontoons)
     const tubePairs = [
-      [v.topL_base, v.topR_base, 0.12, tipYellowMat],
-      [v.botL_base, v.botR_base, 0.12, boomOrangeMat],
-      [v.topL_base, v.botL_base, 0.12, boomOrangeMat],
-      [v.topR_base, v.botR_base, 0.12, boomOrangeMat],
-      [v.topL_base, v.shoulderL, 0.12, boomOrangeMat],
-      [v.shoulderL, v.noseTopL, 0.12, boomOrangeMat],
-      [v.topR_base, v.shoulderR, 0.12, boomOrangeMat],
-      [v.shoulderR, v.noseTopR, 0.12, boomOrangeMat],
-      [v.botL_base, v.midBotL, 0.12, boomOrangeMat],
-      [v.midBotL,   v.noseBotL, 0.12, boomOrangeMat],
-      [v.botR_base, v.midBotR, 0.12, boomOrangeMat],
-      [v.midBotR,   v.noseBotR, 0.12, boomOrangeMat],
-      [v.shoulderL, v.midBotL, 0.11, boomOrangeMat],
-      [v.shoulderR, v.midBotR, 0.11, boomOrangeMat],
-      [v.noseTopL, v.noseTopR, 0.10, tipYellowMat],
-      [v.noseBotL, v.noseBotR, 0.10, tipYellowMat],
-      [v.noseTopL, v.noseBotL, 0.10, tipYellowMat],
-      [v.noseTopR, v.noseBotR, 0.10, tipYellowMat]
+      // Rear transverse frames
+      [v.topL_base, v.topR_base, 0.20, accentRedMat],
+      [v.botL_base, v.botR_base, 0.18, boomOrangeMat],
+      [v.topL_base, v.botL_base, 0.18, boomOrangeMat],
+      [v.topR_base, v.botR_base, 0.18, boomOrangeMat],
+
+      // Left flank outriggers (upper & lower)
+      [v.topL_base, v.shoulderL, 0.18, boomOrangeMat],
+      [v.shoulderL, v.frontTopL, 0.20, boomOrangeMat],
+      [v.botL_base, v.midBotL, 0.18, boomOrangeMat],
+      [v.midBotL,   v.frontBotL, 0.18, boomOrangeMat],
+      [v.shoulderL, v.midBotL, 0.16, boomOrangeMat],
+
+      // Right flank outriggers (upper & lower)
+      [v.topR_base, v.shoulderR, 0.18, boomOrangeMat],
+      [v.shoulderR, v.frontTopR, 0.20, boomOrangeMat],
+      [v.botR_base, v.midBotR, 0.18, boomOrangeMat],
+      [v.midBotR,   v.frontBotR, 0.18, boomOrangeMat],
+      [v.shoulderR, v.midBotR, 0.16, boomOrangeMat],
+
+      // Front mouth opening perimeter framing (\_/ Flared Profile: Left \ , Right / , Bottom _ )
+      // Thick heavy-duty pneumatic pontoons for maximum impact absorption
+      [v.frontTopL, v.frontTopR, 0.22, accentRedMat],   // Upper front arched header (0.44m diameter)
+      [v.frontBotL, v.frontBotR, 0.20, accentRedMat],   // Lower front track clearance bar (_) (0.40m diameter)
+      [v.frontTopL, v.frontBotL, 0.22, accentRedMat],   // Left flared pillar (\) (0.44m diameter)
+      [v.frontTopR, v.frontBotR, 0.22, accentRedMat]    // Right flared pillar (/) (0.44m diameter)
     ];
 
     tubePairs.forEach(p => {
@@ -584,85 +748,190 @@ export class ObstacleCaptureNet {
       if (tube) this.deployableScoop.add(tube);
     });
 
-    // Spherical Knuckles at all 12 vertices
+    // Spherical Knuckles at all structural corner vertices (matched to thick pontoons)
     Object.entries(v).forEach(([name, pt]) => {
-      const isYellow = name.startsWith('nose') || name.startsWith('top');
-      this.deployableScoop.add(createKnuckle(pt, 0.135, isYellow ? tipYellowMat : boomOrangeMat));
+      const isRed = name.startsWith('front') || name.startsWith('top');
+      this.deployableScoop.add(createKnuckle(pt, 0.245, isRed ? accentRedMat : boomOrangeMat));
     });
 
-    // Yellow Reinforcement Straps & Hoop Sleeves along main booms
+    // High-Vis Red Reinforcement Straps & Retroreflective Hoop Sleeves along main booms
     [
       [v.topL_base, v.shoulderL],
       [v.topR_base, v.shoulderR],
-      [v.shoulderL, v.noseTopL],
-      [v.shoulderR, v.noseTopR],
+      [v.shoulderL, v.frontTopL],
+      [v.shoulderR, v.frontTopR],
       [v.botL_base, v.midBotL],
       [v.botR_base, v.midBotR],
-      [v.midBotL, v.noseBotL],
-      [v.midBotR, v.noseBotR]
+      [v.midBotL, v.frontBotL],
+      [v.midBotR, v.frontBotR]
     ].forEach(([pA, pB]) => {
       [0.35, 0.70].forEach(frac => {
         const pos = pA.clone().lerp(pB, frac);
-        const strapGeo = new THREE.CylinderGeometry(0.135, 0.135, 0.16, 16);
+        const strapGeo = new THREE.CylinderGeometry(0.235, 0.235, 0.20, 20);
         strapGeo.rotateX(Math.PI / 2);
-        const strap = new THREE.Mesh(strapGeo, tipYellowMat);
+        const strap = new THREE.Mesh(strapGeo, accentRedMat);
         strap.position.copy(pos);
         const dir = pB.clone().sub(pA).normalize();
         strap.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
         this.deployableScoop.add(strap);
+
+        // Stainless steel clamp ring around strap
+        const clampRing = new THREE.Mesh(new THREE.TorusGeometry(0.245, 0.016, 8, 20), metalMat);
+        clampRing.position.copy(pos);
+        clampRing.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+        this.deployableScoop.add(clampRing);
       });
     });
 
-    // 2. Twin Forward Aerodynamic Deflection Cones & Prow Hood
-    [-0.16, 0.16].forEach(cx => {
-      const coneGeo = new THREE.ConeGeometry(0.19, 0.62, 18);
-      coneGeo.rotateX(Math.PI / 2);
-      const cone = new THREE.Mesh(coneGeo, tipYellowMat);
-      cone.position.set(cx, 0.49, zTip + 0.31);
-      cone.castShadow = true;
-      this.deployableScoop.add(cone);
+    // 2. Heavy-Duty Mechanical Flanged Collar Cuffs with Hex Bolts at all 4 mouth corners
+    [
+      v.frontTopL,
+      v.frontTopR,
+      v.frontBotL,
+      v.frontBotR
+    ].forEach((pt) => {
+      // Polished stainless steel retention collar ring
+      const collarMesh = new THREE.Mesh(new THREE.TorusGeometry(0.255, 0.022, 10, 24), metalMat);
+      collarMesh.position.copy(pt);
+      this.deployableScoop.add(collarMesh);
 
-      const tipCap = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), rubberMat);
-      tipCap.position.set(cx, 0.49, zTip + 0.62);
-      this.deployableScoop.add(tipCap);
-
-      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.025, 8, 16), boomOrangeMat);
-      collar.position.set(cx, 0.49, zTip);
-      this.deployableScoop.add(collar);
+      // Radial hex socket bolt heads around collar
+      for (let b = 0; b < 6; b++) {
+        const ang = (b / 6) * Math.PI * 2;
+        const bx = pt.x + Math.cos(ang) * 0.255;
+        const by = pt.y + Math.sin(ang) * 0.255;
+        const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.035, 6).rotateX(Math.PI / 2), metalMat);
+        bolt.position.set(bx, by, pt.z + 0.03);
+        this.deployableScoop.add(bolt);
+      }
     });
 
-    // Aerodynamic yellow canvas nose hood / skirt bridging the twin cones & tubes
-    const noseHoodGeo = new THREE.BufferGeometry();
-    const nhPos = [
-      v.noseTopL.x, v.noseTopL.y, v.noseTopL.z,
-      v.noseTopR.x, v.noseTopR.y, v.noseTopR.z,
-      0.16, 0.52, zTip + 0.28,
-     -0.16, 0.52, zTip + 0.28,
-      v.noseBotL.x, v.noseBotL.y, v.noseBotL.z,
-      v.noseBotR.x, v.noseBotR.y, v.noseBotR.z,
-      0.16, 0.46, zTip + 0.28,
-     -0.16, 0.46, zTip + 0.28
-    ];
-    const nhIndices = [
-      0, 1, 2,  0, 2, 3,
-      3, 2, 6,  3, 6, 7,
-      7, 6, 5,  7, 5, 4
-    ];
-    noseHoodGeo.setAttribute('position', new THREE.Float32BufferAttribute(nhPos, 3));
-    noseHoodGeo.setIndex(nhIndices);
-    noseHoodGeo.computeVertexNormals();
-    const noseHoodMesh = new THREE.Mesh(noseHoodGeo, tipYellowMat);
-    this.deployableScoop.add(noseHoodMesh);
+    // Tough Vulcanized Rubber Impact Skid Bumper Pads at Bottom Corners
+    [
+      v.frontBotL,
+      v.frontBotR
+    ].forEach((pt) => {
+      const skidPad = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), rubberMat);
+      skidPad.position.set(pt.x, pt.y - 0.08, pt.z + 0.06);
+      this.deployableScoop.add(skidPad);
+    });
 
-    // 3. Four-Panel Recessed High-Tensile Braided Safety Netting
-    this.deployableScoop.add(createQuadPanel(v.topL_base, v.topR_base, v.shoulderR, v.shoulderL, 16, 6, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.shoulderL, v.shoulderR, v.noseTopR, v.noseTopL, 16, 16, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.topL_base, v.shoulderL, v.midBotL, v.botL_base, 8, 10, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.shoulderL, v.noseTopL, v.noseBotL, v.midBotL, 16, 10, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.shoulderR, v.topR_base, v.botR_base, v.midBotR, 8, 10, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.noseTopR, v.shoulderR, v.midBotR, v.noseBotR, 16, 10, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.botL_base, v.botR_base, v.midBotR, v.midBotL, 14, 8, netMeshMat));
-    this.deployableScoop.add(createQuadPanel(v.midBotL, v.midBotR, v.noseBotR, v.noseBotL, 14, 16, netMeshMat));
+    // 3. Aerodynamic Emergency Rescue LED Strobe Light Bar along Top Red Header Bar
+    const lightBarHousing = new THREE.Mesh(new THREE.BoxGeometry(2.40, 0.07, 0.08), darkHousingMat);
+    lightBarHousing.position.set(0, 2.26, zTip + 0.20);
+    this.deployableScoop.add(lightBarHousing);
+
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.018, 0.085), metalMat);
+    bezel.position.set(0, 2.295, zTip + 0.20);
+    this.deployableScoop.add(bezel);
+
+    const strobeLeds = [];
+    const ledCount = 8;
+    const ledSpacing = 2.2 / ledCount;
+    for (let s = 0; s < ledCount; s++) {
+      const lx = -1.1 + (s + 0.5) * ledSpacing;
+      const isAmber = (s === 1 || s === 6 || s === 2 || s === 5);
+      const ledMat = new THREE.MeshBasicMaterial({
+        color: isAmber ? 0xf59e0b : 0xf8fafc,
+        transparent: true,
+        opacity: 0.95
+      });
+      const ledLens = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.042, 0.02), ledMat);
+      ledLens.position.set(lx, 2.26, zTip + 0.245);
+      this.deployableScoop.add(ledLens);
+      strobeLeds.push(ledLens);
+    }
+    this.strobeLeds = strobeLeds;
+
+    // 4. High-Pressure Flexible Pneumatic Equalizer Bypass Hoses & Brass Couplers
+    [-1, 1].forEach(side => {
+      const topPt = new THREE.Vector3(side * 1.48, 2.18, zTip - 0.15);
+      const botPt = new THREE.Vector3(side * 0.98, 0.60, zTip - 0.15);
+      const midPt = new THREE.Vector3(side * 1.30, 1.40, zTip - 0.28);
+      const hoseCurve = new THREE.CatmullRomCurve3([topPt, midPt, botPt]);
+      const hoseGeo = new THREE.TubeGeometry(hoseCurve, 16, 0.022, 8, false);
+      const hose = new THREE.Mesh(hoseGeo, hoseMat);
+      this.deployableScoop.add(hose);
+
+      [topPt, botPt].forEach(p => {
+        const brassFitting = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 8).rotateX(Math.PI / 2), brassMat);
+        brassFitting.position.copy(p);
+        this.deployableScoop.add(brassFitting);
+      });
+    });
+
+    // 5. High-Visibility Rescue Chevron Ground-Clearance Scooper Ramp / Deflection Apron
+    // Spans across the entire bottom opening between frontBotL (-1.02m) and frontBotR (+1.02m)
+    // Printed with bright reflective chevron arrows guiding upward into the deep catching net cradle!
+    const rampGeo = new THREE.BufferGeometry();
+    const rPos = [
+      -1.02, 0.54, zTip,          // Left front lip
+       1.02, 0.54, zTip,          // Right front lip
+       1.02, 0.58, zTip - 0.45,   // Right ramp incline
+      -1.02, 0.58, zTip - 0.45    // Left ramp incline
+    ];
+    const rIndices = [0, 1, 2,  0, 2, 3];
+    const rUvs = [0, 1,  1, 1,  1, 0,  0, 0];
+    rampGeo.setAttribute('position', new THREE.Float32BufferAttribute(rPos, 3));
+    rampGeo.setAttribute('uv', new THREE.Float32BufferAttribute(rUvs, 2));
+    rampGeo.setIndex(rIndices);
+    rampGeo.computeVertexNormals();
+    const rampMesh = new THREE.Mesh(rampGeo, apronMat);
+    this.deployableScoop.add(rampMesh);
+
+    // Stainless Steel Track Guide Roller Skids (Keep the scoop gliding smoothly over rails & turnouts)
+    [-0.84, -0.28, 0.28, 0.84].forEach(sx => {
+      const skidBracket = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.14, 0.34), darkHousingMat);
+      skidBracket.position.set(sx, 0.46, zTip - 0.10);
+      this.deployableScoop.add(skidBracket);
+
+      const rollerWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.06, 16).rotateZ(Math.PI / 2), metalMat);
+      rollerWheel.position.set(sx, 0.42, zTip - 0.08);
+      this.deployableScoop.add(rollerWheel);
+    });
+
+    // High-Tensile Webbing Tabs & Silver Eyelet Rings with Red Tension Lacing along Main Booms
+    const eyeletGeo = new THREE.TorusGeometry(0.024, 0.007, 8, 12);
+    const eyeletMat = metalMat;
+    const lacingMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 }); // Red nylon tension cord
+
+    [
+      [v.topL_base, v.frontTopL],
+      [v.topR_base, v.frontTopR],
+      [v.botL_base, v.frontBotL],
+      [v.botR_base, v.frontBotR]
+    ].forEach(([pA, pB]) => {
+      const segs = 8;
+      for (let s = 1; s < segs; s++) {
+        const frac = s / segs;
+        const pt = pA.clone().lerp(pB, frac);
+        const eyelet = new THREE.Mesh(eyeletGeo, eyeletMat);
+        eyelet.position.copy(pt);
+        this.deployableScoop.add(eyelet);
+
+        // Small tension lacing cord segment
+        const cordPts = [
+          pt.clone(),
+          pt.clone().add(new THREE.Vector3(0, s % 2 === 0 ? 0.04 : -0.04, 0.05))
+        ];
+        const cordGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cordPts), 4, 0.006, 6, false);
+        const cord = new THREE.Mesh(cordGeo, lacingMat);
+        this.deployableScoop.add(cord);
+      }
+    });
+
+    // 3. High-Tensile Kevlar Braided Safety Netting Enclosure
+    // Top Safety Roof Screen (Spans over top arch, preventing deflection over train)
+    this.deployableScoop.add(createQuadPanel(v.topL_base, v.topR_base, v.frontTopR, v.frontTopL, 16, 12, netMeshMat));
+
+    // Left Flank Protective Side Net Wall
+    this.deployableScoop.add(createQuadPanel(v.topL_base, v.frontTopL, v.frontBotL, v.botL_base, 14, 10, netMeshMat));
+
+    // Right Flank Protective Side Net Wall
+    this.deployableScoop.add(createQuadPanel(v.topR_base, v.botR_base, v.frontBotR, v.frontTopR, 14, 10, netMeshMat));
+
+    // Bottom Rescue Cradle Net Bed (Deep catching hammock suspended between pontoons)
+    this.deployableScoop.add(createQuadPanel(v.botL_base, v.botR_base, v.frontBotR, v.frontBotL, 16, 14, netMeshMat));
 
     // 4. Multi-Bolster Quilted Pneumatic Cushion Mattress (6 Vertical Bolsters)
     const bolsterCount = 6;
@@ -686,15 +955,15 @@ export class ObstacleCaptureNet {
       }
     }
 
-    const topPadGeo = new THREE.CylinderGeometry(0.14, 0.14, 2.55, 18);
+    const topPadGeo = new THREE.CylinderGeometry(0.18, 0.18, 2.85, 20);
     topPadGeo.rotateZ(Math.PI / 2);
-    const topPad = new THREE.Mesh(topPadGeo, tipYellowMat);
-    topPad.position.set(0, 2.22, zBase + 0.12);
+    const topPad = new THREE.Mesh(topPadGeo, accentRedMat);
+    topPad.position.set(0, 2.24, zBase + 0.12);
     this.deployableScoop.add(topPad);
 
-    [-1.15, 1.15].forEach(px => {
-      const pocketGeo = new THREE.BoxGeometry(0.06, 0.38, 0.48);
-      const pocket = new THREE.Mesh(pocketGeo, tipYellowMat);
+    [-1.20, 1.20].forEach(px => {
+      const pocketGeo = new THREE.BoxGeometry(0.08, 0.42, 0.52);
+      const pocket = new THREE.Mesh(pocketGeo, accentRedMat);
       pocket.position.set(px, 1.35, zBase + 0.45);
       this.deployableScoop.add(pocket);
     });
@@ -742,7 +1011,7 @@ export class ObstacleCaptureNet {
     });
 
     // Position cradle cargo anchor point
-    this.cradleCargoGroup.position.set(0, 0.58, zBase + 1.55);
+    this.cradleCargoGroup.position.set(0, 0.62, zBase + 1.55);
   }
 
   // ------------------------------------------------------------------
@@ -859,6 +1128,18 @@ export class ObstacleCaptureNet {
       } else {
         this.leds.ai.material.color.setHex((Math.floor(timeSec * 2) % 2 === 0) ? 0x059669 : 0x064e3b);
       }
+    }
+
+    // 4. Emergency Rescue Strobe Flasher Animation along Top Red Pipe Header
+    if (this.strobeLeds && this.strobeLeds.length > 0) {
+      const flashCycle = Math.floor(timeSec * 16) % 6;
+      const isFlash = (flashCycle === 0 || flashCycle === 2);
+      const isLeftPhase = Math.floor(timeSec * 4) % 2 === 0;
+      this.strobeLeds.forEach((led, idx) => {
+        const isLeftLed = idx < this.strobeLeds.length / 2;
+        const active = isFlash && (isLeftPhase ? isLeftLed : !isLeftLed);
+        led.material.opacity = active ? 0.98 : 0.20;
+      });
     }
   }
 }

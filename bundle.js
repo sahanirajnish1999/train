@@ -35140,6 +35140,7 @@ void main() {
       this.cradleCargoGroup.name = "cradleCargoGroup";
       this.deployableScoop.add(this.cradleCargoGroup);
       this.leds = {};
+      this.strobeLeds = [];
       this.lidarBeam = null;
       this.lidarSweepAngle = 0;
       this.build();
@@ -35158,7 +35159,7 @@ void main() {
       const ctxNet = canvasNet.getContext("2d");
       ctxNet.clearRect(0, 0, 512, 512);
       ctxNet.lineWidth = 26;
-      ctxNet.strokeStyle = "#451a03";
+      ctxNet.strokeStyle = "#380404";
       ctxNet.beginPath();
       ctxNet.moveTo(0, 260);
       ctxNet.lineTo(512, 260);
@@ -35166,7 +35167,7 @@ void main() {
       ctxNet.lineTo(260, 512);
       ctxNet.stroke();
       ctxNet.lineWidth = 14;
-      ctxNet.strokeStyle = "rgba(69, 26, 3, 0.45)";
+      ctxNet.strokeStyle = "rgba(56, 4, 4, 0.45)";
       ctxNet.beginPath();
       ctxNet.moveTo(0, 0);
       ctxNet.lineTo(512, 512);
@@ -35174,7 +35175,7 @@ void main() {
       ctxNet.lineTo(0, 512);
       ctxNet.stroke();
       ctxNet.lineWidth = 20;
-      ctxNet.strokeStyle = "#eab308";
+      ctxNet.strokeStyle = "#dc2626";
       ctxNet.beginPath();
       ctxNet.moveTo(0, 256);
       ctxNet.lineTo(512, 256);
@@ -35182,7 +35183,7 @@ void main() {
       ctxNet.lineTo(256, 512);
       ctxNet.stroke();
       ctxNet.lineWidth = 10;
-      ctxNet.strokeStyle = "#ca8a04";
+      ctxNet.strokeStyle = "#b91c1c";
       ctxNet.beginPath();
       ctxNet.moveTo(0, 0);
       ctxNet.lineTo(512, 512);
@@ -35190,14 +35191,14 @@ void main() {
       ctxNet.lineTo(0, 512);
       ctxNet.stroke();
       ctxNet.lineWidth = 6;
-      ctxNet.strokeStyle = "#fef08a";
+      ctxNet.strokeStyle = "#f87171";
       ctxNet.beginPath();
       ctxNet.moveTo(0, 250);
       ctxNet.lineTo(512, 250);
       ctxNet.moveTo(250, 0);
       ctxNet.lineTo(250, 512);
       ctxNet.stroke();
-      ctxNet.strokeStyle = "#a16207";
+      ctxNet.strokeStyle = "#7f1d1d";
       ctxNet.lineWidth = 4;
       for (let i = 0; i < 512; i += 28) {
         ctxNet.beginPath();
@@ -35209,15 +35210,15 @@ void main() {
         ctxNet.lineTo(268, i + 12);
         ctxNet.stroke();
       }
-      ctxNet.fillStyle = "#451a03";
+      ctxNet.fillStyle = "#380404";
       ctxNet.beginPath();
       ctxNet.arc(256, 256, 28, 0, Math.PI * 2);
       ctxNet.fill();
-      ctxNet.fillStyle = "#eab308";
+      ctxNet.fillStyle = "#ef4444";
       ctxNet.beginPath();
       ctxNet.arc(256, 256, 22, 0, Math.PI * 2);
       ctxNet.fill();
-      ctxNet.fillStyle = "#fef08a";
+      ctxNet.fillStyle = "#fee2e2";
       ctxNet.beginPath();
       ctxNet.arc(250, 250, 10, 0, Math.PI * 2);
       ctxNet.fill();
@@ -35225,13 +35226,118 @@ void main() {
       captureNetMeshTex.wrapS = RepeatWrapping;
       captureNetMeshTex.wrapT = RepeatWrapping;
       captureNetMeshTex.repeat.set(1, 1);
+      const canvasRedPipe = document.createElement("canvas");
+      canvasRedPipe.width = 1024;
+      canvasRedPipe.height = 512;
+      const ctxRed = canvasRedPipe.getContext("2d");
+      ctxRed.fillStyle = "#dc2626";
+      ctxRed.fillRect(0, 0, 1024, 512);
+      ctxRed.strokeStyle = "rgba(153, 27, 27, 0.40)";
+      ctxRed.lineWidth = 1.5;
+      for (let i = 0; i < 1024; i += 16) {
+        ctxRed.beginPath();
+        ctxRed.moveTo(i, 0);
+        ctxRed.lineTo(i, 512);
+        ctxRed.stroke();
+      }
+      for (let j = 0; j < 512; j += 16) {
+        ctxRed.beginPath();
+        ctxRed.moveTo(0, j);
+        ctxRed.lineTo(1024, j);
+        ctxRed.stroke();
+      }
+      const gradPipeH = ctxRed.createLinearGradient(0, 0, 0, 190);
+      gradPipeH.addColorStop(0, "rgba(255, 255, 255, 0.38)");
+      gradPipeH.addColorStop(0.4, "rgba(255, 255, 255, 0.14)");
+      gradPipeH.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+      ctxRed.fillStyle = gradPipeH;
+      ctxRed.fillRect(0, 0, 1024, 190);
+      const gradPipeS = ctxRed.createLinearGradient(0, 340, 0, 512);
+      gradPipeS.addColorStop(0, "rgba(0, 0, 0, 0.0)");
+      gradPipeS.addColorStop(1, "rgba(0, 0, 0, 0.48)");
+      ctxRed.fillStyle = gradPipeS;
+      ctxRed.fillRect(0, 340, 1024, 172);
+      const bandPositions = [140, 480, 820];
+      bandPositions.forEach((bx) => {
+        ctxRed.fillStyle = "#1e293b";
+        ctxRed.fillRect(bx - 12, 0, 104, 512);
+        ctxRed.fillStyle = "#f8fafc";
+        ctxRed.fillRect(bx, 0, 80, 512);
+        ctxRed.fillStyle = "#0f172a";
+        for (let y = -40; y < 512; y += 40) {
+          ctxRed.beginPath();
+          ctxRed.moveTo(bx, y);
+          ctxRed.lineTo(bx + 40, y + 40);
+          ctxRed.lineTo(bx + 40, y + 60);
+          ctxRed.lineTo(bx, y + 20);
+          ctxRed.closePath();
+          ctxRed.fill();
+          ctxRed.beginPath();
+          ctxRed.moveTo(bx + 40, y + 40);
+          ctxRed.lineTo(bx + 80, y);
+          ctxRed.lineTo(bx + 80, y + 20);
+          ctxRed.lineTo(bx + 40, y + 60);
+          ctxRed.closePath();
+          ctxRed.fill();
+        }
+        ctxRed.fillStyle = "#cbd5e1";
+        for (let y = 6; y < 512; y += 14) {
+          ctxRed.fillRect(bx - 6, y, 2.5, 6);
+          ctxRed.fillRect(bx + 84, y, 2.5, 6);
+        }
+      });
+      ctxRed.save();
+      ctxRed.fillStyle = "#ffffff";
+      ctxRed.font = 'bold 22px "Courier New", monospace';
+      ctxRed.textAlign = "center";
+      ctxRed.fillText("\u2726 KAVACH IMPACT SCOOP \u2726", 310, 240);
+      ctxRed.font = 'bold 15px "Courier New", monospace';
+      ctxRed.fillText("RAPID PNEUMATIC RESCUE \u2022 150 KG MAX", 310, 275);
+      ctxRed.fillText("WP: 15 BAR \u2022 HIGH-TENSILE HYPALON", 310, 305);
+      ctxRed.font = 'bold 22px "Courier New", monospace';
+      ctxRed.fillText("\u25B6\u25B6 RESCUE BED \u25B6\u25B6", 650, 240);
+      ctxRed.font = 'bold 15px "Courier New", monospace';
+      ctxRed.fillText("HIGH-STRENGTH IMPACT SCOOP", 650, 275);
+      ctxRed.fillText("IR-RDSO SPECIFIED SAFETY PROTOCOL", 650, 305);
+      ctxRed.restore();
+      ctxRed.fillStyle = "#7f1d1d";
+      ctxRed.fillRect(0, 252, 1024, 6);
+      const redPipeTex = new CanvasTexture(canvasRedPipe);
+      redPipeTex.wrapS = RepeatWrapping;
+      redPipeTex.wrapT = RepeatWrapping;
+      redPipeTex.repeat.set(2, 1);
+      const canvasApron = document.createElement("canvas");
+      canvasApron.width = 512;
+      canvasApron.height = 512;
+      const ctxApron = canvasApron.getContext("2d");
+      ctxApron.fillStyle = "#dc2626";
+      ctxApron.fillRect(0, 0, 512, 512);
+      ctxApron.fillStyle = "#ffffff";
+      for (let cy = 60; cy < 480; cy += 120) {
+        ctxApron.beginPath();
+        ctxApron.moveTo(256, cy - 35);
+        ctxApron.lineTo(440, cy + 30);
+        ctxApron.lineTo(400, cy + 50);
+        ctxApron.lineTo(256, cy);
+        ctxApron.lineTo(112, cy + 50);
+        ctxApron.lineTo(72, cy + 30);
+        ctxApron.closePath();
+        ctxApron.fill();
+      }
+      ctxApron.font = "bold 24px monospace";
+      ctxApron.fillStyle = "#ffffff";
+      ctxApron.textAlign = "center";
+      ctxApron.fillText("RESCUE CRADLE ZONE", 256, 490);
+      const apronTex = new CanvasTexture(canvasApron);
+      apronTex.wrapS = ClampToEdgeWrapping;
+      apronTex.wrapT = ClampToEdgeWrapping;
       const canvasCushion = document.createElement("canvas");
       canvasCushion.width = 512;
       canvasCushion.height = 512;
       const ctxCushion = canvasCushion.getContext("2d");
-      ctxCushion.fillStyle = "#f97316";
+      ctxCushion.fillStyle = "#ea580c";
       ctxCushion.fillRect(0, 0, 512, 512);
-      ctxCushion.strokeStyle = "rgba(194, 65, 12, 0.4)";
+      ctxCushion.strokeStyle = "rgba(154, 52, 18, 0.4)";
       ctxCushion.lineWidth = 1.5;
       for (let i = 0; i < 512; i += 16) {
         ctxCushion.beginPath();
@@ -35243,25 +35349,25 @@ void main() {
       }
       for (let bx = 0; bx < 512; bx += 128) {
         const gradH = ctxCushion.createLinearGradient(bx, 0, bx + 64, 0);
-        gradH.addColorStop(0, "rgba(255, 255, 255, 0.28)");
+        gradH.addColorStop(0, "rgba(255, 237, 213, 0.16)");
         gradH.addColorStop(1, "rgba(255, 255, 255, 0.0)");
         ctxCushion.fillStyle = gradH;
         ctxCushion.fillRect(bx + 12, 0, 52, 512);
         const gradS = ctxCushion.createLinearGradient(bx + 64, 0, bx + 128, 0);
         gradS.addColorStop(0, "rgba(0, 0, 0, 0.0)");
-        gradS.addColorStop(1, "rgba(0, 0, 0, 0.50)");
+        gradS.addColorStop(1, "rgba(30, 41, 59, 0.45)");
         ctxCushion.fillStyle = gradS;
         ctxCushion.fillRect(bx + 64, 0, 64, 512);
         ctxCushion.fillStyle = "#7c2d12";
         ctxCushion.fillRect(bx + 124, 0, 8, 512);
-        ctxCushion.fillStyle = "#fef08a";
+        ctxCushion.fillStyle = "#f1f5f9";
         for (let y = 6; y < 512; y += 16) {
           ctxCushion.fillRect(bx + 121, y, 2.5, 7);
           ctxCushion.fillRect(bx + 132, y, 2.5, 7);
         }
       }
       ctxCushion.save();
-      ctxCushion.fillStyle = "rgba(255, 255, 255, 0.75)";
+      ctxCushion.fillStyle = "rgba(255, 255, 255, 0.85)";
       ctxCushion.font = 'bold 20px "Courier New", monospace';
       ctxCushion.textAlign = "center";
       ctxCushion.fillText("OBSTACLE SCOOP \u2022 MAX 150KG", 256, 120);
@@ -35271,7 +35377,7 @@ void main() {
       const captureCushionTex = new CanvasTexture(canvasCushion);
       captureCushionTex.wrapS = RepeatWrapping;
       captureCushionTex.wrapT = RepeatWrapping;
-      captureCushionTex.repeat.set(2, 2);
+      captureCushionTex.repeat.set(1, 1);
       const canvasGauge = document.createElement("canvas");
       canvasGauge.width = 256;
       canvasGauge.height = 256;
@@ -35326,6 +35432,8 @@ void main() {
       ctxG.fill();
       const gaugeDialTex = new CanvasTexture(canvasGauge);
       return {
+        redPipeTex,
+        apronTex,
         captureNetMeshTex,
         captureCushionTex,
         gaugeDialTex
@@ -35342,11 +35450,19 @@ void main() {
         roughness: 0.38,
         metalness: 0.08
       });
-      const tipYellowMat = new MeshStandardMaterial({
-        color: 16436245,
-        // High-visibility warning yellow canvas
-        roughness: 0.35,
+      const accentRedMat = new MeshStandardMaterial({
+        map: this.textures.redPipeTex,
+        color: 16777215,
+        // Full texture fidelity with stencils, chevrons & reflective silver bands
+        roughness: 0.32,
         metalness: 0.12
+      });
+      const apronMat = new MeshStandardMaterial({
+        map: this.textures.apronTex,
+        color: 16777215,
+        roughness: 0.38,
+        metalness: 0.1,
+        side: DoubleSide
       });
       const netMeshMat = new MeshStandardMaterial({
         map: this.textures.captureNetMeshTex,
@@ -35485,24 +35601,27 @@ void main() {
         if (rod) this.group.add(rod);
       });
       const v = {
-        topL_base: new Vector3(-1.32, 2.2, zBase),
-        topR_base: new Vector3(1.32, 2.2, zBase),
-        botL_base: new Vector3(-1.32, 0.72, zBase),
-        botR_base: new Vector3(1.32, 0.72, zBase),
-        shoulderL: new Vector3(-1.18, 2, zBase + 0.95),
-        shoulderR: new Vector3(1.18, 2, zBase + 0.95),
-        midBotL: new Vector3(-1.08, 0.62, zBase + 1.15),
-        midBotR: new Vector3(1.08, 0.62, zBase + 1.15),
-        noseTopL: new Vector3(-0.24, 0.68, zTip - 0.35),
-        noseTopR: new Vector3(0.24, 0.68, zTip - 0.35),
-        noseBotL: new Vector3(-0.18, 0.46, zTip),
-        noseBotR: new Vector3(0.18, 0.46, zTip)
+        // Rear mounting on locomotive buffer beam (zBase)
+        topL_base: new Vector3(-1.46, 2.24, zBase),
+        topR_base: new Vector3(1.46, 2.24, zBase),
+        botL_base: new Vector3(-1.14, 0.58, zBase),
+        botR_base: new Vector3(1.14, 0.58, zBase),
+        // Mid-span outriggers & side struts
+        shoulderL: new Vector3(-1.52, 2.2, zBase + 1.25),
+        shoulderR: new Vector3(1.52, 2.2, zBase + 1.25),
+        midBotL: new Vector3(-1.08, 0.55, zBase + 1.45),
+        midBotR: new Vector3(1.08, 0.55, zBase + 1.45),
+        // Front Wide-Open Mouth Opening (\_/ Profile: Left \ , Right / , Bottom _ )
+        frontTopL: new Vector3(-1.58, 2.22, zTip),
+        frontTopR: new Vector3(1.58, 2.22, zTip),
+        frontBotL: new Vector3(-1.02, 0.54, zTip),
+        frontBotR: new Vector3(1.02, 0.54, zTip)
       };
       function createTube(pA, pB, radius, mat) {
         const dir = pB.clone().sub(pA);
         const len = dir.length();
         if (len < 1e-3) return null;
-        const geom = new CylinderGeometry(radius, radius, len, 16);
+        const geom = new CylinderGeometry(radius, radius, len, 20);
         geom.rotateX(Math.PI / 2);
         const mesh = new Mesh(geom, mat);
         mesh.position.copy(pA.clone().add(pB).multiplyScalar(0.5));
@@ -35511,7 +35630,7 @@ void main() {
         return mesh;
       }
       function createKnuckle(pos, radius, mat) {
-        const geom = new SphereGeometry(radius, 14, 10);
+        const geom = new SphereGeometry(radius, 16, 12);
         const mesh = new Mesh(geom, mat);
         mesh.position.copy(pos);
         mesh.castShadow = true;
@@ -35553,128 +35672,194 @@ void main() {
         return mesh;
       }
       const tubePairs = [
-        [v.topL_base, v.topR_base, 0.12, tipYellowMat],
-        [v.botL_base, v.botR_base, 0.12, boomOrangeMat],
-        [v.topL_base, v.botL_base, 0.12, boomOrangeMat],
-        [v.topR_base, v.botR_base, 0.12, boomOrangeMat],
-        [v.topL_base, v.shoulderL, 0.12, boomOrangeMat],
-        [v.shoulderL, v.noseTopL, 0.12, boomOrangeMat],
-        [v.topR_base, v.shoulderR, 0.12, boomOrangeMat],
-        [v.shoulderR, v.noseTopR, 0.12, boomOrangeMat],
-        [v.botL_base, v.midBotL, 0.12, boomOrangeMat],
-        [v.midBotL, v.noseBotL, 0.12, boomOrangeMat],
-        [v.botR_base, v.midBotR, 0.12, boomOrangeMat],
-        [v.midBotR, v.noseBotR, 0.12, boomOrangeMat],
-        [v.shoulderL, v.midBotL, 0.11, boomOrangeMat],
-        [v.shoulderR, v.midBotR, 0.11, boomOrangeMat],
-        [v.noseTopL, v.noseTopR, 0.1, tipYellowMat],
-        [v.noseBotL, v.noseBotR, 0.1, tipYellowMat],
-        [v.noseTopL, v.noseBotL, 0.1, tipYellowMat],
-        [v.noseTopR, v.noseBotR, 0.1, tipYellowMat]
+        // Rear transverse frames
+        [v.topL_base, v.topR_base, 0.2, accentRedMat],
+        [v.botL_base, v.botR_base, 0.18, boomOrangeMat],
+        [v.topL_base, v.botL_base, 0.18, boomOrangeMat],
+        [v.topR_base, v.botR_base, 0.18, boomOrangeMat],
+        // Left flank outriggers (upper & lower)
+        [v.topL_base, v.shoulderL, 0.18, boomOrangeMat],
+        [v.shoulderL, v.frontTopL, 0.2, boomOrangeMat],
+        [v.botL_base, v.midBotL, 0.18, boomOrangeMat],
+        [v.midBotL, v.frontBotL, 0.18, boomOrangeMat],
+        [v.shoulderL, v.midBotL, 0.16, boomOrangeMat],
+        // Right flank outriggers (upper & lower)
+        [v.topR_base, v.shoulderR, 0.18, boomOrangeMat],
+        [v.shoulderR, v.frontTopR, 0.2, boomOrangeMat],
+        [v.botR_base, v.midBotR, 0.18, boomOrangeMat],
+        [v.midBotR, v.frontBotR, 0.18, boomOrangeMat],
+        [v.shoulderR, v.midBotR, 0.16, boomOrangeMat],
+        // Front mouth opening perimeter framing (\_/ Flared Profile: Left \ , Right / , Bottom _ )
+        // Thick heavy-duty pneumatic pontoons for maximum impact absorption
+        [v.frontTopL, v.frontTopR, 0.22, accentRedMat],
+        // Upper front arched header (0.44m diameter)
+        [v.frontBotL, v.frontBotR, 0.2, accentRedMat],
+        // Lower front track clearance bar (_) (0.40m diameter)
+        [v.frontTopL, v.frontBotL, 0.22, accentRedMat],
+        // Left flared pillar (\) (0.44m diameter)
+        [v.frontTopR, v.frontBotR, 0.22, accentRedMat]
+        // Right flared pillar (/) (0.44m diameter)
       ];
       tubePairs.forEach((p) => {
         const tube = createTube(p[0], p[1], p[2], p[3]);
         if (tube) this.deployableScoop.add(tube);
       });
       Object.entries(v).forEach(([name, pt]) => {
-        const isYellow = name.startsWith("nose") || name.startsWith("top");
-        this.deployableScoop.add(createKnuckle(pt, 0.135, isYellow ? tipYellowMat : boomOrangeMat));
+        const isRed = name.startsWith("front") || name.startsWith("top");
+        this.deployableScoop.add(createKnuckle(pt, 0.245, isRed ? accentRedMat : boomOrangeMat));
       });
       [
         [v.topL_base, v.shoulderL],
         [v.topR_base, v.shoulderR],
-        [v.shoulderL, v.noseTopL],
-        [v.shoulderR, v.noseTopR],
+        [v.shoulderL, v.frontTopL],
+        [v.shoulderR, v.frontTopR],
         [v.botL_base, v.midBotL],
         [v.botR_base, v.midBotR],
-        [v.midBotL, v.noseBotL],
-        [v.midBotR, v.noseBotR]
+        [v.midBotL, v.frontBotL],
+        [v.midBotR, v.frontBotR]
       ].forEach(([pA, pB]) => {
         [0.35, 0.7].forEach((frac) => {
           const pos = pA.clone().lerp(pB, frac);
-          const strapGeo = new CylinderGeometry(0.135, 0.135, 0.16, 16);
+          const strapGeo = new CylinderGeometry(0.235, 0.235, 0.2, 20);
           strapGeo.rotateX(Math.PI / 2);
-          const strap = new Mesh(strapGeo, tipYellowMat);
+          const strap = new Mesh(strapGeo, accentRedMat);
           strap.position.copy(pos);
           const dir = pB.clone().sub(pA).normalize();
           strap.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir);
           this.deployableScoop.add(strap);
+          const clampRing = new Mesh(new TorusGeometry(0.245, 0.016, 8, 20), metalMat);
+          clampRing.position.copy(pos);
+          clampRing.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), dir);
+          this.deployableScoop.add(clampRing);
         });
       });
-      [-0.16, 0.16].forEach((cx) => {
-        const coneGeo = new ConeGeometry(0.19, 0.62, 18);
-        coneGeo.rotateX(Math.PI / 2);
-        const cone = new Mesh(coneGeo, tipYellowMat);
-        cone.position.set(cx, 0.49, zTip + 0.31);
-        cone.castShadow = true;
-        this.deployableScoop.add(cone);
-        const tipCap = new Mesh(new SphereGeometry(0.065, 14, 10), rubberMat);
-        tipCap.position.set(cx, 0.49, zTip + 0.62);
-        this.deployableScoop.add(tipCap);
-        const collar = new Mesh(new TorusGeometry(0.18, 0.025, 8, 16), boomOrangeMat);
-        collar.position.set(cx, 0.49, zTip);
-        this.deployableScoop.add(collar);
+      [
+        v.frontTopL,
+        v.frontTopR,
+        v.frontBotL,
+        v.frontBotR
+      ].forEach((pt) => {
+        const collarMesh = new Mesh(new TorusGeometry(0.255, 0.022, 10, 24), metalMat);
+        collarMesh.position.copy(pt);
+        this.deployableScoop.add(collarMesh);
+        for (let b = 0; b < 6; b++) {
+          const ang = b / 6 * Math.PI * 2;
+          const bx = pt.x + Math.cos(ang) * 0.255;
+          const by = pt.y + Math.sin(ang) * 0.255;
+          const bolt = new Mesh(new CylinderGeometry(0.018, 0.018, 0.035, 6).rotateX(Math.PI / 2), metalMat);
+          bolt.position.set(bx, by, pt.z + 0.03);
+          this.deployableScoop.add(bolt);
+        }
       });
-      const noseHoodGeo = new BufferGeometry();
-      const nhPos = [
-        v.noseTopL.x,
-        v.noseTopL.y,
-        v.noseTopL.z,
-        v.noseTopR.x,
-        v.noseTopR.y,
-        v.noseTopR.z,
-        0.16,
-        0.52,
-        zTip + 0.28,
-        -0.16,
-        0.52,
-        zTip + 0.28,
-        v.noseBotL.x,
-        v.noseBotL.y,
-        v.noseBotL.z,
-        v.noseBotR.x,
-        v.noseBotR.y,
-        v.noseBotR.z,
-        0.16,
-        0.46,
-        zTip + 0.28,
-        -0.16,
-        0.46,
-        zTip + 0.28
+      [
+        v.frontBotL,
+        v.frontBotR
+      ].forEach((pt) => {
+        const skidPad = new Mesh(new SphereGeometry(0.16, 16, 12), rubberMat);
+        skidPad.position.set(pt.x, pt.y - 0.08, pt.z + 0.06);
+        this.deployableScoop.add(skidPad);
+      });
+      const lightBarHousing = new Mesh(new BoxGeometry(2.4, 0.07, 0.08), darkHousingMat);
+      lightBarHousing.position.set(0, 2.26, zTip + 0.2);
+      this.deployableScoop.add(lightBarHousing);
+      const bezel = new Mesh(new BoxGeometry(2.42, 0.018, 0.085), metalMat);
+      bezel.position.set(0, 2.295, zTip + 0.2);
+      this.deployableScoop.add(bezel);
+      const strobeLeds = [];
+      const ledCount = 8;
+      const ledSpacing = 2.2 / ledCount;
+      for (let s = 0; s < ledCount; s++) {
+        const lx = -1.1 + (s + 0.5) * ledSpacing;
+        const isAmber = s === 1 || s === 6 || s === 2 || s === 5;
+        const ledMat = new MeshBasicMaterial({
+          color: isAmber ? 16096779 : 16317180,
+          transparent: true,
+          opacity: 0.95
+        });
+        const ledLens = new Mesh(new BoxGeometry(0.18, 0.042, 0.02), ledMat);
+        ledLens.position.set(lx, 2.26, zTip + 0.245);
+        this.deployableScoop.add(ledLens);
+        strobeLeds.push(ledLens);
+      }
+      this.strobeLeds = strobeLeds;
+      [-1, 1].forEach((side) => {
+        const topPt = new Vector3(side * 1.48, 2.18, zTip - 0.15);
+        const botPt = new Vector3(side * 0.98, 0.6, zTip - 0.15);
+        const midPt = new Vector3(side * 1.3, 1.4, zTip - 0.28);
+        const hoseCurve = new CatmullRomCurve3([topPt, midPt, botPt]);
+        const hoseGeo = new TubeGeometry(hoseCurve, 16, 0.022, 8, false);
+        const hose = new Mesh(hoseGeo, hoseMat);
+        this.deployableScoop.add(hose);
+        [topPt, botPt].forEach((p) => {
+          const brassFitting = new Mesh(new CylinderGeometry(0.035, 0.035, 0.07, 8).rotateX(Math.PI / 2), brassMat);
+          brassFitting.position.copy(p);
+          this.deployableScoop.add(brassFitting);
+        });
+      });
+      const rampGeo = new BufferGeometry();
+      const rPos = [
+        -1.02,
+        0.54,
+        zTip,
+        // Left front lip
+        1.02,
+        0.54,
+        zTip,
+        // Right front lip
+        1.02,
+        0.58,
+        zTip - 0.45,
+        // Right ramp incline
+        -1.02,
+        0.58,
+        zTip - 0.45
+        // Left ramp incline
       ];
-      const nhIndices = [
-        0,
-        1,
-        2,
-        0,
-        2,
-        3,
-        3,
-        2,
-        6,
-        3,
-        6,
-        7,
-        7,
-        6,
-        5,
-        7,
-        5,
-        4
-      ];
-      noseHoodGeo.setAttribute("position", new Float32BufferAttribute(nhPos, 3));
-      noseHoodGeo.setIndex(nhIndices);
-      noseHoodGeo.computeVertexNormals();
-      const noseHoodMesh = new Mesh(noseHoodGeo, tipYellowMat);
-      this.deployableScoop.add(noseHoodMesh);
-      this.deployableScoop.add(createQuadPanel(v.topL_base, v.topR_base, v.shoulderR, v.shoulderL, 16, 6, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.shoulderL, v.shoulderR, v.noseTopR, v.noseTopL, 16, 16, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.topL_base, v.shoulderL, v.midBotL, v.botL_base, 8, 10, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.shoulderL, v.noseTopL, v.noseBotL, v.midBotL, 16, 10, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.shoulderR, v.topR_base, v.botR_base, v.midBotR, 8, 10, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.noseTopR, v.shoulderR, v.midBotR, v.noseBotR, 16, 10, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.botL_base, v.botR_base, v.midBotR, v.midBotL, 14, 8, netMeshMat));
-      this.deployableScoop.add(createQuadPanel(v.midBotL, v.midBotR, v.noseBotR, v.noseBotL, 14, 16, netMeshMat));
+      const rIndices = [0, 1, 2, 0, 2, 3];
+      const rUvs = [0, 1, 1, 1, 1, 0, 0, 0];
+      rampGeo.setAttribute("position", new Float32BufferAttribute(rPos, 3));
+      rampGeo.setAttribute("uv", new Float32BufferAttribute(rUvs, 2));
+      rampGeo.setIndex(rIndices);
+      rampGeo.computeVertexNormals();
+      const rampMesh = new Mesh(rampGeo, apronMat);
+      this.deployableScoop.add(rampMesh);
+      [-0.84, -0.28, 0.28, 0.84].forEach((sx) => {
+        const skidBracket = new Mesh(new BoxGeometry(0.045, 0.14, 0.34), darkHousingMat);
+        skidBracket.position.set(sx, 0.46, zTip - 0.1);
+        this.deployableScoop.add(skidBracket);
+        const rollerWheel = new Mesh(new CylinderGeometry(0.048, 0.048, 0.06, 16).rotateZ(Math.PI / 2), metalMat);
+        rollerWheel.position.set(sx, 0.42, zTip - 0.08);
+        this.deployableScoop.add(rollerWheel);
+      });
+      const eyeletGeo = new TorusGeometry(0.024, 7e-3, 8, 12);
+      const eyeletMat = metalMat;
+      const lacingMat = new MeshStandardMaterial({ color: 15680580, roughness: 0.3 });
+      [
+        [v.topL_base, v.frontTopL],
+        [v.topR_base, v.frontTopR],
+        [v.botL_base, v.frontBotL],
+        [v.botR_base, v.frontBotR]
+      ].forEach(([pA, pB]) => {
+        const segs = 8;
+        for (let s = 1; s < segs; s++) {
+          const frac = s / segs;
+          const pt = pA.clone().lerp(pB, frac);
+          const eyelet = new Mesh(eyeletGeo, eyeletMat);
+          eyelet.position.copy(pt);
+          this.deployableScoop.add(eyelet);
+          const cordPts = [
+            pt.clone(),
+            pt.clone().add(new Vector3(0, s % 2 === 0 ? 0.04 : -0.04, 0.05))
+          ];
+          const cordGeo = new TubeGeometry(new CatmullRomCurve3(cordPts), 4, 6e-3, 6, false);
+          const cord = new Mesh(cordGeo, lacingMat);
+          this.deployableScoop.add(cord);
+        }
+      });
+      this.deployableScoop.add(createQuadPanel(v.topL_base, v.topR_base, v.frontTopR, v.frontTopL, 16, 12, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.topL_base, v.frontTopL, v.frontBotL, v.botL_base, 14, 10, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.topR_base, v.botR_base, v.frontBotR, v.frontTopR, 14, 10, netMeshMat));
+      this.deployableScoop.add(createQuadPanel(v.botL_base, v.botR_base, v.frontBotR, v.frontBotL, 16, 14, netMeshMat));
       const bolsterCount = 6;
       const bW = 2.45 / bolsterCount;
       for (let i = 0; i < bolsterCount; i++) {
@@ -35693,14 +35878,14 @@ void main() {
           this.deployableScoop.add(valveCap);
         }
       }
-      const topPadGeo = new CylinderGeometry(0.14, 0.14, 2.55, 18);
+      const topPadGeo = new CylinderGeometry(0.18, 0.18, 2.85, 20);
       topPadGeo.rotateZ(Math.PI / 2);
-      const topPad = new Mesh(topPadGeo, tipYellowMat);
-      topPad.position.set(0, 2.22, zBase + 0.12);
+      const topPad = new Mesh(topPadGeo, accentRedMat);
+      topPad.position.set(0, 2.24, zBase + 0.12);
       this.deployableScoop.add(topPad);
-      [-1.15, 1.15].forEach((px2) => {
-        const pocketGeo = new BoxGeometry(0.06, 0.38, 0.48);
-        const pocket = new Mesh(pocketGeo, tipYellowMat);
+      [-1.2, 1.2].forEach((px2) => {
+        const pocketGeo = new BoxGeometry(0.08, 0.42, 0.52);
+        const pocket = new Mesh(pocketGeo, accentRedMat);
         pocket.position.set(px2, 1.35, zBase + 0.45);
         this.deployableScoop.add(pocket);
       });
@@ -35738,7 +35923,7 @@ void main() {
         const hose = new Mesh(hoseGeo, hoseMat);
         this.deployableScoop.add(hose);
       });
-      this.cradleCargoGroup.position.set(0, 0.58, zBase + 1.55);
+      this.cradleCargoGroup.position.set(0, 0.62, zBase + 1.55);
     }
     // ------------------------------------------------------------------
     // Pneumatic Rapid Inflation & Deployment Animation
@@ -35831,6 +36016,16 @@ void main() {
           this.leds.ai.material.color.setHex(Math.floor(timeSec * 2) % 2 === 0 ? 366185 : 413243);
         }
       }
+      if (this.strobeLeds && this.strobeLeds.length > 0) {
+        const flashCycle = Math.floor(timeSec * 16) % 6;
+        const isFlash = flashCycle === 0 || flashCycle === 2;
+        const isLeftPhase = Math.floor(timeSec * 4) % 2 === 0;
+        this.strobeLeds.forEach((led, idx) => {
+          const isLeftLed = idx < this.strobeLeds.length / 2;
+          const active = isFlash && (isLeftPhase ? isLeftLed : !isLeftLed);
+          led.material.opacity = active ? 0.98 : 0.2;
+        });
+      }
     }
   };
 
@@ -35856,6 +36051,7 @@ void main() {
       this.textures = this.createProceduralTextures();
       this.headlightBeam = null;
       this.headlightState = "bright";
+      this.flasherLamps = [];
       this.buildTrain();
     }
     // ---------------------------------------------------------
@@ -36224,6 +36420,7 @@ void main() {
       this.rotatingWheels = [];
       this.wipers = [];
       this.radiatorFans = [];
+      this.flasherLamps = [];
       this.locoCar = new Group();
       if (this.trainType === "electric") {
         this.buildWAP7Locomotive(this.locoCar);
@@ -36364,9 +36561,37 @@ void main() {
           bulb.position.set(hx, 3.28, cabLen + 0.28);
           cabGroup.add(bulb);
         });
-        const flasher = new Mesh(new CylinderGeometry(0.05, 0.05, 0.04, 14).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 16096779 }));
+        const flasherMat = new MeshBasicMaterial({ color: 16096779 });
+        const flasher = new Mesh(new CylinderGeometry(0.055, 0.055, 0.05, 14).rotateX(Math.PI / 2), flasherMat);
         flasher.position.set(0, 3.48, cabLen + 0.22);
         cabGroup.add(flasher);
+        this.flasherLamps.push(flasherMat);
+        const acUnit = new Mesh(new BoxGeometry(1.4, 0.28, 1.8), new MeshStandardMaterial({ color: 14870768, roughness: 0.35, metalness: 0.3 }));
+        acUnit.position.set(0, 3.82, cabLen * 0.45);
+        acUnit.castShadow = true;
+        cabGroup.add(acUnit);
+        [-0.45, 0.45].forEach((fz) => {
+          const fanBezel = new Mesh(new CylinderGeometry(0.24, 0.24, 0.04, 16), materials.darkSteel);
+          fanBezel.position.set(0, 3.97, cabLen * 0.45 + fz);
+          cabGroup.add(fanBezel);
+          const fanBlades = new Mesh(new CircleGeometry(0.21, 8).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: 988970 }));
+          fanBlades.position.set(0, 3.99, cabLen * 0.45 + fz);
+          cabGroup.add(fanBlades);
+        });
+        const rtisDome = new Mesh(new CylinderGeometry(0.14, 0.18, 0.08, 16), new MeshStandardMaterial({ color: 16777215, roughness: 0.2 }));
+        rtisDome.position.set(-0.65, 3.82, cabLen * 0.15);
+        cabGroup.add(rtisDome);
+        const bladeAnt = new Mesh(new BoxGeometry(0.03, 0.22, 0.12), materials.darkSteel);
+        bladeAnt.position.set(0.65, 3.86, cabLen * 0.15);
+        cabGroup.add(bladeAnt);
+        [-1.54, 1.54].forEach((hx) => {
+          const rail = new Mesh(new CylinderGeometry(0.018, 0.018, 1.6), materials.chrome);
+          rail.position.set(hx, 1.85, cabLen - 0.1);
+          cabGroup.add(rail);
+          const step = new Mesh(new BoxGeometry(0.34, 0.04, 0.28), materials.darkSteel);
+          step.position.set(hx, 0.52, cabLen + 0.15);
+          cabGroup.add(step);
+        });
         [-1.15, 1.15].forEach((mx) => {
           const markerBezel = new Mesh(new CylinderGeometry(0.06, 0.06, 0.04, 14).rotateX(Math.PI / 2), materials.darkSteel);
           markerBezel.position.set(mx, 1.25, cabLen + 0.05);
@@ -36583,6 +36808,9 @@ void main() {
           const brakeBlock = new Mesh(new BoxGeometry(0.08, 0.16, 0.08), darkSteel);
           brakeBlock.position.set(x, this.wheelRadius, z + 0.38);
           bogie.add(brakeBlock);
+          const sandPipe = new Mesh(new CylinderGeometry(0.016, 0.016, 0.4).rotateX(x > 0 ? 0.35 : -0.35), darkSteel);
+          sandPipe.position.set(x * 0.95, this.wheelRadius - 0.18, z + (x > 0 ? 0.52 : -0.52));
+          bogie.add(sandPipe);
         });
         bogie.add(axleGroup);
         this.rotatingWheels.push(axleGroup);
@@ -36745,6 +36973,9 @@ void main() {
       this.rotatingWheels.forEach((w) => {
         w.rotation.x += deltaAngle;
       });
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 8e-3);
+      const flasherColor = pulse > 0.45 ? 16096779 : 7877903;
+      this.flasherLamps.forEach((m) => m.color.setHex(flasherColor));
       if (this.captureNet) {
         this.captureNet.update(dt, isTargetDetected);
       }
