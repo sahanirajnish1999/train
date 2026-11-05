@@ -1586,7 +1586,7 @@ export class ObstacleManager {
   // ------------------------------------------------------------------
   // Spawn and Positioning Logic
   // ------------------------------------------------------------------
-  spawnObstacle(type, trackProgress, moveOffTrack = null) {
+  spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0) {
     let mesh, name, mass;
     switch (type) {
       case 'human':
@@ -1614,6 +1614,9 @@ export class ObstacleManager {
 
     const transform = this.track.getTrackTransform(trackProgress, 0); // Placed directly on Track 1
     mesh.position.copy(transform.position);
+    if (lateralOffset !== 0 && transform.normal) {
+      mesh.position.add(transform.normal.clone().multiplyScalar(lateralOffset));
+    }
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), transform.tangent);
 
     const obstacleObj = {
@@ -1623,11 +1626,17 @@ export class ObstacleManager {
       mass,
       mesh,
       progress: trackProgress,
+      lateralOffset: lateralOffset || 0,
       isCollected: false,
       isDeterred: false,
       hasBeenShocked: false,
       shockTime: 0,
       isCleared: false,
+      isSideShocked: false,
+      lastSideShockTime: 0,
+      isSideRepelled: false,
+      sideRepelStartTime: 0,
+      sideRepelDir: null,
       moveOffTrackOnShock: moveOffTrack !== null ? moveOffTrack : (type === 'cattle')
     };
 
@@ -1650,6 +1659,8 @@ export class ObstacleManager {
     this.spawnObstacle('animal', 0.60, false);
     // 6. Stubborn Heavy Bull -> E-shock fires -> Stays on track -> 480kg > 150kg -> Net stowed, emergency brake!
     this.spawnObstacle('cattle', 0.85, false);
+    // 7. Trackside Pedestrian at 2.4m lateral offset (within 2-3m of passing train coaches) -> Coach Side E-Shock fires!
+    this.spawnObstacle('human', 0.18, true, 2.4);
   }
 
   // Spawn immediately ahead of the train on demand (via HUD test buttons)
@@ -1657,6 +1668,17 @@ export class ObstacleManager {
     const deltaProgress = distanceMeters / trackLength;
     const targetProgress = (trainProgress + deltaProgress) % 1.0;
     return this.spawnObstacle(type, targetProgress, moveOffTrack);
+  }
+
+  // Spawn person or animal directly beside one of the train coaches within 2-3m perimeter
+  spawnBesideCoach(trainProgress, trackLength, coachIndex = 1, lateralOffset = 2.4) {
+    const locoLen = 20.5;
+    const coachLen = 23.5;
+    const couplerGap = 0.8;
+    const distBack = (locoLen / 2) + couplerGap + (coachLen / 2) + coachIndex * (coachLen + couplerGap);
+    const actualTrackLength = trackLength || (this.track && this.track.totalLength) || 3600;
+    const coachProgress = (trainProgress - (distBack / actualTrackLength) + 1.0) % 1.0;
+    return this.spawnObstacle('human', coachProgress, true, lateralOffset);
   }
 
   // ------------------------------------------------------------------
@@ -1952,6 +1974,12 @@ export class ObstacleManager {
           if (child.userData.isNozzleFlare && child.userData.emitterTip) {
             child.userData.emitterTip.getWorldPosition(child.position);
             child.intensity = (Math.random() > 0.3 ? 4.0 : 1.5) * progress;
+          } else if (child.userData.isSideNozzleFlare && child.userData.emitterTip) {
+            child.userData.emitterTip.getWorldPosition(child.position);
+            child.intensity = (Math.random() > 0.3 ? 5.0 : 2.0) * progress;
+          } else if (child.userData.isSideTargetLight && child.userData.obs && child.userData.obs.mesh) {
+            child.userData.obs.mesh.getWorldPosition(child.position).add(child.userData.targetOffset);
+            child.intensity = (Math.random() > 0.2 ? 6.0 : 2.0) * progress;
           } else {
             child.intensity = (Math.random() > 0.2 ? 7.5 : 2.0) * progress;
           }
@@ -1962,10 +1990,158 @@ export class ObstacleManager {
         if (this.train && this.train.pulseShockEmitters) {
           this.train.pulseShockEmitters(0);
         }
+        if (this.train && this.train.pulseCoachSideEmitters) {
+          this.train.pulseCoachSideEmitters(null, 'all', 0);
+        }
         while (this.fxGroup.children.length > 0) {
           const c = this.fxGroup.children[0];
           if (c.geometry) c.geometry.dispose();
           this.fxGroup.remove(c);
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
+  // Installed along sides of passenger coaches; delivers electric shock
+  // if someone gets within 2-3 meters of the passing train.
+  // ------------------------------------------------------------------
+  spawnCoachSideShockFX(obs, nearest) {
+    const emitter = nearest.emitter;
+    const emitterPos = nearest.worldPos;
+    const obsPos = obs.mesh.position.clone();
+    const isHuman = obs.type === 'human';
+
+    // Tailored spark color: bright electric cyan
+    const sparkColor = isHuman ? 0xa5f3fc : 0x38bdf8;
+    const targetOffset = new THREE.Vector3(0, isHuman ? 1.15 : 0.95, 0);
+    const p1 = emitterPos.clone();
+    const p2 = obsPos.clone().add(targetOffset);
+
+    const segs = 14;
+    const pts = [];
+    const dist = p1.distanceTo(p2);
+    const jitterAmp = Math.min(0.65, Math.max(0.12, dist * 0.08));
+
+    for (let s = 0; s <= segs; s++) {
+      const t = s / segs;
+      const p = p1.clone().lerp(p2, t);
+      if (s > 0 && s < segs) {
+        const envelope = Math.sin(t * Math.PI);
+        p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+        p.y += (Math.random() - 0.5) * jitterAmp * 0.7 * envelope;
+        p.z += (Math.random() - 0.5) * jitterAmp * envelope;
+      }
+      pts.push(p);
+    }
+
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({
+      color: sparkColor,
+      transparent: true,
+      opacity: 1.0,
+      linewidth: 2.5
+    });
+    const line = new THREE.Line(geo, mat);
+    line.userData = {
+      isLightning: true,
+      isSideShock: true,
+      emitterTip: emitter.tip,
+      obs: obs,
+      targetOffset: targetOffset,
+      isHuman: isHuman,
+      segs: segs
+    };
+    this.fxGroup.add(line);
+
+    // Flashing plasma flare at the coach side emitter nozzle
+    const nozzleFlare = new THREE.PointLight(sparkColor, 5.0, 8);
+    nozzleFlare.position.copy(emitterPos);
+    nozzleFlare.userData = { isSideNozzleFlare: true, emitterTip: emitter.tip };
+    this.fxGroup.add(nozzleFlare);
+
+    // Flashing discharge point light at the intruder contact point
+    const targetLight = new THREE.PointLight(sparkColor, 6.0, 10);
+    targetLight.position.copy(p2);
+    targetLight.userData = { isSideTargetLight: true, obs: obs, targetOffset: targetOffset };
+    this.fxGroup.add(targetLight);
+
+    // Spark burst at contact point
+    const sparkCount = 20;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sPos = [];
+    for (let s = 0; s < sparkCount; s++) {
+      sPos.push(
+        p2.x + (Math.random() - 0.5) * 0.45,
+        p2.y + (Math.random() - 0.5) * 0.45,
+        p2.z + (Math.random() - 0.5) * 0.45
+      );
+    }
+    sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sPos, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      color: 0xe0f2fe,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.95
+    });
+    this.fxGroup.add(new THREE.Points(sparkGeo, sparkMat));
+
+    this.fxTimer = 0.85; // Active FX duration for side shock crackle
+  }
+
+  checkCoachSideProximity(train, audio) {
+    if (!train || !train.getNearestCoachSideEmitter) return;
+
+    for (let i = 0; i < this.obstacles.length; i++) {
+      const obs = this.obstacles[i];
+      if (obs.isCollected || !obs.mesh) continue;
+
+      const obsPos = obs.mesh.position;
+      const nearest = train.getNearestCoachSideEmitter(obsPos);
+      if (!nearest) continue;
+
+      // Check proximity condition: within 2-3 meters of the coach
+      // nearest.dist measures distance from coach outer wall emitter tip to obstacle
+      if (nearest.dist <= 3.0) {
+        // Cooldown check: deliver shock pulse if not shocked in last 1.2s
+        const canShock = !obs.lastSideShockTime || (this.animTime - obs.lastSideShockTime) > 1.2;
+        if (canShock) {
+          obs.lastSideShockTime = this.animTime;
+          obs.isSideShocked = true;
+          obs.isSideRepelled = true;
+          obs.sideRepelStartTime = this.animTime;
+
+          // Outward push vector away from train side
+          const pushDir = obsPos.clone().sub(nearest.worldPos);
+          pushDir.y = 0;
+          if (pushDir.lengthSq() < 0.01) {
+            pushDir.set(nearest.emitter.side === 'left' ? -1 : 1, 0, 0);
+          } else {
+            pushDir.normalize();
+          }
+          obs.sideRepelDir = pushDir;
+
+          // Deliver side electric shock FX
+          this.spawnCoachSideShockFX(obs, nearest);
+
+          // Pulse coach side emitter plasma cores
+          if (train.pulseCoachSideEmitters) {
+            train.pulseCoachSideEmitters(nearest.emitter.coachIndex, nearest.emitter.side, 1.0);
+          }
+
+          // Play procedural Web Audio electric shock discharge
+          if (audio) {
+            audio.playElectricShockDischarge(obs.type, obs.mass);
+          }
+
+          // Telemetry and alert notification
+          const coachNum = nearest.emitter.coachIndex + 1;
+          const sideName = nearest.emitter.side.toUpperCase();
+          this.telemetry.sideShockActive = true;
+          this.telemetry.alertType = 'deploy';
+          this.telemetry.alertMessage = `⚡ SIDE PROXIMITY GUARD: ${obs.name.toUpperCase()} WITHIN 2-3M (${nearest.dist.toFixed(1)}M) OF COACH #${coachNum} ${sideName}! DELIVERED ELECTRIC SHOCK!`;
+          this.telemetry.action = `⚡ COACH #${coachNum} SIDE E-SHOCK DELIVERED (PROXIMITY: ${nearest.dist.toFixed(1)}M ≤ 3M)`;
         }
       }
     }
@@ -2017,6 +2193,31 @@ export class ObstacleManager {
           ud.eyelids.forEach(el => {
             el.scale.y = blinkScale;
           });
+        }
+
+        // Side Proximity Repulsion (When shocked by Coach Side Mechanism within 2-3m)
+        if (obs.isSideRepelled && obs.sideRepelDir) {
+          const repelT = this.animTime - obs.sideRepelStartTime;
+          obs.mesh.position.add(obs.sideRepelDir.clone().multiplyScalar(4.0 * dt));
+
+          if (repelT < 0.4) {
+            obs.mesh.position.y += Math.sin(repelT / 0.4 * Math.PI) * 0.18;
+            if (ud.headGroup) ud.headGroup.rotation.x = -0.35;
+            if (ud.armL) ud.armL.rotation.set(-1.1, 0, -0.6);
+            if (ud.armR) ud.armR.rotation.set(-1.1, 0, 0.6);
+          } else {
+            obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), obs.sideRepelDir);
+            const runCycle = (this.animTime * 14) % (Math.PI * 2);
+            if (ud.armL) ud.armL.rotation.x = Math.sin(runCycle) * 0.9;
+            if (ud.armR) ud.armR.rotation.x = -Math.sin(runCycle) * 0.9;
+            if (ud.legL) ud.legL.rotation.x = -Math.sin(runCycle) * 1.1;
+            if (ud.legR) ud.legR.rotation.x = Math.sin(runCycle) * 1.1;
+          }
+
+          if (repelT > 1.4) {
+            obs.isSideRepelled = false;
+            obs.isCleared = true;
+          }
         }
 
         if (obs.isDeterred) {
@@ -2595,6 +2796,9 @@ export class ObstacleManager {
 
     // Update 3D visual FX for deterrence discharges
     this.updateDeterrenceFX(dt);
+
+    // Coach Side Electric Shock Perimeter Guard (Evaluates 2-3m proximity alongside coaches)
+    this.checkCoachSideProximity(this.train, audio);
 
     // If an obstacle is detected within 1 km (1000m) Camera & LiDAR range
     if (closestObstacle && minForwardDist <= 1000) {

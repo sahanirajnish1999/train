@@ -18,6 +18,7 @@ export class TrainModel {
     // Articulated train components
     this.locoCar = null;
     this.shockEmitters = [];
+    this.coachSideEmitters = [];
     this.coachCars = []; // Array of independent coach group objects
     this.rotatingWheels = [];
     this.wipers = [];
@@ -523,6 +524,7 @@ export class TrainModel {
     this.radiatorFans = [];
     this.flasherLamps = [];
     this.shockEmitters = [];
+    this.coachSideEmitters = [];
 
     // 1. Build Locomotive Car Group (Independent Top-Level Group)
     this.locoCar = new THREE.Group();
@@ -537,9 +539,9 @@ export class TrainModel {
     for (let i = 0; i < this.coachCount; i++) {
       const coachCar = new THREE.Group();
       if (this.trainType === 'electric') {
-        this.buildLhbCoach(coachCar, i === this.coachCount - 1);
+        this.buildLhbCoach(coachCar, i === this.coachCount - 1, i);
       } else {
-        this.buildIcfCoach(coachCar, i === this.coachCount - 1);
+        this.buildIcfCoach(coachCar, i === this.coachCount - 1, i);
       }
       this.rootGroup.add(coachCar);
       this.coachCars.push(coachCar);
@@ -1129,7 +1131,7 @@ export class TrainModel {
   // ---------------------------------------------------------
   // LHB Red/Silver Coaches (Image 1 - Rajdhani Express)
   // ---------------------------------------------------------
-  buildLhbCoach(group, isRear = false) {
+  buildLhbCoach(group, isRear = false, coachIndex = 0) {
     const length = this.coachLength;
     const width = 3.24;
     const height = 2.75;
@@ -1169,12 +1171,15 @@ export class TrainModel {
     // 2 FIAT Bogies
     this.buildFiatBogie(group, length * 0.35);
     this.buildFiatBogie(group, -length * 0.35);
+
+    // Coach Side Electric Shock Mechanisms (Perimeter Guard 2-3m)
+    this.buildCoachSideShockMechanisms(group, length, width, coachIndex);
   }
 
   // ---------------------------------------------------------
   // ICF Blue Coaches (Image 2)
   // ---------------------------------------------------------
-  buildIcfCoach(group, isRear = false) {
+  buildIcfCoach(group, isRear = false, coachIndex = 0) {
     const length = this.coachLength;
     const width = 3.24;
     const height = 2.7;
@@ -1198,6 +1203,9 @@ export class TrainModel {
     // 2 Bogies
     this.buildFiatBogie(group, length * 0.35);
     this.buildFiatBogie(group, -length * 0.35);
+
+    // Coach Side Electric Shock Mechanisms (Perimeter Guard 2-3m)
+    this.buildCoachSideShockMechanisms(group, length, width, coachIndex);
   }
 
   // ---------------------------------------------------------
@@ -1447,6 +1455,162 @@ export class TrainModel {
         if (intensity > 0.05) {
           e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
           e.core.scale.setScalar(1.0 + intensity * 0.8);
+        } else {
+          e.mat.color.setHex(0x38bdf8);
+          e.core.scale.setScalar(1.0);
+        }
+      }
+    });
+  }
+
+  // ---------------------------------------------------------
+  // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
+  // Installed along both flanks (Left & Right) of each coach car
+  // ---------------------------------------------------------
+  buildCoachSideShockMechanisms(coachGroup, length, width, coachIndex = 0) {
+    const halfW = width / 2; // ~1.62m
+    const zOffsets = [-8.8, -3.2, 3.2, 8.8]; // 4 emitter stations along coach length
+    const ySill = 1.05; // Lower coach waistband/chassis sill
+
+    const conduitMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.35
+    });
+    const hazardMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      metalness: 0.2,
+      roughness: 0.4
+    });
+    const insulatorMat = new THREE.MeshStandardMaterial({
+      color: 0x78350f, // Terracotta high-voltage insulator
+      roughness: 0.25,
+      metalness: 0.15
+    });
+    const alloyMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      metalness: 0.88,
+      roughness: 0.25
+    });
+
+    [-1, 1].forEach(sideSign => {
+      const isLeft = sideSign < 0;
+      const sideName = isLeft ? 'left' : 'right';
+      const sideX = sideSign * (halfW + 0.02);
+
+      // 1. High-Voltage Perimeter Warning Conduit Rail (runs full length of coach)
+      const conduit = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.05, length - 1.8),
+        conduitMat
+      );
+      conduit.position.set(sideX, ySill, 0);
+      coachGroup.add(conduit);
+
+      // Yellow/Black Danger Hazard Trim
+      const hazardStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.042, 0.02, length - 2.0),
+        hazardMat
+      );
+      hazardStrip.position.set(sideX + sideSign * 0.002, ySill, 0);
+      coachGroup.add(hazardStrip);
+
+      // 2. High-Voltage Directional Emitter Pods along coach flank
+      zOffsets.forEach((z, podIdx) => {
+        const podGroup = new THREE.Group();
+        podGroup.name = `coach_${coachIndex}_side_${sideName}_pod_${podIdx}`;
+        podGroup.position.set(sideX, ySill, z);
+        podGroup.rotation.z = sideSign * -0.20; // Angled slightly down towards trespassers
+
+        // Heavy Base Mounting Flange
+        const flange = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.16, 0.22),
+          conduitMat
+        );
+        podGroup.add(flange);
+
+        // Porcelain Insulator Column
+        const insulator = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.055, 0.055, 0.08, 14).rotateZ(sideSign * Math.PI / 2),
+          insulatorMat
+        );
+        insulator.position.set(sideSign * 0.04, 0, 0);
+        podGroup.add(insulator);
+
+        // Insulator Ribbed Ring
+        const shed = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.075, 0.075, 0.015, 14).rotateZ(sideSign * Math.PI / 2),
+          insulatorMat
+        );
+        shed.position.set(sideSign * 0.04, 0, 0);
+        podGroup.add(shed);
+
+        // Projector Collimator Nozzle
+        const nozzle = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.045, 0.065, 0.08, 14).rotateZ(sideSign * Math.PI / 2),
+          alloyMat
+        );
+        nozzle.position.set(sideSign * 0.09, 0, 0);
+        podGroup.add(nozzle);
+
+        // Glowing Cyan Plasma Cathode Core
+        const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const core = new THREE.Mesh(
+          new THREE.SphereGeometry(0.028, 10, 10),
+          plasmaMat
+        );
+        core.position.set(sideSign * 0.09, 0, 0);
+        podGroup.add(core);
+
+        // Tip Anchor Node for sub-millimeter 3D world space arc attachment
+        const tip = new THREE.Object3D();
+        tip.name = `coachSideTip_${coachIndex}_${sideName}_${podIdx}`;
+        tip.position.set(sideSign * 0.14, 0, 0);
+        podGroup.add(tip);
+
+        coachGroup.add(podGroup);
+
+        this.coachSideEmitters.push({
+          coachIndex,
+          side: sideName,
+          podIndex: podIdx,
+          group: podGroup,
+          tip,
+          core,
+          mat: plasmaMat
+        });
+      });
+    });
+  }
+
+  getNearestCoachSideEmitter(targetWorldPos) {
+    if (!this.coachSideEmitters || this.coachSideEmitters.length === 0) return null;
+    let closest = null;
+    let minDist = Infinity;
+    const v = new THREE.Vector3();
+
+    for (let i = 0; i < this.coachSideEmitters.length; i++) {
+      const e = this.coachSideEmitters[i];
+      e.tip.getWorldPosition(v);
+      const dist = v.distanceTo(targetWorldPos);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = {
+          emitter: e,
+          worldPos: v.clone(),
+          dist: dist
+        };
+      }
+    }
+    return closest;
+  }
+
+  pulseCoachSideEmitters(coachIndex, side = 'all', intensity = 1.0) {
+    if (!this.coachSideEmitters) return;
+    this.coachSideEmitters.forEach(e => {
+      if ((coachIndex === undefined || coachIndex === null || e.coachIndex === coachIndex) && (side === 'all' || e.side === side)) {
+        if (intensity > 0.05) {
+          e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
+          e.core.scale.setScalar(1.0 + intensity * 0.9);
         } else {
           e.mat.color.setHex(0x38bdf8);
           e.core.scale.setScalar(1.0);

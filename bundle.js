@@ -37569,6 +37569,7 @@ void main() {
       this.trainType = "electric";
       this.locoCar = null;
       this.shockEmitters = [];
+      this.coachSideEmitters = [];
       this.coachCars = [];
       this.rotatingWheels = [];
       this.wipers = [];
@@ -37954,6 +37955,7 @@ void main() {
       this.radiatorFans = [];
       this.flasherLamps = [];
       this.shockEmitters = [];
+      this.coachSideEmitters = [];
       this.locoCar = new Group();
       if (this.trainType === "electric") {
         this.buildWAP7Locomotive(this.locoCar);
@@ -37964,9 +37966,9 @@ void main() {
       for (let i = 0; i < this.coachCount; i++) {
         const coachCar = new Group();
         if (this.trainType === "electric") {
-          this.buildLhbCoach(coachCar, i === this.coachCount - 1);
+          this.buildLhbCoach(coachCar, i === this.coachCount - 1, i);
         } else {
-          this.buildIcfCoach(coachCar, i === this.coachCount - 1);
+          this.buildIcfCoach(coachCar, i === this.coachCount - 1, i);
         }
         this.rootGroup.add(coachCar);
         this.coachCars.push(coachCar);
@@ -38415,7 +38417,7 @@ void main() {
     // ---------------------------------------------------------
     // LHB Red/Silver Coaches (Image 1 - Rajdhani Express)
     // ---------------------------------------------------------
-    buildLhbCoach(group, isRear = false) {
+    buildLhbCoach(group, isRear = false, coachIndex = 0) {
       const length = this.coachLength;
       const width = 3.24;
       const height = 2.75;
@@ -38451,11 +38453,12 @@ void main() {
       });
       this.buildFiatBogie(group, length * 0.35);
       this.buildFiatBogie(group, -length * 0.35);
+      this.buildCoachSideShockMechanisms(group, length, width, coachIndex);
     }
     // ---------------------------------------------------------
     // ICF Blue Coaches (Image 2)
     // ---------------------------------------------------------
-    buildIcfCoach(group, isRear = false) {
+    buildIcfCoach(group, isRear = false, coachIndex = 0) {
       const length = this.coachLength;
       const width = 3.24;
       const height = 2.7;
@@ -38479,6 +38482,7 @@ void main() {
       group.add(body);
       this.buildFiatBogie(group, length * 0.35);
       this.buildFiatBogie(group, -length * 0.35);
+      this.buildCoachSideShockMechanisms(group, length, width, coachIndex);
     }
     // ---------------------------------------------------------
     // 2-Axle FIAT / ICF Passenger Bogie
@@ -38688,6 +38692,137 @@ void main() {
           if (intensity > 0.05) {
             e.mat.color.setHex(intensity > 0.6 ? 16777215 : 3718648);
             e.core.scale.setScalar(1 + intensity * 0.8);
+          } else {
+            e.mat.color.setHex(3718648);
+            e.core.scale.setScalar(1);
+          }
+        }
+      });
+    }
+    // ---------------------------------------------------------
+    // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
+    // Installed along both flanks (Left & Right) of each coach car
+    // ---------------------------------------------------------
+    buildCoachSideShockMechanisms(coachGroup, length, width, coachIndex = 0) {
+      const halfW = width / 2;
+      const zOffsets = [-8.8, -3.2, 3.2, 8.8];
+      const ySill = 1.05;
+      const conduitMat = new MeshStandardMaterial({
+        color: 1976635,
+        metalness: 0.85,
+        roughness: 0.35
+      });
+      const hazardMat = new MeshStandardMaterial({
+        color: 16436245,
+        metalness: 0.2,
+        roughness: 0.4
+      });
+      const insulatorMat = new MeshStandardMaterial({
+        color: 7877903,
+        // Terracotta high-voltage insulator
+        roughness: 0.25,
+        metalness: 0.15
+      });
+      const alloyMat = new MeshStandardMaterial({
+        color: 3359061,
+        metalness: 0.88,
+        roughness: 0.25
+      });
+      [-1, 1].forEach((sideSign) => {
+        const isLeft = sideSign < 0;
+        const sideName = isLeft ? "left" : "right";
+        const sideX = sideSign * (halfW + 0.02);
+        const conduit = new Mesh(
+          new BoxGeometry(0.04, 0.05, length - 1.8),
+          conduitMat
+        );
+        conduit.position.set(sideX, ySill, 0);
+        coachGroup.add(conduit);
+        const hazardStrip = new Mesh(
+          new BoxGeometry(0.042, 0.02, length - 2),
+          hazardMat
+        );
+        hazardStrip.position.set(sideX + sideSign * 2e-3, ySill, 0);
+        coachGroup.add(hazardStrip);
+        zOffsets.forEach((z, podIdx) => {
+          const podGroup = new Group();
+          podGroup.name = `coach_${coachIndex}_side_${sideName}_pod_${podIdx}`;
+          podGroup.position.set(sideX, ySill, z);
+          podGroup.rotation.z = sideSign * -0.2;
+          const flange = new Mesh(
+            new BoxGeometry(0.03, 0.16, 0.22),
+            conduitMat
+          );
+          podGroup.add(flange);
+          const insulator = new Mesh(
+            new CylinderGeometry(0.055, 0.055, 0.08, 14).rotateZ(sideSign * Math.PI / 2),
+            insulatorMat
+          );
+          insulator.position.set(sideSign * 0.04, 0, 0);
+          podGroup.add(insulator);
+          const shed = new Mesh(
+            new CylinderGeometry(0.075, 0.075, 0.015, 14).rotateZ(sideSign * Math.PI / 2),
+            insulatorMat
+          );
+          shed.position.set(sideSign * 0.04, 0, 0);
+          podGroup.add(shed);
+          const nozzle = new Mesh(
+            new CylinderGeometry(0.045, 0.065, 0.08, 14).rotateZ(sideSign * Math.PI / 2),
+            alloyMat
+          );
+          nozzle.position.set(sideSign * 0.09, 0, 0);
+          podGroup.add(nozzle);
+          const plasmaMat = new MeshBasicMaterial({ color: 3718648 });
+          const core = new Mesh(
+            new SphereGeometry(0.028, 10, 10),
+            plasmaMat
+          );
+          core.position.set(sideSign * 0.09, 0, 0);
+          podGroup.add(core);
+          const tip = new Object3D();
+          tip.name = `coachSideTip_${coachIndex}_${sideName}_${podIdx}`;
+          tip.position.set(sideSign * 0.14, 0, 0);
+          podGroup.add(tip);
+          coachGroup.add(podGroup);
+          this.coachSideEmitters.push({
+            coachIndex,
+            side: sideName,
+            podIndex: podIdx,
+            group: podGroup,
+            tip,
+            core,
+            mat: plasmaMat
+          });
+        });
+      });
+    }
+    getNearestCoachSideEmitter(targetWorldPos) {
+      if (!this.coachSideEmitters || this.coachSideEmitters.length === 0) return null;
+      let closest = null;
+      let minDist = Infinity;
+      const v = new Vector3();
+      for (let i = 0; i < this.coachSideEmitters.length; i++) {
+        const e = this.coachSideEmitters[i];
+        e.tip.getWorldPosition(v);
+        const dist = v.distanceTo(targetWorldPos);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = {
+            emitter: e,
+            worldPos: v.clone(),
+            dist
+          };
+        }
+      }
+      return closest;
+    }
+    pulseCoachSideEmitters(coachIndex, side = "all", intensity = 1) {
+      if (!this.coachSideEmitters) return;
+      this.coachSideEmitters.forEach((e) => {
+        if ((coachIndex === void 0 || coachIndex === null || e.coachIndex === coachIndex) && (side === "all" || e.side === side)) {
+          if (intensity > 0.05) {
+            e.mat.color.setHex(intensity > 0.6 ? 16777215 : 3718648);
+            e.core.scale.setScalar(1 + intensity * 0.9);
           } else {
             e.mat.color.setHex(3718648);
             e.core.scale.setScalar(1);
@@ -40920,7 +41055,7 @@ void main() {
     // ------------------------------------------------------------------
     // Spawn and Positioning Logic
     // ------------------------------------------------------------------
-    spawnObstacle(type, trackProgress, moveOffTrack = null) {
+    spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0) {
       let mesh, name, mass;
       switch (type) {
         case "human":
@@ -40947,6 +41082,9 @@ void main() {
       }
       const transform = this.track.getTrackTransform(trackProgress, 0);
       mesh.position.copy(transform.position);
+      if (lateralOffset !== 0 && transform.normal) {
+        mesh.position.add(transform.normal.clone().multiplyScalar(lateralOffset));
+      }
       mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
       const obstacleObj = {
         id: this.nextId++,
@@ -40955,11 +41093,17 @@ void main() {
         mass,
         mesh,
         progress: trackProgress,
+        lateralOffset: lateralOffset || 0,
         isCollected: false,
         isDeterred: false,
         hasBeenShocked: false,
         shockTime: 0,
         isCleared: false,
+        isSideShocked: false,
+        lastSideShockTime: 0,
+        isSideRepelled: false,
+        sideRepelStartTime: 0,
+        sideRepelDir: null,
         moveOffTrackOnShock: moveOffTrack !== null ? moveOffTrack : type === "cattle"
       };
       this.scene.add(mesh);
@@ -40974,12 +41118,23 @@ void main() {
       this.spawnObstacle("cattle", 0.45, true);
       this.spawnObstacle("animal", 0.6, false);
       this.spawnObstacle("cattle", 0.85, false);
+      this.spawnObstacle("human", 0.18, true, 2.4);
     }
     // Spawn immediately ahead of the train on demand (via HUD test buttons)
     spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null) {
       const deltaProgress = distanceMeters / trackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
       return this.spawnObstacle(type, targetProgress, moveOffTrack);
+    }
+    // Spawn person or animal directly beside one of the train coaches within 2-3m perimeter
+    spawnBesideCoach(trainProgress, trackLength, coachIndex = 1, lateralOffset = 2.4) {
+      const locoLen = 20.5;
+      const coachLen = 23.5;
+      const couplerGap = 0.8;
+      const distBack = locoLen / 2 + couplerGap + coachLen / 2 + coachIndex * (coachLen + couplerGap);
+      const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
+      const coachProgress = (trainProgress - distBack / actualTrackLength + 1) % 1;
+      return this.spawnObstacle("human", coachProgress, true, lateralOffset);
     }
     // ------------------------------------------------------------------
     // Active Non-Lethal Electric Shock Protocol (Track Clearance)
@@ -41229,6 +41384,12 @@ void main() {
             if (child.userData.isNozzleFlare && child.userData.emitterTip) {
               child.userData.emitterTip.getWorldPosition(child.position);
               child.intensity = (Math.random() > 0.3 ? 4 : 1.5) * progress;
+            } else if (child.userData.isSideNozzleFlare && child.userData.emitterTip) {
+              child.userData.emitterTip.getWorldPosition(child.position);
+              child.intensity = (Math.random() > 0.3 ? 5 : 2) * progress;
+            } else if (child.userData.isSideTargetLight && child.userData.obs && child.userData.obs.mesh) {
+              child.userData.obs.mesh.getWorldPosition(child.position).add(child.userData.targetOffset);
+              child.intensity = (Math.random() > 0.2 ? 6 : 2) * progress;
             } else {
               child.intensity = (Math.random() > 0.2 ? 7.5 : 2) * progress;
             }
@@ -41238,10 +41399,128 @@ void main() {
           if (this.train && this.train.pulseShockEmitters) {
             this.train.pulseShockEmitters(0);
           }
+          if (this.train && this.train.pulseCoachSideEmitters) {
+            this.train.pulseCoachSideEmitters(null, "all", 0);
+          }
           while (this.fxGroup.children.length > 0) {
             const c = this.fxGroup.children[0];
             if (c.geometry) c.geometry.dispose();
             this.fxGroup.remove(c);
+          }
+        }
+      }
+    }
+    // ------------------------------------------------------------------
+    // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
+    // Installed along sides of passenger coaches; delivers electric shock
+    // if someone gets within 2-3 meters of the passing train.
+    // ------------------------------------------------------------------
+    spawnCoachSideShockFX(obs, nearest) {
+      const emitter = nearest.emitter;
+      const emitterPos = nearest.worldPos;
+      const obsPos = obs.mesh.position.clone();
+      const isHuman = obs.type === "human";
+      const sparkColor = isHuman ? 10875900 : 3718648;
+      const targetOffset = new Vector3(0, isHuman ? 1.15 : 0.95, 0);
+      const p1 = emitterPos.clone();
+      const p2 = obsPos.clone().add(targetOffset);
+      const segs = 14;
+      const pts = [];
+      const dist = p1.distanceTo(p2);
+      const jitterAmp = Math.min(0.65, Math.max(0.12, dist * 0.08));
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const p = p1.clone().lerp(p2, t);
+        if (s > 0 && s < segs) {
+          const envelope = Math.sin(t * Math.PI);
+          p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+          p.y += (Math.random() - 0.5) * jitterAmp * 0.7 * envelope;
+          p.z += (Math.random() - 0.5) * jitterAmp * envelope;
+        }
+        pts.push(p);
+      }
+      const geo = new BufferGeometry().setFromPoints(pts);
+      const mat = new LineBasicMaterial({
+        color: sparkColor,
+        transparent: true,
+        opacity: 1,
+        linewidth: 2.5
+      });
+      const line = new Line(geo, mat);
+      line.userData = {
+        isLightning: true,
+        isSideShock: true,
+        emitterTip: emitter.tip,
+        obs,
+        targetOffset,
+        isHuman,
+        segs
+      };
+      this.fxGroup.add(line);
+      const nozzleFlare = new PointLight(sparkColor, 5, 8);
+      nozzleFlare.position.copy(emitterPos);
+      nozzleFlare.userData = { isSideNozzleFlare: true, emitterTip: emitter.tip };
+      this.fxGroup.add(nozzleFlare);
+      const targetLight = new PointLight(sparkColor, 6, 10);
+      targetLight.position.copy(p2);
+      targetLight.userData = { isSideTargetLight: true, obs, targetOffset };
+      this.fxGroup.add(targetLight);
+      const sparkCount = 20;
+      const sparkGeo = new BufferGeometry();
+      const sPos = [];
+      for (let s = 0; s < sparkCount; s++) {
+        sPos.push(
+          p2.x + (Math.random() - 0.5) * 0.45,
+          p2.y + (Math.random() - 0.5) * 0.45,
+          p2.z + (Math.random() - 0.5) * 0.45
+        );
+      }
+      sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
+      const sparkMat = new PointsMaterial({
+        color: 14742270,
+        size: 0.08,
+        transparent: true,
+        opacity: 0.95
+      });
+      this.fxGroup.add(new Points(sparkGeo, sparkMat));
+      this.fxTimer = 0.85;
+    }
+    checkCoachSideProximity(train, audio) {
+      if (!train || !train.getNearestCoachSideEmitter) return;
+      for (let i = 0; i < this.obstacles.length; i++) {
+        const obs = this.obstacles[i];
+        if (obs.isCollected || !obs.mesh) continue;
+        const obsPos = obs.mesh.position;
+        const nearest = train.getNearestCoachSideEmitter(obsPos);
+        if (!nearest) continue;
+        if (nearest.dist <= 3) {
+          const canShock = !obs.lastSideShockTime || this.animTime - obs.lastSideShockTime > 1.2;
+          if (canShock) {
+            obs.lastSideShockTime = this.animTime;
+            obs.isSideShocked = true;
+            obs.isSideRepelled = true;
+            obs.sideRepelStartTime = this.animTime;
+            const pushDir = obsPos.clone().sub(nearest.worldPos);
+            pushDir.y = 0;
+            if (pushDir.lengthSq() < 0.01) {
+              pushDir.set(nearest.emitter.side === "left" ? -1 : 1, 0, 0);
+            } else {
+              pushDir.normalize();
+            }
+            obs.sideRepelDir = pushDir;
+            this.spawnCoachSideShockFX(obs, nearest);
+            if (train.pulseCoachSideEmitters) {
+              train.pulseCoachSideEmitters(nearest.emitter.coachIndex, nearest.emitter.side, 1);
+            }
+            if (audio) {
+              audio.playElectricShockDischarge(obs.type, obs.mass);
+            }
+            const coachNum = nearest.emitter.coachIndex + 1;
+            const sideName = nearest.emitter.side.toUpperCase();
+            this.telemetry.sideShockActive = true;
+            this.telemetry.alertType = "deploy";
+            this.telemetry.alertMessage = `\u26A1 SIDE PROXIMITY GUARD: ${obs.name.toUpperCase()} WITHIN 2-3M (${nearest.dist.toFixed(1)}M) OF COACH #${coachNum} ${sideName}! DELIVERED ELECTRIC SHOCK!`;
+            this.telemetry.action = `\u26A1 COACH #${coachNum} SIDE E-SHOCK DELIVERED (PROXIMITY: ${nearest.dist.toFixed(1)}M \u2264 3M)`;
           }
         }
       }
@@ -41283,6 +41562,27 @@ void main() {
             ud.eyelids.forEach((el) => {
               el.scale.y = blinkScale;
             });
+          }
+          if (obs.isSideRepelled && obs.sideRepelDir) {
+            const repelT = this.animTime - obs.sideRepelStartTime;
+            obs.mesh.position.add(obs.sideRepelDir.clone().multiplyScalar(4 * dt));
+            if (repelT < 0.4) {
+              obs.mesh.position.y += Math.sin(repelT / 0.4 * Math.PI) * 0.18;
+              if (ud.headGroup) ud.headGroup.rotation.x = -0.35;
+              if (ud.armL) ud.armL.rotation.set(-1.1, 0, -0.6);
+              if (ud.armR) ud.armR.rotation.set(-1.1, 0, 0.6);
+            } else {
+              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), obs.sideRepelDir);
+              const runCycle = this.animTime * 14 % (Math.PI * 2);
+              if (ud.armL) ud.armL.rotation.x = Math.sin(runCycle) * 0.9;
+              if (ud.armR) ud.armR.rotation.x = -Math.sin(runCycle) * 0.9;
+              if (ud.legL) ud.legL.rotation.x = -Math.sin(runCycle) * 1.1;
+              if (ud.legR) ud.legR.rotation.x = Math.sin(runCycle) * 1.1;
+            }
+            if (repelT > 1.4) {
+              obs.isSideRepelled = false;
+              obs.isCleared = true;
+            }
           }
           if (obs.isDeterred) {
             const fleeT = this.animTime - obs.fleeStartTime;
@@ -41729,6 +42029,7 @@ void main() {
       });
       this.animateLivingObstacles(dt, trainSpeedMs);
       this.updateDeterrenceFX(dt);
+      this.checkCoachSideProximity(this.train, audio);
       if (closestObstacle && minForwardDist <= 1e3) {
         this.telemetry.targetDetected = true;
         this.telemetry.type = closestObstacle.type;
@@ -41907,6 +42208,7 @@ void main() {
         btnSpawnAnimalFlee: document.getElementById("btn-spawn-animal-flee"),
         btnSpawnBull: document.getElementById("btn-spawn-bull"),
         btnSpawnBullFlee: document.getElementById("btn-spawn-bull-flee"),
+        btnSpawnCoachSide: document.getElementById("btn-spawn-coach-side"),
         btnClearCradle: document.getElementById("btn-clear-cradle"),
         // Floating Console Elements
         floatingConsole: document.getElementById("floating-console-container"),
@@ -42100,6 +42402,11 @@ void main() {
       if (this.dom.btnSpawnBull) {
         this.dom.btnSpawnBull.addEventListener("click", () => {
           this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, false);
+        });
+      }
+      if (this.dom.btnSpawnCoachSide) {
+        this.dom.btnSpawnCoachSide.addEventListener("click", () => {
+          this.obstacles.spawnBesideCoach(this.physics.trackProgress, this.track.totalLength, 1, 2.4);
         });
       }
       if (this.dom.btnClearCradle) {

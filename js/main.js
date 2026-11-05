@@ -90,6 +90,7 @@ class SimulatorApp {
       btnSpawnAnimalFlee: document.getElementById('btn-spawn-animal-flee'),
       btnSpawnBull: document.getElementById('btn-spawn-bull'),
       btnSpawnBullFlee: document.getElementById('btn-spawn-bull-flee'),
+      btnSpawnCoachSide: document.getElementById('btn-spawn-coach-side'),
       btnClearCradle: document.getElementById('btn-clear-cradle'),
       // Floating Console Elements
       floatingConsole: document.getElementById('floating-console-container'),
@@ -310,6 +311,11 @@ class SimulatorApp {
     if (this.dom.btnSpawnBull) {
       this.dom.btnSpawnBull.addEventListener('click', () => {
         this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, false);
+      });
+    }
+    if (this.dom.btnSpawnCoachSide) {
+      this.dom.btnSpawnCoachSide.addEventListener('click', () => {
+        this.obstacles.spawnBesideCoach(this.physics.trackProgress, this.track.totalLength, 1, 2.4);
       });
     }
     if (this.dom.btnClearCradle) {

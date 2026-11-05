@@ -77,7 +77,8 @@
       <div class="kavach-sensors-row">
         <span class="sensor-badge active" id="badge-cam">📷 Camera (1km)</span>
         <span class="sensor-badge active" id="badge-lidar">📡 LiDAR (1km)</span>
-        <span class="sensor-badge active" id="badge-shock">⚡ 4x Shock Senders (TL/TR/DL/DR)</span>
+        <span class="sensor-badge active" id="badge-shock">⚡ 4x Front Senders</span>
+        <span class="sensor-badge active" id="badge-side-guard">⚡ Coach Side Guards (2-3m)</span>
         <span class="sensor-badge active" id="badge-net">🪤 Net (<150kg)</span>
       </div>
 
@@ -125,6 +126,7 @@
         <button class="spawn-btn" id="btn-spawn-animal" title="Wildlife: Electric shock fires -> Animal does NOT move -> Weight 110kg < 150kg -> Capture net deploys at 30-40m & Scoops!">🐘 Animal (110kg - Net at 30-40m)</button>
         <button class="spawn-btn hazard" id="btn-spawn-bull-flee" title="Heavy Bull: Electric shock fires -> Bull moves off track safely -> Track Clear">🐂 Bull (Shock -> Flees)</button>
         <button class="spawn-btn hazard" id="btn-spawn-bull" title="Heavy Bull: Electric shock fires -> Bull does NOT move -> Weight 480kg > 150kg -> Net Stowed (Under 150kg only), Emergency Brake!">🐂 Bull (480kg - Overweight)</button>
+        <button class="spawn-btn" id="btn-spawn-coach-side" style="grid-column: span 2; background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.5); color: #38bdf8;" title="Person within 2-3m of coach flank -> Side proximity sensor triggers -> High-voltage side shock delivered -> Person recoils outside 3m">⚡ Person at Coach Side (2-3m Proximity Shock)</button>
         <button class="spawn-btn clear" id="btn-clear-cradle" title="Clear and Release Captured Obstacles">🔄 Clear Net</button>
       </div>
     </div>
@@ -263,7 +265,7 @@
   </div>
 
   <!-- Main Self-Contained Bundle with Cache-Buster -->
-  <script src="bundle.js?v=20261105_v8"></script>
+  <script src="bundle.js?v=20261105_v9"></script>
 </body>
 </html>
 
