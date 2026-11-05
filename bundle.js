@@ -39425,7 +39425,7 @@ void main() {
     // ------------------------------------------------------------------
     // Spawn and Positioning Logic
     // ------------------------------------------------------------------
-    spawnObstacle(type, trackProgress) {
+    spawnObstacle(type, trackProgress, moveOffTrack = null) {
       let mesh, name, mass;
       switch (type) {
         case "human":
@@ -39460,7 +39460,12 @@ void main() {
         mass,
         mesh,
         progress: trackProgress,
-        isCollected: false
+        isCollected: false,
+        isDeterred: false,
+        hasBeenShocked: false,
+        shockTime: 0,
+        isCleared: false,
+        moveOffTrackOnShock: moveOffTrack !== null ? moveOffTrack : type === "cattle"
       };
       this.scene.add(mesh);
       this.obstacles.push(obstacleObj);
@@ -39468,19 +39473,19 @@ void main() {
     }
     // Initial scenic obstacles along the route
     initDefaultObstacles() {
-      this.spawnObstacle("human", 0.045);
-      this.spawnObstacle("animal", 0.12);
-      this.spawnObstacle("human", 0.28);
-      this.spawnObstacle("cattle", 0.45);
-      this.spawnObstacle("animal", 0.6);
-      this.spawnObstacle("debris", 0.74);
-      this.spawnObstacle("human", 0.88);
+      this.spawnObstacle("human", 0.045, false);
+      this.spawnObstacle("animal", 0.12, true);
+      this.spawnObstacle("human", 0.28, false);
+      this.spawnObstacle("cattle", 0.45, true);
+      this.spawnObstacle("animal", 0.6, false);
+      this.spawnObstacle("debris", 0.74, false);
+      this.spawnObstacle("cattle", 0.88, false);
     }
     // Spawn immediately ahead of the train on demand (via HUD test buttons)
-    spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85) {
+    spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null) {
       const deltaProgress = distanceMeters / trackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      return this.spawnObstacle(type, targetProgress);
+      return this.spawnObstacle(type, targetProgress, moveOffTrack);
     }
     // ------------------------------------------------------------------
     // Active Non-Lethal Animal Deterrence Protocol (>150kg Obstacles)
@@ -39550,9 +39555,11 @@ void main() {
           };
       }
     }
-    triggerAnimalDeterrence(obs, audio) {
+    triggerDeterrence(obs, audio) {
       if (!obs || obs.isDeterred) return;
       obs.isDeterred = true;
+      obs.hasBeenShocked = true;
+      obs.shockTime = this.animTime;
       obs.deterMode = this.activeDeterrenceMode;
       obs.fleeStartTime = this.animTime;
       obs.fleeDirection = Math.random() > 0.5 ? 1 : -1;
@@ -39572,6 +39579,10 @@ void main() {
         }
       }
       this.spawnDeterrenceFX(obs);
+    }
+    // Alias for backward compatibility
+    triggerAnimalDeterrence(obs, audio) {
+      return this.triggerDeterrence(obs, audio);
     }
     spawnDeterrenceFX(obs) {
       while (this.fxGroup.children.length > 0) {
@@ -39746,7 +39757,80 @@ void main() {
               el.scale.y = blinkScale;
             });
           }
-          if (!isTrainClose) {
+          if (obs.isDeterred) {
+            const fleeT = this.animTime - obs.fleeStartTime;
+            const fleeDir = obs.fleeDirection || 1;
+            const transform = this.track.getTrackTransform(obs.progress, 0);
+            const tangent = transform.tangent.clone().normalize();
+            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+            if (obs.moveOffTrackOnShock) {
+              const fleeDist = Math.min(5.5, fleeT * 4.2);
+              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.25, fleeDist * 0.06));
+              obs.mesh.position.copy(lateralPos);
+              if (fleeDist >= 2.5) {
+                obs.isCleared = true;
+              }
+              if (fleeT < 0.35) {
+                obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.22;
+                if (ud.headGroup) ud.headGroup.rotation.x = -0.3;
+                if (ud.armL) ud.armL.rotation.set(-0.8, 0, -0.6);
+                if (ud.armR) ud.armR.rotation.set(-0.8, 0, 0.6);
+              } else if (fleeT < 2.5) {
+                const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
+                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
+                const runCycle = (fleeT - 0.35) * 14;
+                if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
+                if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0, -Math.sin(runCycle) * 1.1);
+                if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
+                if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0, Math.sin(runCycle) * 1.1);
+                if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
+                if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
+                if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.22;
+                if (ud.headGroup) ud.headGroup.rotation.x = 0.1;
+              } else {
+                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
+                if (ud.headGroup) {
+                  ud.headGroup.rotation.y = -fleeDir * 0.8;
+                  ud.headGroup.rotation.x = -0.1;
+                }
+                if (ud.armL) ud.armL.rotation.set(0.1, 0, -0.15);
+                if (ud.armR) ud.armR.rotation.set(0.1, 0, 0.15);
+                if (ud.legL) ud.legL.rotation.set(0, 0, 0);
+                if (ud.legR) ud.legR.rotation.set(0, 0, 0);
+                if (ud.lowerLegL) ud.lowerLegL.rotation.set(0, 0, 0);
+                if (ud.lowerLegR) ud.lowerLegR.rotation.set(0, 0, 0);
+              }
+            } else {
+              obs.isCleared = false;
+              const basePos = transform.position.clone();
+              if (fleeT < 0.35) {
+                basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.18;
+              }
+              obs.mesh.position.copy(basePos);
+              const shiver = Math.sin(localT * 25) * 0.04;
+              if (ud.headGroup) {
+                ud.headGroup.rotation.set(-0.25 + shiver, Math.sin(localT * 8) * 0.08, 0);
+              }
+              if (ud.torsoGroup) {
+                ud.torsoGroup.rotation.x = -0.15 + shiver;
+                ud.torsoGroup.rotation.z = Math.sin(localT * 12) * 0.03;
+              }
+              if (ud.armL) {
+                ud.armL.rotation.set(-2.1 + Math.sin(localT * 14) * 0.3, 0, -0.45);
+              }
+              if (ud.forearmL) ud.forearmL.rotation.x = -0.85;
+              if (ud.armR) {
+                ud.armR.rotation.set(-1.6 + Math.sin(localT * 8) * 0.15, 0, 0.35);
+              }
+              if (ud.forearmR) ud.forearmR.rotation.x = -1.1;
+              if (ud.legL) ud.legL.rotation.x = 0.38 + shiver * 0.5;
+              if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.65;
+              if (ud.legR) ud.legR.rotation.x = 0.3 - shiver * 0.5;
+              if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.55;
+            }
+          } else if (!isTrainClose) {
             const breath = Math.sin(localT * 2.2);
             if (ud.torsoGroup) {
               ud.torsoGroup.scale.set(1 + 0.018 * breath, 1 + 0.01 * breath, 1 + 0.018 * breath);
@@ -39865,7 +39949,76 @@ void main() {
             ud.tail.rotation.z = Math.sin(localT * 3.5) * 0.45;
             ud.tail.rotation.x = 0.3 + Math.abs(Math.sin(localT * 1.6)) * 0.2;
           }
-          if (!isTrainClose) {
+          if (obs.isDeterred) {
+            const fleeT = this.animTime - obs.fleeStartTime;
+            const fleeDir = obs.fleeDirection || 1;
+            const transform = this.track.getTrackTransform(obs.progress, 0);
+            const tangent = transform.tangent.clone().normalize();
+            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+            if (obs.moveOffTrackOnShock) {
+              const fleeDist = Math.min(6, fleeT * 3.2);
+              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.25, fleeDist * 0.06));
+              obs.mesh.position.copy(lateralPos);
+              if (fleeDist >= 2.8) {
+                obs.isCleared = true;
+              }
+              if (fleeT < 0.4) {
+                obs.mesh.position.y += Math.sin(fleeT / 0.4 * Math.PI) * 0.2;
+                if (ud.headGroup) ud.headGroup.rotation.x = -0.4;
+                if (ud.earL) ud.earL.rotation.y = 0.5;
+                if (ud.earR) ud.earR.rotation.y = -0.5;
+              } else if (fleeT < 3.2) {
+                const trotHeading = sideDir.clone().multiplyScalar(fleeDir);
+                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), trotHeading);
+                const trotCycle = (fleeT - 0.4) * 8;
+                if (ud.legs && ud.legs.length >= 4) {
+                  ud.legs[0].rotation.x = Math.sin(trotCycle) * 0.45;
+                  ud.legs[1].rotation.x = -Math.sin(trotCycle) * 0.45;
+                  ud.legs[2].rotation.x = -Math.sin(trotCycle + 0.4) * 0.4;
+                  ud.legs[3].rotation.x = Math.sin(trotCycle + 0.4) * 0.4;
+                }
+                if (ud.headGroup) ud.headGroup.rotation.x = -0.15 + Math.sin(trotCycle) * 0.12;
+                if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+                  ud.trunkSegments[0].rotation.x = -0.6;
+                  ud.trunkSegments[1].rotation.x = -0.4;
+                }
+              } else {
+                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
+                if (ud.headGroup) {
+                  ud.headGroup.rotation.y = -fleeDir * 0.7;
+                  ud.headGroup.rotation.x = 0.05;
+                }
+              }
+            } else {
+              obs.isCleared = false;
+              const basePos = transform.position.clone();
+              if (fleeT < 0.4) {
+                basePos.y += Math.sin(fleeT / 0.4 * Math.PI) * 0.18;
+              }
+              obs.mesh.position.copy(basePos);
+              if (ud.headGroup) {
+                ud.headGroup.rotation.x = -0.38 + Math.sin(localT * 15) * 0.05;
+                ud.headGroup.rotation.y = Math.sin(localT * 8) * 0.08;
+              }
+              if (ud.earL) ud.earL.rotation.y = 0.45;
+              if (ud.earR) ud.earR.rotation.y = -0.45;
+              if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+                ud.trunkSegments[0].rotation.x = -0.85;
+                ud.trunkSegments[1].rotation.x = -0.7;
+                ud.trunkSegments[2].rotation.x = -0.55;
+                ud.trunkSegments[3].rotation.x = -0.25;
+                ud.trunkSegments[4].rotation.x = -0.35;
+              }
+              if (ud.legs) {
+                const shudder = Math.sin(localT * 20) * 0.02;
+                ud.legs.forEach((leg) => {
+                  leg.rotation.z = shudder;
+                });
+              }
+            }
+          } else if (!isTrainClose) {
             if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
               const trunkWaveTime = localT * 2;
               ud.trunkSegments[0].rotation.x = -0.42 + Math.sin(trunkWaveTime) * 0.08;
@@ -39922,65 +40075,78 @@ void main() {
           if (obs.isDeterred) {
             const fleeT = this.animTime - obs.fleeStartTime;
             const fleeDir = obs.fleeDirection || 1;
-            const fleeDist = Math.min(6.5, fleeT * 3.5);
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const tangent = transform.tangent.clone().normalize();
             const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
-            const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-            lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.3, fleeDist * 0.08));
-            obs.mesh.position.copy(lateralPos);
-            if (fleeDist >= 2.6) {
-              obs.isCleared = true;
-            }
-            if (fleeT < 0.35) {
-              obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
-              if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
-              if (ud.tail) ud.tail.rotation.x = 0.95;
-              if (ud.ears) ud.ears.forEach((ear) => {
-                ear.rotation.x = 0.6;
-              });
-            } else if (fleeT < 3.2) {
-              const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
-              const gallopFreq = 7.5 * Math.PI;
-              const gallopCycle = (fleeT - 0.35) * gallopFreq;
-              if (ud.legs && ud.legs.length === 4) {
-                ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.6;
-                ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.6;
-                ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
-                ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
-                ud.legs.forEach((leg) => {
-                  if (leg.kneeGroup) {
-                    leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
-                  }
+            if (obs.moveOffTrackOnShock) {
+              const fleeDist = Math.min(6.5, fleeT * 3.5);
+              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.3, fleeDist * 0.08));
+              obs.mesh.position.copy(lateralPos);
+              if (fleeDist >= 2.6) {
+                obs.isCleared = true;
+              }
+              if (fleeT < 0.35) {
+                obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
+                if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
+                if (ud.tail) ud.tail.rotation.x = 0.95;
+                if (ud.ears) ud.ears.forEach((ear) => {
+                  ear.rotation.x = 0.6;
                 });
-              }
-              if (ud.headGroup) {
-                ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2) * 0.22;
-                ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
-              }
-              if (ud.dewlap) {
-                ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
-              }
-              if (ud.tail) {
-                ud.tail.rotation.x = 0.85;
-                ud.tail.rotation.z = Math.sin(gallopCycle) * 0.4;
+              } else if (fleeT < 3.2) {
+                const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
+                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
+                const gallopFreq = 7.5 * Math.PI;
+                const gallopCycle = (fleeT - 0.35) * gallopFreq;
+                if (ud.legs && ud.legs.length === 4) {
+                  ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.6;
+                  ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.6;
+                  ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
+                  ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
+                  ud.legs.forEach((leg) => {
+                    if (leg.kneeGroup) {
+                      leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
+                    }
+                  });
+                }
+                if (ud.headGroup) {
+                  ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2) * 0.22;
+                  ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
+                }
+                if (ud.dewlap) {
+                  ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
+                }
+                if (ud.tail) {
+                  ud.tail.rotation.x = 0.85;
+                  ud.tail.rotation.z = Math.sin(gallopCycle) * 0.4;
+                }
+              } else {
+                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
+                if (ud.headGroup) {
+                  ud.headGroup.rotation.y = -fleeDir * 0.75;
+                  ud.headGroup.rotation.x = -0.1;
+                }
+                if (ud.legs) {
+                  ud.legs.forEach((leg) => {
+                    leg.group.rotation.x = 0;
+                    if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
+                  });
+                }
+                if (ud.tail) {
+                  ud.tail.rotation.z = Math.sin(localT * 3) * 0.4;
+                }
               }
             } else {
-              const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
+              obs.isCleared = false;
+              const basePos = transform.position.clone();
+              if (fleeT < 0.35) {
+                basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.2;
+              }
+              obs.mesh.position.copy(basePos);
               if (ud.headGroup) {
-                ud.headGroup.rotation.y = -fleeDir * 0.75;
-                ud.headGroup.rotation.x = -0.1;
-              }
-              if (ud.legs) {
-                ud.legs.forEach((leg) => {
-                  leg.group.rotation.x = 0;
-                  if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
-                });
-              }
-              if (ud.tail) {
-                ud.tail.rotation.z = Math.sin(localT * 3) * 0.4;
+                ud.headGroup.rotation.x = -0.4 + Math.sin(localT * 16) * 0.06;
+                ud.headGroup.rotation.y = Math.sin(localT * 8) * 0.12;
               }
             }
           } else {
@@ -40039,53 +40205,63 @@ void main() {
         this.telemetry.type = closestObstacle.type;
         this.telemetry.name = closestObstacle.name;
         this.telemetry.distance = minForwardDist;
-        this.telemetry.mass = closestObstacle.mass;
-        const isWeightSafe = closestObstacle.mass <= 150;
-        const isSpeedSafe = speedKmh <= 160;
-        const canCollect = isWeightSafe && isSpeedSafe;
-        this.telemetry.canCollect = canCollect;
-        if (canCollect) {
-          this.telemetry.action = "AIRBAG NET RAPID DEPLOY & RESCUE SCOOP";
+        if (aiSensorAuto && minForwardDist <= 95 && !closestObstacle.hasBeenShocked) {
+          this.triggerDeterrence(closestObstacle, audio);
+          if (audio) audio.playTargetAcquiredBeep(false);
+          this.telemetry.action = "\u26A1 LI-DAR TARGET DETECTED - E-SHOCK DETERRENCE FIRED (MOVING OFF TRACK?)";
           this.telemetry.alertType = "deploy";
-          if (aiSensorAuto && minForwardDist <= 80 && !captureNet.isDeployed) {
-            captureNet.triggerSolenoidDeploy(audio);
-            if (audio) audio.playTargetAcquiredBeep(false);
-            this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED (${closestObstacle.mass}KG \u2264 150KG, SPEED \u2264 160 KM/H). AIRBAG NET INFLATING!`;
-          }
-          if (minForwardDist <= 14) {
-            this.scene.remove(closestObstacle.mesh);
-            captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
-            closestObstacle.isCollected = true;
-            if (audio) audio.playRescueSuccessChime();
-            this.telemetry.collectedCount++;
-            this.telemetry.collectedWeight += closestObstacle.mass;
-            this.telemetry.alertType = "success";
-            this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in scoop cradle. Zero casualties!`;
-          }
-        } else {
+          this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED! NON-LETHAL E-SHOCK DELIVERED TO CLEAR TRACK!`;
+        }
+        if (closestObstacle.isCleared) {
           if (captureNet.isDeployed) {
             captureNet.setDeployed(false);
           }
-          const specs = this.getDeterrenceSpecs(this.activeDeterrenceMode);
-          if (aiSensorAuto && minForwardDist <= 90 && !closestObstacle.isDeterred) {
-            this.triggerAnimalDeterrence(closestObstacle, audio);
-            if (audio) audio.playTargetAcquiredBeep(true);
+          this.telemetry.mass = closestObstacle.mass;
+          this.telemetry.canCollect = false;
+          this.telemetry.action = "TARGET CLEARED VIA E-SHOCK - TRACK CLEAR";
+          this.telemetry.alertType = "success";
+          this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEARED! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA E-SHOCK! ZERO CASUALTIES!`;
+          if (physics && physics.emergencyBrake) {
+            physics.setEmergencyBrake(false);
           }
-          if (closestObstacle.isCleared) {
-            this.telemetry.action = `TARGET CLEARED VIA ${specs.shortTitle} - TRACK CLEAR`;
-            this.telemetry.alertType = "success";
-            this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEARED! HEAVY BULL (480KG) ESCAPED SAFELY INTO FIELD VIA ${specs.shortTitle}. ZERO CASUALTIES!`;
-            if (physics && physics.emergencyBrake) {
-              physics.setEmergencyBrake(false);
-            }
-          } else if (closestObstacle.isDeterred) {
-            this.telemetry.action = `\u26A1 ${specs.shortTitle} ACTIVE - BULL FLEEING TO MEADOW`;
+        } else if (closestObstacle.isDeterred && closestObstacle.moveOffTrackOnShock) {
+          this.telemetry.mass = closestObstacle.mass;
+          this.telemetry.action = "\u26A1 E-SHOCK ACTIVE - TARGET SCRAMBLING OFF TRACK";
+          this.telemetry.alertType = "deploy";
+        } else {
+          const isWeightSafe = closestObstacle.mass <= 150;
+          this.telemetry.mass = closestObstacle.mass;
+          this.telemetry.canCollect = isWeightSafe;
+          if (isWeightSafe) {
+            this.telemetry.action = `WEIGHT \u2264 150KG (${closestObstacle.mass}KG) - AIRBAG NET RAPID DEPLOY & RESCUE SCOOP`;
             this.telemetry.alertType = "deploy";
-            this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${specs.shortTitle} DELIVERED (${specs.badge})! BULL SCRAMBLING OFF RAILS!`;
+            if (aiSensorAuto && minForwardDist <= 75 && !captureNet.isDeployed) {
+              captureNet.triggerSolenoidDeploy(audio);
+              if (audio) audio.playTargetAcquiredBeep(false);
+              this.telemetry.alertMessage = `\u26A1 TARGET ON TRACK! MASS CALC: ${closestObstacle.mass}KG \u2264 150KG. AIRBAG NET DEPLOYED FOR RESCUE SCOOP!`;
+            }
+            if (minForwardDist <= 14) {
+              this.scene.remove(closestObstacle.mesh);
+              captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+              closestObstacle.isCollected = true;
+              if (audio) audio.playRescueSuccessChime();
+              this.telemetry.collectedCount++;
+              this.telemetry.collectedWeight += closestObstacle.mass;
+              this.telemetry.alertType = "success";
+              this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in scoop cradle. Zero casualties!`;
+            }
           } else {
-            this.telemetry.action = `OVERWEIGHT (480KG) - ${specs.shortTitle} ARMED`;
+            if (captureNet.isDeployed) {
+              captureNet.setDeployed(false);
+            }
+            if (this.fxTimer <= 0) {
+              this.spawnDeterrenceFX(closestObstacle);
+              if (audio) audio.playElectricShockDischarge();
+              this.fxTimer = 0.8;
+            }
+            this.telemetry.action = `OVERWEIGHT (${closestObstacle.mass}KG > 150KG) - NET STOWED! E-SHOCK + EMERGENCY BRAKE`;
             this.telemetry.alertType = "hazard";
-            this.telemetry.alertMessage = `\u26A0\uFE0F HAZARD: ${closestObstacle.name.toUpperCase()} DETECTED! ARMED WITH ${specs.shortTitle}!`;
+            this.telemetry.alertMessage = `\u26A0\uFE0F OVERWEIGHT HAZARD: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG > 150KG)! NET STOWED! REPEAT E-SHOCK ACTIVE!`;
             if (minForwardDist <= 35) {
               if (physics && !physics.emergencyBrake) {
                 physics.setEmergencyBrake(true);
@@ -40179,7 +40355,9 @@ void main() {
         kavachPayloadVal: document.getElementById("kavach-payload-val"),
         kavachPayloadBar: document.getElementById("kavach-payload-bar"),
         btnSpawnHuman: document.getElementById("btn-spawn-human"),
+        btnSpawnHumanFlee: document.getElementById("btn-spawn-human-flee"),
         btnSpawnAnimal: document.getElementById("btn-spawn-animal"),
+        btnSpawnAnimalFlee: document.getElementById("btn-spawn-animal-flee"),
         btnSpawnBull: document.getElementById("btn-spawn-bull"),
         btnSpawnCrate: document.getElementById("btn-spawn-crate"),
         btnClearCradle: document.getElementById("btn-clear-cradle"),
@@ -40356,22 +40534,32 @@ void main() {
       }
       if (this.dom.btnSpawnHuman) {
         this.dom.btnSpawnHuman.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, false);
+        });
+      }
+      if (this.dom.btnSpawnHumanFlee) {
+        this.dom.btnSpawnHumanFlee.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, true);
         });
       }
       if (this.dom.btnSpawnAnimal) {
         this.dom.btnSpawnAnimal.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, false);
+        });
+      }
+      if (this.dom.btnSpawnAnimalFlee) {
+        this.dom.btnSpawnAnimalFlee.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, true);
         });
       }
       if (this.dom.btnSpawnBull) {
         this.dom.btnSpawnBull.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, false);
         });
       }
       if (this.dom.btnSpawnCrate) {
         this.dom.btnSpawnCrate.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, false);
         });
       }
       if (this.dom.btnClearCradle) {
@@ -40498,12 +40686,12 @@ void main() {
       }
     }
     fireDeterrenceBeam() {
-      let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isDeterred && o.mass > 150);
+      let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isDeterred);
       if (!target) {
         target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 70);
       }
       if (target) {
-        this.obstacles.triggerAnimalDeterrence(target, this.audio);
+        this.obstacles.triggerDeterrence(target, this.audio);
         this.beamDischargingTimer = 2.5;
         if (this.dom.btnConsoleBeam) {
           this.dom.btnConsoleBeam.innerText = "\u26A1 BEAM: FIRED";

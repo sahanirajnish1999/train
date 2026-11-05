@@ -1381,7 +1381,7 @@ export class ObstacleManager {
   // ------------------------------------------------------------------
   // Spawn and Positioning Logic
   // ------------------------------------------------------------------
-  spawnObstacle(type, trackProgress) {
+  spawnObstacle(type, trackProgress, moveOffTrack = null) {
     let mesh, name, mass;
     switch (type) {
       case 'human':
@@ -1418,7 +1418,12 @@ export class ObstacleManager {
       mass,
       mesh,
       progress: trackProgress,
-      isCollected: false
+      isCollected: false,
+      isDeterred: false,
+      hasBeenShocked: false,
+      shockTime: 0,
+      isCleared: false,
+      moveOffTrackOnShock: moveOffTrack !== null ? moveOffTrack : (type === 'cattle')
     };
 
     this.scene.add(mesh);
@@ -1428,27 +1433,27 @@ export class ObstacleManager {
 
   // Initial scenic obstacles along the route
   initDefaultObstacles() {
-    // 1. Human Track Worker in immediate line-of-sight (65-75m ahead of train spawn)
-    this.spawnObstacle('human', 0.045);
-    // 2. Stray Animal near mustard fields
-    this.spawnObstacle('animal', 0.12);
-    // 3. Track Inspector near mountain approach
-    this.spawnObstacle('human', 0.28);
-    // 4. Heavy Stray Bull (>150kg Overweight Hazard)
-    this.spawnObstacle('cattle', 0.45);
-    // 5. Stray Animal
-    this.spawnObstacle('animal', 0.60);
-    // 6. Track Cargo Debris
-    this.spawnObstacle('debris', 0.74);
-    // 7. Human Track Worker near level crossing
-    this.spawnObstacle('human', 0.88);
+    // 1. Human Track Worker right ahead (65-75m from spawn) -> E-shock fires -> Stays on track -> Weight 72kg <= 150kg -> Scoop Net rescue!
+    this.spawnObstacle('human', 0.045, false);
+    // 2. Stray Elephant -> E-shock fires -> Scrambles off track into pasture -> Track clear!
+    this.spawnObstacle('animal', 0.12, true);
+    // 3. Track Inspector Human -> E-shock fires -> Stays on track -> Net scoop rescue!
+    this.spawnObstacle('human', 0.28, false);
+    // 4. Heavy Stray Bull (>150kg Overweight Hazard) -> E-shock fires -> Gallops off track!
+    this.spawnObstacle('cattle', 0.45, true);
+    // 5. Elephant Calf -> E-shock fires -> Stays on track -> Weight 110kg <= 150kg -> Net scoop rescue!
+    this.spawnObstacle('animal', 0.60, false);
+    // 6. Track Cargo Debris -> Inanimate crate 40kg -> Net scoop rescue!
+    this.spawnObstacle('debris', 0.74, false);
+    // 7. Stubborn Heavy Bull -> E-shock fires -> Stays on track -> 480kg > 150kg -> Net stowed, emergency brake!
+    this.spawnObstacle('cattle', 0.88, false);
   }
 
   // Spawn immediately ahead of the train on demand (via HUD test buttons)
-  spawnAheadOfTrain(trainProgress, trackLength, type = 'human', distanceMeters = 85) {
+  spawnAheadOfTrain(trainProgress, trackLength, type = 'human', distanceMeters = 85, moveOffTrack = null) {
     const deltaProgress = distanceMeters / trackLength;
     const targetProgress = (trainProgress + deltaProgress) % 1.0;
-    return this.spawnObstacle(type, targetProgress);
+    return this.spawnObstacle(type, targetProgress, moveOffTrack);
   }
 
   // ------------------------------------------------------------------
@@ -1522,10 +1527,12 @@ export class ObstacleManager {
     }
   }
 
-  triggerAnimalDeterrence(obs, audio) {
+  triggerDeterrence(obs, audio) {
     if (!obs || obs.isDeterred) return;
 
     obs.isDeterred = true;
+    obs.hasBeenShocked = true;
+    obs.shockTime = this.animTime;
     obs.deterMode = this.activeDeterrenceMode;
     obs.fleeStartTime = this.animTime;
     obs.fleeDirection = (Math.random() > 0.5 ? 1 : -1);
@@ -1549,6 +1556,11 @@ export class ObstacleManager {
 
     // Spawn 3D Visual FX in world scene
     this.spawnDeterrenceFX(obs);
+  }
+
+  // Alias for backward compatibility
+  triggerAnimalDeterrence(obs, audio) {
+    return this.triggerDeterrence(obs, audio);
   }
 
   spawnDeterrenceFX(obs) {
@@ -1752,7 +1764,99 @@ export class ObstacleManager {
           });
         }
 
-        if (!isTrainClose) {
+        if (obs.isDeterred) {
+          const fleeT = this.animTime - obs.fleeStartTime;
+          const fleeDir = obs.fleeDirection || 1;
+
+          // Track lateral offset calculation (perpendicular to track tangent)
+          const transform = this.track.getTrackTransform(obs.progress, 0);
+          const tangent = transform.tangent.clone().normalize();
+          const sideDir = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+          if (obs.moveOffTrackOnShock) {
+            // ==============================================================
+            // A. HUMAN ESCAPES TRACK SAFELY (Compelled by non-lethal E-shock)
+            // ==============================================================
+            const fleeDist = Math.min(5.5, fleeT * 4.2);
+            const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+            lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.25, fleeDist * 0.06));
+            obs.mesh.position.copy(lateralPos);
+
+            if (fleeDist >= 2.5) {
+              obs.isCleared = true;
+            }
+
+            if (fleeT < 0.35) {
+              // 1. Initial Shock Reflex Jump!
+              obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.22;
+              if (ud.headGroup) ud.headGroup.rotation.x = -0.3;
+              if (ud.armL) ud.armL.rotation.set(-0.8, 0, -0.6);
+              if (ud.armR) ud.armR.rotation.set(-0.8, 0, 0.6);
+            } else if (fleeT < 2.5) {
+              // 2. High-speed running sprint off the track
+              const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fleeHeading);
+
+              const runCycle = (fleeT - 0.35) * 14.0;
+              if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
+              if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0, -Math.sin(runCycle) * 1.1);
+              if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
+              if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0, Math.sin(runCycle) * 1.1);
+
+              if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
+              if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
+              if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.22;
+              if (ud.headGroup) ud.headGroup.rotation.x = 0.1;
+            } else {
+              // 3. Safe on the grassy shoulder, turning to watch the train pass safely
+              const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), safeHeading);
+              if (ud.headGroup) {
+                ud.headGroup.rotation.y = -fleeDir * 0.8;
+                ud.headGroup.rotation.x = -0.1;
+              }
+              if (ud.armL) ud.armL.rotation.set(0.1, 0, -0.15);
+              if (ud.armR) ud.armR.rotation.set(0.1, 0, 0.15);
+              if (ud.legL) ud.legL.rotation.set(0, 0, 0);
+              if (ud.legR) ud.legR.rotation.set(0, 0, 0);
+              if (ud.lowerLegL) ud.lowerLegL.rotation.set(0, 0, 0);
+              if (ud.lowerLegR) ud.lowerLegR.rotation.set(0, 0, 0);
+            }
+          } else {
+            // ==============================================================
+            // B. HUMAN SHOCKED BUT REMAINS FROZEN ON TRACK
+            // ("If he not move it . then calculate to weaght , if under 150KG collect in net")
+            // ==============================================================
+            obs.isCleared = false;
+            const basePos = transform.position.clone();
+            if (fleeT < 0.35) {
+              basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.18;
+            }
+            obs.mesh.position.copy(basePos);
+
+            const shiver = Math.sin(localT * 25.0) * 0.04;
+            if (ud.headGroup) {
+              ud.headGroup.rotation.set(-0.25 + shiver, Math.sin(localT * 8.0) * 0.08, 0);
+            }
+            if (ud.torsoGroup) {
+              ud.torsoGroup.rotation.x = -0.15 + shiver;
+              ud.torsoGroup.rotation.z = Math.sin(localT * 12.0) * 0.03;
+            }
+            if (ud.armL) {
+              ud.armL.rotation.set(-2.1 + Math.sin(localT * 14.0) * 0.3, 0, -0.45);
+            }
+            if (ud.forearmL) ud.forearmL.rotation.x = -0.85;
+            if (ud.armR) {
+              ud.armR.rotation.set(-1.6 + Math.sin(localT * 8.0) * 0.15, 0, 0.35);
+            }
+            if (ud.forearmR) ud.forearmR.rotation.x = -1.1;
+
+            if (ud.legL) ud.legL.rotation.x = 0.38 + shiver * 0.5;
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.65;
+            if (ud.legR) ud.legR.rotation.x = 0.30 - shiver * 0.5;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.55;
+          }
+        } else if (!isTrainClose) {
           // B. Natural Idling: Chest Breathing & Gentle Contrapposto Weight Shift
           const breath = Math.sin(localT * 2.2);
           if (ud.torsoGroup) {
@@ -1902,7 +2006,87 @@ export class ObstacleManager {
           ud.tail.rotation.x = 0.30 + Math.abs(Math.sin(localT * 1.6)) * 0.20;
         }
 
-        if (!isTrainClose) {
+        if (obs.isDeterred) {
+          const fleeT = this.animTime - obs.fleeStartTime;
+          const fleeDir = obs.fleeDirection || 1;
+
+          const transform = this.track.getTrackTransform(obs.progress, 0);
+          const tangent = transform.tangent.clone().normalize();
+          const sideDir = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+
+          if (obs.moveOffTrackOnShock) {
+            // ==============================================================
+            // ELEPHANT ESCAPES TRACK INTO FIELD VIA E-SHOCK
+            // ==============================================================
+            const fleeDist = Math.min(6.0, fleeT * 3.2);
+            const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+            lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.25, fleeDist * 0.06));
+            obs.mesh.position.copy(lateralPos);
+
+            if (fleeDist >= 2.8) {
+              obs.isCleared = true;
+            }
+
+            if (fleeT < 0.40) {
+              obs.mesh.position.y += Math.sin(fleeT / 0.40 * Math.PI) * 0.20;
+              if (ud.headGroup) ud.headGroup.rotation.x = -0.4;
+              if (ud.earL) ud.earL.rotation.y = 0.5;
+              if (ud.earR) ud.earR.rotation.y = -0.5;
+            } else if (fleeT < 3.2) {
+              const trotHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), trotHeading);
+
+              const trotCycle = (fleeT - 0.40) * 8.0;
+              if (ud.legs && ud.legs.length >= 4) {
+                ud.legs[0].rotation.x = Math.sin(trotCycle) * 0.45;
+                ud.legs[1].rotation.x = -Math.sin(trotCycle) * 0.45;
+                ud.legs[2].rotation.x = -Math.sin(trotCycle + 0.4) * 0.40;
+                ud.legs[3].rotation.x = Math.sin(trotCycle + 0.4) * 0.40;
+              }
+              if (ud.headGroup) ud.headGroup.rotation.x = -0.15 + Math.sin(trotCycle) * 0.12;
+              if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+                ud.trunkSegments[0].rotation.x = -0.6;
+                ud.trunkSegments[1].rotation.x = -0.4;
+              }
+            } else {
+              const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), safeHeading);
+              if (ud.headGroup) {
+                ud.headGroup.rotation.y = -fleeDir * 0.7;
+                ud.headGroup.rotation.x = 0.05;
+              }
+            }
+          } else {
+            // ==============================================================
+            // ELEPHANT CALF SHOCKED BUT REMAINS FROZEN ON TRACK
+            // ("If he not move it . then calculate to weaght , if under 150KG collect in net")
+            // ==============================================================
+            obs.isCleared = false;
+            const basePos = transform.position.clone();
+            if (fleeT < 0.40) {
+              basePos.y += Math.sin(fleeT / 0.40 * Math.PI) * 0.18;
+            }
+            obs.mesh.position.copy(basePos);
+
+            if (ud.headGroup) {
+              ud.headGroup.rotation.x = -0.38 + Math.sin(localT * 15.0) * 0.05;
+              ud.headGroup.rotation.y = Math.sin(localT * 8.0) * 0.08;
+            }
+            if (ud.earL) ud.earL.rotation.y = 0.45;
+            if (ud.earR) ud.earR.rotation.y = -0.45;
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              ud.trunkSegments[0].rotation.x = -0.85;
+              ud.trunkSegments[1].rotation.x = -0.70;
+              ud.trunkSegments[2].rotation.x = -0.55;
+              ud.trunkSegments[3].rotation.x = -0.25;
+              ud.trunkSegments[4].rotation.x = -0.35;
+            }
+            if (ud.legs) {
+              const shudder = Math.sin(localT * 20.0) * 0.02;
+              ud.legs.forEach(leg => { leg.rotation.z = shudder; });
+            }
+          }
+        } else if (!isTrainClose) {
           // E. Normal Idling: Fluid Traveling Sinusoidal Wave along 5 Trunk Segments!
           // (Forward & upward arching wave extending proud over the track)
           if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
@@ -1990,84 +2174,97 @@ export class ObstacleManager {
         }
 
         if (obs.isDeterred) {
-          // ==============================================================
-          // ACTIVE NON-LETHAL ESCAPE REACTION (Fleeing the track safely!)
-          // ==============================================================
           const fleeT = this.animTime - obs.fleeStartTime;
           const fleeDir = obs.fleeDirection || 1;
-          const fleeDist = Math.min(6.5, fleeT * 3.5);
 
           // Track lateral offset calculation (perpendicular to track tangent)
           const transform = this.track.getTrackTransform(obs.progress, 0);
           const tangent = transform.tangent.clone().normalize();
           const sideDir = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-          // Move down the embankment into the grassy pasture (6.5m offset)
-          const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-          lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.30, fleeDist * 0.08));
-          obs.mesh.position.copy(lateralPos);
+          if (obs.moveOffTrackOnShock) {
+            // ==============================================================
+            // ACTIVE NON-LETHAL ESCAPE REACTION (Fleeing the track safely!)
+            // ==============================================================
+            const fleeDist = Math.min(6.5, fleeT * 3.5);
+            const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+            lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.30, fleeDist * 0.08));
+            obs.mesh.position.copy(lateralPos);
 
-          if (fleeDist >= 2.6) {
-            obs.isCleared = true;
-          }
-
-          if (fleeT < 0.35) {
-            // A. Initial Jump / Muscular Shock Reflex
-            obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
-            if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
-            if (ud.tail) ud.tail.rotation.x = 0.95;
-            if (ud.ears) ud.ears.forEach(ear => { ear.rotation.x = 0.6; });
-          } else if (fleeT < 3.2) {
-            // B. High-Speed Quadruped Gallop off the track
-            const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-            obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fleeHeading);
-
-            const gallopFreq = 7.5 * Math.PI;
-            const gallopCycle = (fleeT - 0.35) * gallopFreq;
-
-            // Vigorous 4-leg gallop kinematics
-            if (ud.legs && ud.legs.length === 4) {
-              ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.60;
-              ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.60;
-              ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
-              ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
-
-              ud.legs.forEach(leg => {
-                if (leg.kneeGroup) {
-                  leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
-                }
-              });
+            if (fleeDist >= 2.6) {
+              obs.isCleared = true;
             }
 
-            // Head galloping bob & dewlap whip
-            if (ud.headGroup) {
-              ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2.0) * 0.22;
-              ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
-            }
-            if (ud.dewlap) {
-              ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
-            }
-            if (ud.tail) {
-              ud.tail.rotation.x = 0.85;
-              ud.tail.rotation.z = Math.sin(gallopCycle) * 0.40;
+            if (fleeT < 0.35) {
+              // A. Initial Jump / Muscular Shock Reflex
+              obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
+              if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
+              if (ud.tail) ud.tail.rotation.x = 0.95;
+              if (ud.ears) ud.ears.forEach(ear => { ear.rotation.x = 0.6; });
+            } else if (fleeT < 3.2) {
+              // B. High-Speed Quadruped Gallop off the track
+              const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fleeHeading);
+
+              const gallopFreq = 7.5 * Math.PI;
+              const gallopCycle = (fleeT - 0.35) * gallopFreq;
+
+              // Vigorous 4-leg gallop kinematics
+              if (ud.legs && ud.legs.length === 4) {
+                ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.60;
+                ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.60;
+                ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
+                ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
+
+                ud.legs.forEach(leg => {
+                  if (leg.kneeGroup) {
+                    leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
+                  }
+                });
+              }
+
+              // Head galloping bob & dewlap whip
+              if (ud.headGroup) {
+                ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2.0) * 0.22;
+                ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
+              }
+              if (ud.dewlap) {
+                ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
+              }
+              if (ud.tail) {
+                ud.tail.rotation.x = 0.85;
+                ud.tail.rotation.z = Math.sin(gallopCycle) * 0.40;
+              }
+            } else {
+              // C. Safe in Meadow Pasture (Watching train pass safely from 6.5m distance)
+              const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), safeHeading);
+
+              if (ud.headGroup) {
+                ud.headGroup.rotation.y = -fleeDir * 0.75;
+                ud.headGroup.rotation.x = -0.10;
+              }
+              if (ud.legs) {
+                ud.legs.forEach(leg => {
+                  leg.group.rotation.x = 0;
+                  if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
+                });
+              }
+              if (ud.tail) {
+                ud.tail.rotation.z = Math.sin(localT * 3.0) * 0.40;
+              }
             }
           } else {
-            // C. Safe in Meadow Pasture (Watching train pass safely from 6.5m distance)
-            const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-            obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), safeHeading);
-
+            // Overweight bull remains stubborn / frozen on track (Overweight hazard!)
+            obs.isCleared = false;
+            const basePos = transform.position.clone();
+            if (fleeT < 0.35) {
+              basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.20;
+            }
+            obs.mesh.position.copy(basePos);
             if (ud.headGroup) {
-              ud.headGroup.rotation.y = -fleeDir * 0.75;
-              ud.headGroup.rotation.x = -0.10;
-            }
-            if (ud.legs) {
-              ud.legs.forEach(leg => {
-                leg.group.rotation.x = 0;
-                if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
-              });
-            }
-            if (ud.tail) {
-              ud.tail.rotation.z = Math.sin(localT * 3.0) * 0.40;
+              ud.headGroup.rotation.x = -0.40 + Math.sin(localT * 16.0) * 0.06;
+              ud.headGroup.rotation.y = Math.sin(localT * 8.0) * 0.12;
             }
           }
         } else {
@@ -2148,87 +2345,107 @@ export class ObstacleManager {
       this.telemetry.type = closestObstacle.type;
       this.telemetry.name = closestObstacle.name;
       this.telemetry.distance = minForwardDist;
-      this.telemetry.mass = closestObstacle.mass;
 
-      // Dual Safety Condition: Collect ONLY when Mass <= 150 kg AND Speed <= 160 km/h
-      const isWeightSafe = closestObstacle.mass <= 150;
-      const isSpeedSafe = speedKmh <= 160;
-      const canCollect = isWeightSafe && isSpeedSafe;
-      this.telemetry.canCollect = canCollect;
-
-      // ----------------------------------------------------------------
-      // SAFETY CONTROLLER LOGIC:
-      // Case A: Safe for capture (Mass <= 150 kg & Speed <= 160 km/h)
-      // Net is default closed; Rapidly opens with 3D pneumatic animation
-      // ----------------------------------------------------------------
-      if (canCollect) {
-        this.telemetry.action = 'AIRBAG NET RAPID DEPLOY & RESCUE SCOOP';
+      // ================================================================
+      // STAGE 1: LIDAR DETECTION & INITIAL NON-LETHAL ELECTRIC SHOCK
+      // User requirement: "when delect to Human OR Animal , then fair to electic shock for his move to track"
+      // Discharges non-lethal pulsed electrical gradient at <= 95m to give obstacle the chance to flee off track
+      // ================================================================
+      if (aiSensorAuto && minForwardDist <= 95 && !closestObstacle.hasBeenShocked) {
+        this.triggerDeterrence(closestObstacle, audio);
+        if (audio) audio.playTargetAcquiredBeep(false);
+        this.telemetry.action = '⚡ LI-DAR TARGET DETECTED - E-SHOCK DETERRENCE FIRED (MOVING OFF TRACK?)';
         this.telemetry.alertType = 'deploy';
-
-        // 1. Rapid Pneumatic Inflation Trigger: Opens with animation at <= 80m (Auto mode)
-        if (aiSensorAuto && minForwardDist <= 80 && !captureNet.isDeployed) {
-          captureNet.triggerSolenoidDeploy(audio);
-          if (audio) audio.playTargetAcquiredBeep(false);
-          this.telemetry.alertMessage = `⚡ AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED (${closestObstacle.mass}KG ≤ 150KG, SPEED ≤ 160 KM/H). AIRBAG NET INFLATING!`;
-        }
-
-        // 2. Physical Scoop / Collection Event right as the scoop tip meets obstacle (<= 14.0m from train center)
-        if (minForwardDist <= 14.0) {
-          this.scene.remove(closestObstacle.mesh);
-          captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
-          closestObstacle.isCollected = true;
-
-          // Sound celebratory rescue confirmation audio
-          if (audio) audio.playRescueSuccessChime();
-
-          this.telemetry.collectedCount++;
-          this.telemetry.collectedWeight += closestObstacle.mass;
-          this.telemetry.alertType = 'success';
-          this.telemetry.alertMessage = `🎯 OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in scoop cradle. Zero casualties!`;
-        }
+        this.telemetry.alertMessage = `⚡ AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED! NON-LETHAL E-SHOCK DELIVERED TO CLEAR TRACK!`;
       }
-      // ----------------------------------------------------------------
-      // Case B: OVERWEIGHT (> 150 kg) - ACTIVE NON-LETHAL ANIMAL DETERRENCE
-      // Inflatable net stays CLOSED. We actively deliver deterrence (e.g. Electric Shock)
-      // to remove the heavy animal from tracks with ZERO HARM!
-      // ----------------------------------------------------------------
-      else {
-        // Ensure net remains CLOSED/STOWED to avoid structural damage
+
+      // ================================================================
+      // STAGE 2: TRACK CLEARANCE EVALUATION
+      // Check if target has scrambled off the track or is actively fleeing
+      // ================================================================
+      if (closestObstacle.isCleared) {
+        // Target successfully scrambled off the tracks into pasture / grass verge!
         if (captureNet.isDeployed) {
           captureNet.setDeployed(false);
         }
+        this.telemetry.mass = closestObstacle.mass;
+        this.telemetry.canCollect = false;
+        this.telemetry.action = 'TARGET CLEARED VIA E-SHOCK - TRACK CLEAR';
+        this.telemetry.alertType = 'success';
+        this.telemetry.alertMessage = `🎯 TRACK CLEARED! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA E-SHOCK! ZERO CASUALTIES!`;
 
-        const specs = this.getDeterrenceSpecs(this.activeDeterrenceMode);
-
-        // 1. Automatic Deterrence Discharge at <= 90m (Auto mode)
-        if (aiSensorAuto && minForwardDist <= 90 && !closestObstacle.isDeterred) {
-          this.triggerAnimalDeterrence(closestObstacle, audio);
-          if (audio) audio.playTargetAcquiredBeep(true);
+        // Release emergency brake if tripped earlier
+        if (physics && physics.emergencyBrake) {
+          physics.setEmergencyBrake(false);
         }
+      } else if (closestObstacle.isDeterred && closestObstacle.moveOffTrackOnShock) {
+        // Obstacle is actively in motion fleeing the ballast
+        this.telemetry.mass = closestObstacle.mass;
+        this.telemetry.action = '⚡ E-SHOCK ACTIVE - TARGET SCRAMBLING OFF TRACK';
+        this.telemetry.alertType = 'deploy';
+      }
+      // ================================================================
+      // STAGE 3: TARGET DID NOT MOVE OFF TRACK -> WEIGHT CALCULATION & RESCUE PROTOCOL
+      // User requirement: "If he not move it . then calculate to weaght , if weight under 150KG Of Human OR Animal . then collect in net"
+      // ================================================================
+      else {
+        // Calculate / verify mass:
+        const isWeightSafe = closestObstacle.mass <= 150;
+        this.telemetry.mass = closestObstacle.mass;
+        this.telemetry.canCollect = isWeightSafe;
 
-        // 2. Track Clearance Verification
-        if (closestObstacle.isCleared) {
-          // Animal has successfully scrambled off the ballast into the pasture!
-          this.telemetry.action = `TARGET CLEARED VIA ${specs.shortTitle} - TRACK CLEAR`;
-          this.telemetry.alertType = 'success';
-          this.telemetry.alertMessage = `🎯 TRACK CLEARED! HEAVY BULL (480KG) ESCAPED SAFELY INTO FIELD VIA ${specs.shortTitle}. ZERO CASUALTIES!`;
-
-          // Release emergency brake if it was tripped earlier so train can proceed safely
-          if (physics && physics.emergencyBrake) {
-            physics.setEmergencyBrake(false);
-          }
-        } else if (closestObstacle.isDeterred) {
-          // Animal is actively galloping off the track!
-          this.telemetry.action = `⚡ ${specs.shortTitle} ACTIVE - BULL FLEEING TO MEADOW`;
+        // ----------------------------------------------------------------
+        // CASE A: WEIGHT <= 150 KG (Human: 72kg, Elephant Calf: 110kg, Debris: 40kg)
+        // -> Inflatable Scoop Net Rapidly Deploys and Collects into Cradle!
+        // ----------------------------------------------------------------
+        if (isWeightSafe) {
+          this.telemetry.action = `WEIGHT ≤ 150KG (${closestObstacle.mass}KG) - AIRBAG NET RAPID DEPLOY & RESCUE SCOOP`;
           this.telemetry.alertType = 'deploy';
-          this.telemetry.alertMessage = `⚡ AI KAVACH: ${specs.shortTitle} DELIVERED (${specs.badge})! BULL SCRAMBLING OFF RAILS!`;
-        } else {
-          // Detected ahead, deterrence armed
-          this.telemetry.action = `OVERWEIGHT (480KG) - ${specs.shortTitle} ARMED`;
-          this.telemetry.alertType = 'hazard';
-          this.telemetry.alertMessage = `⚠️ HAZARD: ${closestObstacle.name.toUpperCase()} DETECTED! ARMED WITH ${specs.shortTitle}!`;
 
-          // Fail-safe emergency brake only if animal is dangerously close (< 35m) and still on track
+          // 1. Rapid Pneumatic Inflation Trigger: Opens with animation at <= 75m (Auto mode)
+          if (aiSensorAuto && minForwardDist <= 75 && !captureNet.isDeployed) {
+            captureNet.triggerSolenoidDeploy(audio);
+            if (audio) audio.playTargetAcquiredBeep(false);
+            this.telemetry.alertMessage = `⚡ TARGET ON TRACK! MASS CALC: ${closestObstacle.mass}KG ≤ 150KG. AIRBAG NET DEPLOYED FOR RESCUE SCOOP!`;
+          }
+
+          // 2. Physical Scoop / Collection Event right as scoop tip meets obstacle (<= 14.0m from train center)
+          if (minForwardDist <= 14.0) {
+            this.scene.remove(closestObstacle.mesh);
+            captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+            closestObstacle.isCollected = true;
+
+            // Sound celebratory rescue confirmation audio
+            if (audio) audio.playRescueSuccessChime();
+
+            this.telemetry.collectedCount++;
+            this.telemetry.collectedWeight += closestObstacle.mass;
+            this.telemetry.alertType = 'success';
+            this.telemetry.alertMessage = `🎯 OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in scoop cradle. Zero casualties!`;
+          }
+        }
+        // ----------------------------------------------------------------
+        // CASE B: OVERWEIGHT (> 150 kg, e.g. 480kg Heavy Bull)
+        // -> Net stays CLOSED / STOWED to prevent damage. Repeat E-shock + Horn + Emergency Brake!
+        // ----------------------------------------------------------------
+        else {
+          // Ensure net remains CLOSED/STOWED to avoid structural damage
+          if (captureNet.isDeployed) {
+            captureNet.setDeployed(false);
+          }
+
+          // Continuous repeat electric shock pulses if still on track
+          if (this.fxTimer <= 0) {
+            this.spawnDeterrenceFX(closestObstacle);
+            if (audio) audio.playElectricShockDischarge();
+            this.fxTimer = 0.8;
+          }
+
+          this.telemetry.action = `OVERWEIGHT (${closestObstacle.mass}KG > 150KG) - NET STOWED! E-SHOCK + EMERGENCY BRAKE`;
+          this.telemetry.alertType = 'hazard';
+          this.telemetry.alertMessage = `⚠️ OVERWEIGHT HAZARD: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG > 150KG)! NET STOWED! REPEAT E-SHOCK ACTIVE!`;
+
+          // Fail-safe emergency brake and horn only if animal is dangerously close (<= 35m) and still on track
           if (minForwardDist <= 35) {
             if (physics && !physics.emergencyBrake) {
               physics.setEmergencyBrake(true);

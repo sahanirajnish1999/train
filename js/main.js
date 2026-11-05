@@ -83,7 +83,9 @@ class SimulatorApp {
       kavachPayloadVal: document.getElementById('kavach-payload-val'),
       kavachPayloadBar: document.getElementById('kavach-payload-bar'),
       btnSpawnHuman: document.getElementById('btn-spawn-human'),
+      btnSpawnHumanFlee: document.getElementById('btn-spawn-human-flee'),
       btnSpawnAnimal: document.getElementById('btn-spawn-animal'),
+      btnSpawnAnimalFlee: document.getElementById('btn-spawn-animal-flee'),
       btnSpawnBull: document.getElementById('btn-spawn-bull'),
       btnSpawnCrate: document.getElementById('btn-spawn-crate'),
       btnClearCradle: document.getElementById('btn-clear-cradle'),
@@ -287,22 +289,32 @@ class SimulatorApp {
     // AI Kavach Obstacle Spawner Buttons
     if (this.dom.btnSpawnHuman) {
       this.dom.btnSpawnHuman.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, false);
+      });
+    }
+    if (this.dom.btnSpawnHumanFlee) {
+      this.dom.btnSpawnHumanFlee.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, true);
       });
     }
     if (this.dom.btnSpawnAnimal) {
       this.dom.btnSpawnAnimal.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, false);
+      });
+    }
+    if (this.dom.btnSpawnAnimalFlee) {
+      this.dom.btnSpawnAnimalFlee.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, true);
       });
     }
     if (this.dom.btnSpawnBull) {
       this.dom.btnSpawnBull.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, false);
       });
     }
     if (this.dom.btnSpawnCrate) {
       this.dom.btnSpawnCrate.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, false);
       });
     }
     if (this.dom.btnClearCradle) {
@@ -459,12 +471,12 @@ class SimulatorApp {
   }
 
   fireDeterrenceBeam() {
-    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isDeterred && o.mass > 150);
+    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isDeterred);
     if (!target) {
       target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 70);
     }
     if (target) {
-      this.obstacles.triggerAnimalDeterrence(target, this.audio);
+      this.obstacles.triggerDeterrence(target, this.audio);
       this.beamDischargingTimer = 2.5;
       if (this.dom.btnConsoleBeam) {
         this.dom.btnConsoleBeam.innerText = '⚡ BEAM: FIRED';
