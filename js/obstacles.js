@@ -114,12 +114,12 @@ export class ObstacleManager {
       humanShoesDark: new THREE.MeshStandardMaterial({ color: 0x1f1f23, roughness: 0.65 }), // Dark casual loafers
 
       // Indian Elephant Materials (Exact match to media_1793820037213_e448b2e7.jpg)
-      elephantSkin: new THREE.MeshStandardMaterial({ color: 0x567b8d, roughness: 0.74 }), // Slate blue-grey body skin
-      elephantSkinDark: new THREE.MeshStandardMaterial({ color: 0x3d5c6b, roughness: 0.78 }), // Dark contour accents & creases
-      elephantEarInner: new THREE.MeshStandardMaterial({ color: 0x4a6b7a, roughness: 0.82 }), // Ear contour / inner face
-      elephantTusk: new THREE.MeshStandardMaterial({ color: 0xfffae5, roughness: 0.32, metalness: 0.05 }), // Smooth ivory tusks
-      elephantTuskTip: new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.35 }), // Warm golden tusk tip
-      elephantNails: new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.42 }), // 3 cute yellow toenails per foot
+      elephantSkin: new THREE.MeshStandardMaterial({ color: 0x606f7b, roughness: 0.70 }), // Natural slate grey-blue body skin
+      elephantSkinDark: new THREE.MeshStandardMaterial({ color: 0x45525c, roughness: 0.75 }), // Dark contour accents & creases
+      elephantEarInner: new THREE.MeshStandardMaterial({ color: 0x566570, roughness: 0.78 }), // Ear contour / inner face
+      elephantTusk: new THREE.MeshStandardMaterial({ color: 0xfffae5, roughness: 0.28, metalness: 0.05 }), // Smooth ivory tusks
+      elephantTuskTip: new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.32 }), // Warm golden tusk tip
+      elephantNails: new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.38 }), // Cute yellow toenails per foot
       elephantEyeWhite: new THREE.MeshBasicMaterial({ color: 0xf8fafc }), // Big cartoon white sclera
       elephantEyePupil: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.15 }), // Deep dark cartoon pupil
       elephantEyeCatchlight: new THREE.MeshBasicMaterial({ color: 0xffffff }), // Eye specular highlight
@@ -180,6 +180,7 @@ export class ObstacleManager {
   // ------------------------------------------------------------------
 
   createHumanFaceTexture() {
+    if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 1024;
@@ -297,6 +298,7 @@ export class ObstacleManager {
   }
 
   createElephantFaceTexture() {
+    if (typeof document === 'undefined') return null;
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
     canvas.height = 1024;
@@ -387,6 +389,76 @@ export class ObstacleManager {
     drawFace(0);
     const tex = new THREE.CanvasTexture(canvas);
     return { tex, canvas, ctx, drawFace };
+  }
+
+  // Parametric tapered tube geometry with closed rounded caps (Ideal for hair locks, horns, tusks)
+  createTaperedTubeGeometry(curve, tubularSegments = 16, rStart = 0.024, rEnd = 0.003, radialSegments = 8, cap = true) {
+    const points = curve.getPoints(tubularSegments);
+    const frames = curve.computeFrenetFrames(tubularSegments, false);
+    const positions = [];
+    const uvs = [];
+    const indices = [];
+
+    for (let i = 0; i <= tubularSegments; i++) {
+      const t = i / tubularSegments;
+      const r = rStart * (1 - t) + rEnd * t;
+      const p = points[i];
+      const N = frames.normals[i];
+      const B = frames.binormals[i];
+
+      for (let j = 0; j <= radialSegments; j++) {
+        const theta = (j / radialSegments) * Math.PI * 2;
+        const sin = Math.sin(theta);
+        const cos = -Math.cos(theta);
+
+        const vx = p.x + r * (cos * N.x + sin * B.x);
+        const vy = p.y + r * (cos * N.y + sin * B.y);
+        const vz = p.z + r * (cos * N.z + sin * B.z);
+
+        positions.push(vx, vy, vz);
+        uvs.push(j / radialSegments, t);
+      }
+    }
+
+    for (let i = 0; i < tubularSegments; i++) {
+      for (let j = 0; j < radialSegments; j++) {
+        const a = i * (radialSegments + 1) + j;
+        const b = (i + 1) * (radialSegments + 1) + j;
+        const c = (i + 1) * (radialSegments + 1) + (j + 1);
+        const d = i * (radialSegments + 1) + (j + 1);
+
+        indices.push(a, b, d);
+        indices.push(b, c, d);
+      }
+    }
+
+    if (cap) {
+      const startIdx = positions.length / 3;
+      const pStart = points[0];
+      positions.push(pStart.x, pStart.y, pStart.z);
+      uvs.push(0.5, 0);
+
+      for (let j = 0; j < radialSegments; j++) {
+        indices.push(startIdx, j + 1, j);
+      }
+
+      const endIdx = positions.length / 3;
+      const pEnd = points[tubularSegments];
+      positions.push(pEnd.x, pEnd.y, pEnd.z);
+      uvs.push(0.5, 1);
+
+      const lastRing = tubularSegments * (radialSegments + 1);
+      for (let j = 0; j < radialSegments; j++) {
+        indices.push(endIdx, lastRing + j, lastRing + j + 1);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
   }
 
   // 1. Modern Stylized Human Character (Mass: 72 kg <= 150 kg -> SCOOPABLE)
@@ -628,55 +700,69 @@ export class ObstacleManager {
     });
 
     // D. STYLISH SCULPTED GINGER / AUBURN HAIR (Matching Reference Image 1)
-    // 1. Fitted cranial hair cap (zero gaps, zero bread loaf shape!)
+    // 1. Fitted cranial hair cap (zero gaps, perfectly hugs cranium)
     const hairCap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.126, 26, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      new THREE.SphereGeometry(0.126, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
       this.materials.humanHairGinger
     );
     hairCap.position.set(0, 0.015, -0.012);
     hairCap.scale.set(0.95, 1.06, 1.02);
     headGroup.add(hairCap);
 
-    // 2. Layered Side-Swept Fringe / Bangs across forehead
-    const lock1Curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.08, 0.12, 0.07),
-      new THREE.Vector3(-0.02, 0.11, 0.11),
-      new THREE.Vector3( 0.05, 0.08, 0.12),
-      new THREE.Vector3( 0.09, 0.03, 0.10)
-    ]);
-    const lock1 = new THREE.Mesh(
-      new THREE.TubeGeometry(lock1Curve, 16, 0.024, 10, false),
-      this.materials.humanHairGinger
-    );
-    headGroup.add(lock1);
-
-    const lock2Curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.06, 0.14, 0.06),
-      new THREE.Vector3(-0.03, 0.09, 0.11),
-      new THREE.Vector3(-0.02, 0.04, 0.115)
-    ]);
-    const lock2 = new THREE.Mesh(
-      new THREE.TubeGeometry(lock2Curve, 12, 0.018, 8, false),
-      this.materials.humanHairGinger
-    );
-    headGroup.add(lock2);
-
-    // 3. Volumetric Crown Quiff flowing naturally backwards along cranium
+    // 2. Main Voluminous Crest Quiff (Curving up from front-left across crown to right)
     const quiffCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.04, 0.13, 0.04),
-      new THREE.Vector3(-0.01, 0.15, -0.01),
-      new THREE.Vector3( 0.03, 0.14, -0.06)
+      new THREE.Vector3(-0.05, 0.12, 0.06),
+      new THREE.Vector3(-0.01, 0.155, 0.02),
+      new THREE.Vector3( 0.03, 0.15, -0.04),
+      new THREE.Vector3( 0.06, 0.12, -0.08)
     ]);
-    const quiff = new THREE.Mesh(
-      new THREE.TubeGeometry(quiffCurve, 14, 0.032, 10, false),
-      this.materials.humanHairGinger
-    );
+    const quiffGeo = this.createTaperedTubeGeometry(quiffCurve, 16, 0.032, 0.004, 10, true);
+    const quiff = new THREE.Mesh(quiffGeo, this.materials.humanHairGinger);
     headGroup.add(quiff);
 
-    // 4. Tapered Sideburns framing the ears
+    // 3. Side Crest Accent Lock (Gives the stylish flick in Reference Image 1)
+    const crestFlickCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.02, 0.13, 0.05),
+      new THREE.Vector3( 0.02, 0.165, 0.01),
+      new THREE.Vector3( 0.05, 0.155, -0.03)
+    ]);
+    const crestFlickGeo = this.createTaperedTubeGeometry(crestFlickCurve, 14, 0.024, 0.003, 8, true);
+    const crestFlick = new THREE.Mesh(crestFlickGeo, this.materials.humanHairGinger);
+    headGroup.add(crestFlick);
+
+    // 4. Layered Side-Swept Fringe / Bangs sweeping across forehead
+    const bang1Curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.08, 0.11, 0.07),
+      new THREE.Vector3(-0.02, 0.10, 0.11),
+      new THREE.Vector3( 0.05, 0.075, 0.118),
+      new THREE.Vector3( 0.09, 0.025, 0.095)
+    ]);
+    const bang1Geo = this.createTaperedTubeGeometry(bang1Curve, 16, 0.026, 0.003, 10, true);
+    const bang1 = new THREE.Mesh(bang1Geo, this.materials.humanHairGinger);
+    headGroup.add(bang1);
+
+    const bang2Curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.06, 0.13, 0.06),
+      new THREE.Vector3(-0.025, 0.09, 0.11),
+      new THREE.Vector3( 0.02, 0.045, 0.115)
+    ]);
+    const bang2Geo = this.createTaperedTubeGeometry(bang2Curve, 14, 0.020, 0.003, 8, true);
+    const bang2 = new THREE.Mesh(bang2Geo, this.materials.humanHairGinger);
+    headGroup.add(bang2);
+
+    const bang3Curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.08, 0.09, 0.075),
+      new THREE.Vector3(-0.065, 0.05, 0.10),
+      new THREE.Vector3(-0.045, 0.01, 0.105)
+    ]);
+    const bang3Geo = this.createTaperedTubeGeometry(bang3Curve, 12, 0.016, 0.003, 8, true);
+    const bang3 = new THREE.Mesh(bang3Geo, this.materials.humanHairGinger);
+    headGroup.add(bang3);
+
+    // 5. Tapered Sideburns framing the ears
     [-1, 1].forEach(side => {
       const sideburn = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.010, 0.006, 0.055, 8),
+        new THREE.CylinderGeometry(0.010, 0.004, 0.055, 8),
         this.materials.humanHairGinger
       );
       sideburn.position.set(side * 0.108, 0.015, 0.020);
@@ -882,21 +968,23 @@ export class ObstacleManager {
 
   // Seamless organic elephant body geometry generator (No flat cylinder cuts, continuous natural curves)
   createElephantBodyGeometry() {
-    const rings = 18;
+    const rings = 24;
     const segments = 24;
 
     const profile = [
-      [ 0.58, 0.68, 0.16, 0.18],  // Neck junction
-      [ 0.50, 0.72, 0.34, 0.38],  // Front brisket
-      [ 0.40, 0.78, 0.44, 0.48],  // High shoulder withers
-      [ 0.28, 0.77, 0.47, 0.51],  // Shoulder crest
-      [ 0.14, 0.74, 0.49, 0.53],  // Mid-back dip
-      [ 0.00, 0.73, 0.50, 0.54],  // Deep belly center
-      [-0.14, 0.75, 0.49, 0.52],  // Lumbar rise
-      [-0.28, 0.77, 0.47, 0.50],  // Pelvic haunch peak
-      [-0.42, 0.73, 0.41, 0.44],  // Rump slope
-      [-0.52, 0.68, 0.31, 0.33],  // Tail root base
-      [-0.56, 0.64, 0.14, 0.16]   // Rounded end cap
+      [ 0.62, 0.68, 0.001, 0.001], // Closed front cap meeting neck
+      [ 0.58, 0.70, 0.20, 0.22],   // Neck junction
+      [ 0.50, 0.73, 0.35, 0.38],   // Front brisket
+      [ 0.38, 0.80, 0.45, 0.49],   // High shoulder withers hump
+      [ 0.25, 0.79, 0.48, 0.52],   // Shoulder crest
+      [ 0.12, 0.76, 0.50, 0.54],   // Mid-back dip
+      [ 0.00, 0.75, 0.51, 0.56],   // Deep belly center
+      [-0.14, 0.77, 0.50, 0.54],   // Lumbar rise
+      [-0.28, 0.79, 0.48, 0.52],   // Pelvic haunch peak
+      [-0.42, 0.74, 0.42, 0.46],   // Rump slope
+      [-0.54, 0.69, 0.30, 0.33],   // Tail root base
+      [-0.62, 0.65, 0.12, 0.14],   // Rear haunch curve
+      [-0.65, 0.63, 0.001, 0.001]  // Closed rear cap
     ];
 
     const positions = [];
@@ -961,26 +1049,6 @@ export class ObstacleManager {
     const body = new THREE.Mesh(bodyGeo, this.materials.elephantSkin);
     body.castShadow = true;
     group.add(body);
-
-    // Front Chest Brisket & Shoulder Blend
-    const chest = new THREE.Mesh(
-      new THREE.SphereGeometry(0.38, 20, 16),
-      this.materials.elephantSkin
-    );
-    chest.position.set(0, 0.70, 0.36);
-    chest.scale.set(0.96, 1.10, 0.90);
-    chest.castShadow = true;
-    group.add(chest);
-
-    // Rounded Pelvic Rump Haunches
-    const rump = new THREE.Mesh(
-      new THREE.SphereGeometry(0.36, 20, 16),
-      this.materials.elephantSkin
-    );
-    rump.position.set(0, 0.71, -0.38);
-    rump.scale.set(0.94, 1.08, 0.92);
-    rump.castShadow = true;
-    group.add(rump);
 
     // B. Expressive Elephant Head Group (Pivoted at y = 0.78, z = 0.58)
     const headGroup = new THREE.Group();
@@ -1305,8 +1373,8 @@ export class ObstacleManager {
     group.userData = {
       type: 'animal',
       body,
-      chest,
-      rump,
+      chest: body,
+      rump: body,
       headGroup,
       faceData: elephantFaceData,
       trunkSegments,
@@ -2222,10 +2290,10 @@ export class ObstacleManager {
           ud.eyelids.forEach(el => { el.scale.y = blinkScale; });
         }
 
-        // B. Deep Belly Breathing
+        // B. Deep Belly Breathing (Natural subtle breathing without distortion)
         const breath = Math.sin(localT * 1.8);
         if (ud.body) {
-          ud.body.scale.set(1.05 + 0.025 * breath, 1.18 + 0.020 * breath, 1.0);
+          ud.body.scale.set(1.0 + 0.018 * breath, 1.0 + 0.018 * breath, 1.0 + 0.012 * breath);
         }
 
         // C. Rhythmic Big Ear Flapping (Keeping cool and attentive, anchored to resting -0.45 / +0.45 baseline)

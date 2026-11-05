@@ -39581,18 +39581,18 @@ void main() {
         humanShoesDark: new MeshStandardMaterial({ color: 2039587, roughness: 0.65 }),
         // Dark casual loafers
         // Indian Elephant Materials (Exact match to media_1793820037213_e448b2e7.jpg)
-        elephantSkin: new MeshStandardMaterial({ color: 5667725, roughness: 0.74 }),
-        // Slate blue-grey body skin
-        elephantSkinDark: new MeshStandardMaterial({ color: 4021355, roughness: 0.78 }),
+        elephantSkin: new MeshStandardMaterial({ color: 6319995, roughness: 0.7 }),
+        // Natural slate grey-blue body skin
+        elephantSkinDark: new MeshStandardMaterial({ color: 4543068, roughness: 0.75 }),
         // Dark contour accents & creases
-        elephantEarInner: new MeshStandardMaterial({ color: 4877178, roughness: 0.82 }),
+        elephantEarInner: new MeshStandardMaterial({ color: 5662064, roughness: 0.78 }),
         // Ear contour / inner face
-        elephantTusk: new MeshStandardMaterial({ color: 16775909, roughness: 0.32, metalness: 0.05 }),
+        elephantTusk: new MeshStandardMaterial({ color: 16775909, roughness: 0.28, metalness: 0.05 }),
         // Smooth ivory tusks
-        elephantTuskTip: new MeshStandardMaterial({ color: 16707722, roughness: 0.35 }),
+        elephantTuskTip: new MeshStandardMaterial({ color: 16638023, roughness: 0.32 }),
         // Warm golden tusk tip
-        elephantNails: new MeshStandardMaterial({ color: 16707722, roughness: 0.42 }),
-        // 3 cute yellow toenails per foot
+        elephantNails: new MeshStandardMaterial({ color: 16707722, roughness: 0.38 }),
+        // Cute yellow toenails per foot
         elephantEyeWhite: new MeshBasicMaterial({ color: 16317180 }),
         // Big cartoon white sclera
         elephantEyePupil: new MeshStandardMaterial({ color: 1579035, roughness: 0.15 }),
@@ -39653,6 +39653,7 @@ void main() {
     // (Prevents disconnected geometric primitives, clipping, and z-fighting)
     // ------------------------------------------------------------------
     createHumanFaceTexture() {
+      if (typeof document === "undefined") return null;
       const canvas = document.createElement("canvas");
       canvas.width = 1024;
       canvas.height = 1024;
@@ -39741,6 +39742,7 @@ void main() {
       return { tex, canvas, ctx, drawFace };
     }
     createElephantFaceTexture() {
+      if (typeof document === "undefined") return null;
       const canvas = document.createElement("canvas");
       canvas.width = 1024;
       canvas.height = 1024;
@@ -39810,6 +39812,64 @@ void main() {
       drawFace(0);
       const tex = new CanvasTexture(canvas);
       return { tex, canvas, ctx, drawFace };
+    }
+    // Parametric tapered tube geometry with closed rounded caps (Ideal for hair locks, horns, tusks)
+    createTaperedTubeGeometry(curve, tubularSegments = 16, rStart = 0.024, rEnd = 3e-3, radialSegments = 8, cap = true) {
+      const points = curve.getPoints(tubularSegments);
+      const frames = curve.computeFrenetFrames(tubularSegments, false);
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+      for (let i = 0; i <= tubularSegments; i++) {
+        const t = i / tubularSegments;
+        const r = rStart * (1 - t) + rEnd * t;
+        const p = points[i];
+        const N = frames.normals[i];
+        const B = frames.binormals[i];
+        for (let j = 0; j <= radialSegments; j++) {
+          const theta = j / radialSegments * Math.PI * 2;
+          const sin = Math.sin(theta);
+          const cos = -Math.cos(theta);
+          const vx = p.x + r * (cos * N.x + sin * B.x);
+          const vy = p.y + r * (cos * N.y + sin * B.y);
+          const vz = p.z + r * (cos * N.z + sin * B.z);
+          positions.push(vx, vy, vz);
+          uvs.push(j / radialSegments, t);
+        }
+      }
+      for (let i = 0; i < tubularSegments; i++) {
+        for (let j = 0; j < radialSegments; j++) {
+          const a = i * (radialSegments + 1) + j;
+          const b = (i + 1) * (radialSegments + 1) + j;
+          const c = (i + 1) * (radialSegments + 1) + (j + 1);
+          const d = i * (radialSegments + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+      if (cap) {
+        const startIdx = positions.length / 3;
+        const pStart = points[0];
+        positions.push(pStart.x, pStart.y, pStart.z);
+        uvs.push(0.5, 0);
+        for (let j = 0; j < radialSegments; j++) {
+          indices.push(startIdx, j + 1, j);
+        }
+        const endIdx = positions.length / 3;
+        const pEnd = points[tubularSegments];
+        positions.push(pEnd.x, pEnd.y, pEnd.z);
+        uvs.push(0.5, 1);
+        const lastRing = tubularSegments * (radialSegments + 1);
+        for (let j = 0; j < radialSegments; j++) {
+          indices.push(endIdx, lastRing + j, lastRing + j + 1);
+        }
+      }
+      const geo = new BufferGeometry();
+      geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
+      geo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
     }
     // 1. Modern Stylized Human Character (Mass: 72 kg <= 150 kg -> SCOOPABLE)
     // Exact anatomical & aesthetic match to media_1793819995371_c74a70f7.png:
@@ -39999,46 +40059,57 @@ void main() {
         headGroup.add(ear);
       });
       const hairCap = new Mesh(
-        new SphereGeometry(0.126, 26, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+        new SphereGeometry(0.126, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
         this.materials.humanHairGinger
       );
       hairCap.position.set(0, 0.015, -0.012);
       hairCap.scale.set(0.95, 1.06, 1.02);
       headGroup.add(hairCap);
-      const lock1Curve = new CatmullRomCurve3([
-        new Vector3(-0.08, 0.12, 0.07),
-        new Vector3(-0.02, 0.11, 0.11),
-        new Vector3(0.05, 0.08, 0.12),
-        new Vector3(0.09, 0.03, 0.1)
-      ]);
-      const lock1 = new Mesh(
-        new TubeGeometry(lock1Curve, 16, 0.024, 10, false),
-        this.materials.humanHairGinger
-      );
-      headGroup.add(lock1);
-      const lock2Curve = new CatmullRomCurve3([
-        new Vector3(-0.06, 0.14, 0.06),
-        new Vector3(-0.03, 0.09, 0.11),
-        new Vector3(-0.02, 0.04, 0.115)
-      ]);
-      const lock2 = new Mesh(
-        new TubeGeometry(lock2Curve, 12, 0.018, 8, false),
-        this.materials.humanHairGinger
-      );
-      headGroup.add(lock2);
       const quiffCurve = new CatmullRomCurve3([
-        new Vector3(-0.04, 0.13, 0.04),
-        new Vector3(-0.01, 0.15, -0.01),
-        new Vector3(0.03, 0.14, -0.06)
+        new Vector3(-0.05, 0.12, 0.06),
+        new Vector3(-0.01, 0.155, 0.02),
+        new Vector3(0.03, 0.15, -0.04),
+        new Vector3(0.06, 0.12, -0.08)
       ]);
-      const quiff = new Mesh(
-        new TubeGeometry(quiffCurve, 14, 0.032, 10, false),
-        this.materials.humanHairGinger
-      );
+      const quiffGeo = this.createTaperedTubeGeometry(quiffCurve, 16, 0.032, 4e-3, 10, true);
+      const quiff = new Mesh(quiffGeo, this.materials.humanHairGinger);
       headGroup.add(quiff);
+      const crestFlickCurve = new CatmullRomCurve3([
+        new Vector3(-0.02, 0.13, 0.05),
+        new Vector3(0.02, 0.165, 0.01),
+        new Vector3(0.05, 0.155, -0.03)
+      ]);
+      const crestFlickGeo = this.createTaperedTubeGeometry(crestFlickCurve, 14, 0.024, 3e-3, 8, true);
+      const crestFlick = new Mesh(crestFlickGeo, this.materials.humanHairGinger);
+      headGroup.add(crestFlick);
+      const bang1Curve = new CatmullRomCurve3([
+        new Vector3(-0.08, 0.11, 0.07),
+        new Vector3(-0.02, 0.1, 0.11),
+        new Vector3(0.05, 0.075, 0.118),
+        new Vector3(0.09, 0.025, 0.095)
+      ]);
+      const bang1Geo = this.createTaperedTubeGeometry(bang1Curve, 16, 0.026, 3e-3, 10, true);
+      const bang1 = new Mesh(bang1Geo, this.materials.humanHairGinger);
+      headGroup.add(bang1);
+      const bang2Curve = new CatmullRomCurve3([
+        new Vector3(-0.06, 0.13, 0.06),
+        new Vector3(-0.025, 0.09, 0.11),
+        new Vector3(0.02, 0.045, 0.115)
+      ]);
+      const bang2Geo = this.createTaperedTubeGeometry(bang2Curve, 14, 0.02, 3e-3, 8, true);
+      const bang2 = new Mesh(bang2Geo, this.materials.humanHairGinger);
+      headGroup.add(bang2);
+      const bang3Curve = new CatmullRomCurve3([
+        new Vector3(-0.08, 0.09, 0.075),
+        new Vector3(-0.065, 0.05, 0.1),
+        new Vector3(-0.045, 0.01, 0.105)
+      ]);
+      const bang3Geo = this.createTaperedTubeGeometry(bang3Curve, 12, 0.016, 3e-3, 8, true);
+      const bang3 = new Mesh(bang3Geo, this.materials.humanHairGinger);
+      headGroup.add(bang3);
       [-1, 1].forEach((side) => {
         const sideburn = new Mesh(
-          new CylinderGeometry(0.01, 6e-3, 0.055, 8),
+          new CylinderGeometry(0.01, 4e-3, 0.055, 8),
           this.materials.humanHairGinger
         );
         sideburn.position.set(side * 0.108, 0.015, 0.02);
@@ -40197,31 +40268,35 @@ void main() {
     }
     // Seamless organic elephant body geometry generator (No flat cylinder cuts, continuous natural curves)
     createElephantBodyGeometry() {
-      const rings = 18;
+      const rings = 24;
       const segments = 24;
       const profile = [
-        [0.58, 0.68, 0.16, 0.18],
+        [0.62, 0.68, 1e-3, 1e-3],
+        // Closed front cap meeting neck
+        [0.58, 0.7, 0.2, 0.22],
         // Neck junction
-        [0.5, 0.72, 0.34, 0.38],
+        [0.5, 0.73, 0.35, 0.38],
         // Front brisket
-        [0.4, 0.78, 0.44, 0.48],
-        // High shoulder withers
-        [0.28, 0.77, 0.47, 0.51],
+        [0.38, 0.8, 0.45, 0.49],
+        // High shoulder withers hump
+        [0.25, 0.79, 0.48, 0.52],
         // Shoulder crest
-        [0.14, 0.74, 0.49, 0.53],
+        [0.12, 0.76, 0.5, 0.54],
         // Mid-back dip
-        [0, 0.73, 0.5, 0.54],
+        [0, 0.75, 0.51, 0.56],
         // Deep belly center
-        [-0.14, 0.75, 0.49, 0.52],
+        [-0.14, 0.77, 0.5, 0.54],
         // Lumbar rise
-        [-0.28, 0.77, 0.47, 0.5],
+        [-0.28, 0.79, 0.48, 0.52],
         // Pelvic haunch peak
-        [-0.42, 0.73, 0.41, 0.44],
+        [-0.42, 0.74, 0.42, 0.46],
         // Rump slope
-        [-0.52, 0.68, 0.31, 0.33],
+        [-0.54, 0.69, 0.3, 0.33],
         // Tail root base
-        [-0.56, 0.64, 0.14, 0.16]
-        // Rounded end cap
+        [-0.62, 0.65, 0.12, 0.14],
+        // Rear haunch curve
+        [-0.65, 0.63, 1e-3, 1e-3]
+        // Closed rear cap
       ];
       const positions = [];
       const uvs = [];
@@ -40274,22 +40349,6 @@ void main() {
       const body = new Mesh(bodyGeo, this.materials.elephantSkin);
       body.castShadow = true;
       group.add(body);
-      const chest = new Mesh(
-        new SphereGeometry(0.38, 20, 16),
-        this.materials.elephantSkin
-      );
-      chest.position.set(0, 0.7, 0.36);
-      chest.scale.set(0.96, 1.1, 0.9);
-      chest.castShadow = true;
-      group.add(chest);
-      const rump = new Mesh(
-        new SphereGeometry(0.36, 20, 16),
-        this.materials.elephantSkin
-      );
-      rump.position.set(0, 0.71, -0.38);
-      rump.scale.set(0.94, 1.08, 0.92);
-      rump.castShadow = true;
-      group.add(rump);
       const headGroup = new Group();
       headGroup.position.set(0, 0.78, 0.58);
       [-1, 1].forEach((side) => {
@@ -40548,8 +40607,8 @@ void main() {
       group.userData = {
         type: "animal",
         body,
-        chest,
-        rump,
+        chest: body,
+        rump: body,
         headGroup,
         faceData: elephantFaceData,
         trunkSegments,
@@ -41309,7 +41368,7 @@ void main() {
           }
           const breath = Math.sin(localT * 1.8);
           if (ud.body) {
-            ud.body.scale.set(1.05 + 0.025 * breath, 1.18 + 0.02 * breath, 1);
+            ud.body.scale.set(1 + 0.018 * breath, 1 + 0.018 * breath, 1 + 0.012 * breath);
           }
           const earFlap = Math.sin(localT * 2.2);
           if (!isTrainClose) {
