@@ -11015,6 +11015,529 @@
       this.dispatchEvent({ type: "dispose" });
     }
   };
+  var InterleavedBuffer = class {
+    /**
+     * Constructs a new interleaved buffer.
+     *
+     * @param {TypedArray} array - A typed array with a shared buffer storing attribute data.
+     * @param {number} stride - The number of typed-array elements per vertex.
+     */
+    constructor(array, stride) {
+      this.isInterleavedBuffer = true;
+      this.array = array;
+      this.stride = stride;
+      this.count = array !== void 0 ? array.length / stride : 0;
+      this.usage = StaticDrawUsage;
+      this.updateRanges = [];
+      this.version = 0;
+      this.uuid = generateUUID();
+    }
+    /**
+     * A callback function that is executed after the renderer has transferred the attribute array
+     * data to the GPU.
+     */
+    onUploadCallback() {
+    }
+    /**
+     * Flag to indicate that this attribute has changed and should be re-sent to
+     * the GPU. Set this to `true` when you modify the value of the array.
+     *
+     * @type {number}
+     * @default false
+     * @param {boolean} value
+     */
+    set needsUpdate(value) {
+      if (value === true) this.version++;
+    }
+    /**
+     * Sets the usage of this interleaved buffer.
+     *
+     * @param {(StaticDrawUsage|DynamicDrawUsage|StreamDrawUsage|StaticReadUsage|DynamicReadUsage|StreamReadUsage|StaticCopyUsage|DynamicCopyUsage|StreamCopyUsage)} value - The usage to set.
+     * @return {InterleavedBuffer} A reference to this interleaved buffer.
+     */
+    setUsage(value) {
+      this.usage = value;
+      return this;
+    }
+    /**
+     * Adds a range of data in the data array to be updated on the GPU.
+     *
+     * @param {number} start - Position at which to start update.
+     * @param {number} count - The number of components to update.
+     */
+    addUpdateRange(start, count) {
+      this.updateRanges.push({ start, count });
+    }
+    /**
+     * Clears the update ranges.
+     */
+    clearUpdateRanges() {
+      this.updateRanges.length = 0;
+    }
+    /**
+     * Copies the values of the given interleaved buffer to this instance.
+     *
+     * @param {InterleavedBuffer} source - The interleaved buffer to copy.
+     * @return {InterleavedBuffer} A reference to this instance.
+     */
+    copy(source) {
+      this.array = new source.array.constructor(source.array);
+      this.count = source.count;
+      this.stride = source.stride;
+      this.usage = source.usage;
+      return this;
+    }
+    /**
+     * Copies a vector from the given interleaved buffer to this one. The start
+     * and destination position in the attribute buffers are represented by the
+     * given indices.
+     *
+     * @param {number} index1 - The destination index into this interleaved buffer.
+     * @param {InterleavedBuffer} interleavedBuffer - The interleaved buffer to copy from.
+     * @param {number} index2 - The source index into the given interleaved buffer.
+     * @return {InterleavedBuffer} A reference to this instance.
+     */
+    copyAt(index1, interleavedBuffer, index2) {
+      index1 *= this.stride;
+      index2 *= interleavedBuffer.stride;
+      for (let i = 0, l = this.stride; i < l; i++) {
+        this.array[index1 + i] = interleavedBuffer.array[index2 + i];
+      }
+      return this;
+    }
+    /**
+     * Sets the given array data in the interleaved buffer.
+     *
+     * @param {(TypedArray|Array)} value - The array data to set.
+     * @param {number} [offset=0] - The offset in this interleaved buffer's array.
+     * @return {InterleavedBuffer} A reference to this instance.
+     */
+    set(value, offset = 0) {
+      this.array.set(value, offset);
+      return this;
+    }
+    /**
+     * Returns a new interleaved buffer with copied values from this instance.
+     *
+     * @param {Object} [data] - An object with shared array buffers that allows to retain shared structures.
+     * @return {InterleavedBuffer} A clone of this instance.
+     */
+    clone(data) {
+      if (data.arrayBuffers === void 0) {
+        data.arrayBuffers = {};
+      }
+      const key = getArrayKey(this.array);
+      if (data.arrayBuffers[key] === void 0) {
+        data.arrayBuffers[key] = this.array.slice(0).buffer;
+      }
+      const array = new this.array.constructor(data.arrayBuffers[key]);
+      const ib = new this.constructor(array, this.stride);
+      ib.setUsage(this.usage);
+      return ib;
+    }
+    /**
+     * Sets the given callback function that is executed after the Renderer has transferred
+     * the array data to the GPU. Can be used to perform clean-up operations after
+     * the upload when data are not needed anymore on the CPU side.
+     *
+     * @param {Function} callback - The `onUpload()` callback.
+     * @return {InterleavedBuffer} A reference to this instance.
+     */
+    onUpload(callback) {
+      this.onUploadCallback = callback;
+      return this;
+    }
+    /**
+     * Serializes the interleaved buffer into JSON.
+     *
+     * @param {Object} [data] - An optional value holding meta information about the serialization.
+     * @return {Object} A JSON object representing the serialized interleaved buffer.
+     */
+    toJSON(data) {
+      if (data.arrayBuffers === void 0) {
+        data.arrayBuffers = {};
+      }
+      const key = getArrayKey(this.array);
+      if (data.arrayBuffers[key] === void 0) {
+        data.arrayBuffers[key] = Array.from(new Uint32Array(this.array.slice(0).buffer));
+      }
+      const json = {
+        uuid: this.uuid,
+        buffer: key,
+        type: this.array.constructor.name,
+        stride: this.stride
+      };
+      json.usage = this.usage;
+      return json;
+    }
+  };
+  function getArrayKey(array) {
+    if (array.buffer._uuid === void 0) {
+      array.buffer._uuid = generateUUID();
+    }
+    if (array.byteOffset === 0 && array.byteLength === array.buffer.byteLength) return array.buffer._uuid;
+    return array.buffer._uuid + ":" + array.byteOffset + ":" + array.byteLength;
+  }
+  var _vector$8 = /* @__PURE__ */ new Vector3();
+  var InterleavedBufferAttribute = class _InterleavedBufferAttribute {
+    /**
+     * Constructs a new interleaved buffer attribute.
+     *
+     * @param {InterleavedBuffer} interleavedBuffer - The buffer holding the interleaved data.
+     * @param {number} itemSize - The item size.
+     * @param {number} offset - The attribute offset into the buffer.
+     * @param {boolean} [normalized=false] - Whether the data are normalized or not.
+     */
+    constructor(interleavedBuffer, itemSize, offset, normalized = false) {
+      this.isInterleavedBufferAttribute = true;
+      this.name = "";
+      this.data = interleavedBuffer;
+      this.itemSize = itemSize;
+      this.offset = offset;
+      this.normalized = normalized;
+      this._normalizationScale = interleavedBuffer !== void 0 ? getNormalizationScale(interleavedBuffer.array) : void 0;
+    }
+    /**
+     * The item count of this buffer attribute.
+     *
+     * @type {number}
+     * @readonly
+     */
+    get count() {
+      return this.data.count;
+    }
+    /**
+     * The array holding the interleaved buffer attribute data.
+     *
+     * @type {TypedArray}
+     */
+    get array() {
+      return this.data.array;
+    }
+    /**
+     * Flag to indicate that this attribute has changed and should be re-sent to
+     * the GPU. Set this to `true` when you modify the value of the array.
+     *
+     * @type {number}
+     * @default false
+     * @param {boolean} value
+     */
+    set needsUpdate(value) {
+      this.data.needsUpdate = value;
+    }
+    /**
+     * Applies the given 4x4 matrix to the given attribute. Only works with
+     * item size `3`.
+     *
+     * @param {Matrix4} m - The matrix to apply.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    applyMatrix4(m) {
+      for (let i = 0, l = this.data.count; i < l; i++) {
+        _vector$8.fromBufferAttribute(this, i);
+        _vector$8.applyMatrix4(m);
+        this.setXYZ(i, _vector$8.x, _vector$8.y, _vector$8.z);
+      }
+      return this;
+    }
+    /**
+     * Applies the given 3x3 normal matrix to the given attribute. Only works with
+     * item size `3`.
+     *
+     * @param {Matrix3} m - The normal matrix to apply.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    applyNormalMatrix(m) {
+      for (let i = 0, l = this.count; i < l; i++) {
+        _vector$8.fromBufferAttribute(this, i);
+        _vector$8.applyNormalMatrix(m);
+        this.setXYZ(i, _vector$8.x, _vector$8.y, _vector$8.z);
+      }
+      return this;
+    }
+    /**
+     * Applies the given 4x4 matrix to the given attribute. Only works with
+     * item size `3` and with direction vectors.
+     *
+     * @param {Matrix4} m - The matrix to apply.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    transformDirection(m) {
+      for (let i = 0, l = this.count; i < l; i++) {
+        _vector$8.fromBufferAttribute(this, i);
+        _vector$8.transformDirection(m);
+        this.setXYZ(i, _vector$8.x, _vector$8.y, _vector$8.z);
+      }
+      return this;
+    }
+    /**
+     * Returns the given component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} component - The component index.
+     * @return {number} The returned value.
+     */
+    getComponent(index, component) {
+      let value = this.array[index * this.data.stride + this.offset + component];
+      if (this.normalized) value = this._denormalize(value);
+      return value;
+    }
+    /**
+     * Sets the given value to the given component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} component - The component index.
+     * @param {number} value - The value to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setComponent(index, component, value) {
+      if (this.normalized) value = this._normalize(value);
+      this.data.array[index * this.data.stride + this.offset + component] = value;
+      return this;
+    }
+    /**
+     * Sets the x component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} x - The value to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setX(index, x) {
+      if (this.normalized) x = this._normalize(x);
+      this.data.array[index * this.data.stride + this.offset] = x;
+      return this;
+    }
+    /**
+     * Sets the y component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} y - The value to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setY(index, y) {
+      if (this.normalized) y = this._normalize(y);
+      this.data.array[index * this.data.stride + this.offset + 1] = y;
+      return this;
+    }
+    /**
+     * Sets the z component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} z - The value to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setZ(index, z) {
+      if (this.normalized) z = this._normalize(z);
+      this.data.array[index * this.data.stride + this.offset + 2] = z;
+      return this;
+    }
+    /**
+     * Sets the w component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} w - The value to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setW(index, w) {
+      if (this.normalized) w = this._normalize(w);
+      this.data.array[index * this.data.stride + this.offset + 3] = w;
+      return this;
+    }
+    /**
+     * Returns the x component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @return {number} The x component.
+     */
+    getX(index) {
+      let x = this.data.array[index * this.data.stride + this.offset];
+      if (this.normalized) x = this._denormalize(x);
+      return x;
+    }
+    /**
+     * Returns the y component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @return {number} The y component.
+     */
+    getY(index) {
+      let y = this.data.array[index * this.data.stride + this.offset + 1];
+      if (this.normalized) y = this._denormalize(y);
+      return y;
+    }
+    /**
+     * Returns the z component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @return {number} The z component.
+     */
+    getZ(index) {
+      let z = this.data.array[index * this.data.stride + this.offset + 2];
+      if (this.normalized) z = this._denormalize(z);
+      return z;
+    }
+    /**
+     * Returns the w component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @return {number} The w component.
+     */
+    getW(index) {
+      let w = this.data.array[index * this.data.stride + this.offset + 3];
+      if (this.normalized) w = this._denormalize(w);
+      return w;
+    }
+    /**
+     * Sets the x and y component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} x - The value for the x component to set.
+     * @param {number} y - The value for the y component to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setXY(index, x, y) {
+      index = index * this.data.stride + this.offset;
+      if (this.normalized) {
+        x = this._normalize(x);
+        y = this._normalize(y);
+      }
+      this.data.array[index + 0] = x;
+      this.data.array[index + 1] = y;
+      return this;
+    }
+    /**
+     * Sets the x, y and z component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} x - The value for the x component to set.
+     * @param {number} y - The value for the y component to set.
+     * @param {number} z - The value for the z component to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setXYZ(index, x, y, z) {
+      index = index * this.data.stride + this.offset;
+      if (this.normalized) {
+        x = this._normalize(x);
+        y = this._normalize(y);
+        z = this._normalize(z);
+      }
+      this.data.array[index + 0] = x;
+      this.data.array[index + 1] = y;
+      this.data.array[index + 2] = z;
+      return this;
+    }
+    /**
+     * Sets the x, y, z and w component of the vector at the given index.
+     *
+     * @param {number} index - The index into the buffer attribute.
+     * @param {number} x - The value for the x component to set.
+     * @param {number} y - The value for the y component to set.
+     * @param {number} z - The value for the z component to set.
+     * @param {number} w - The value for the w component to set.
+     * @return {InterleavedBufferAttribute} A reference to this instance.
+     */
+    setXYZW(index, x, y, z, w) {
+      index = index * this.data.stride + this.offset;
+      if (this.normalized) {
+        x = this._normalize(x);
+        y = this._normalize(y);
+        z = this._normalize(z);
+        w = this._normalize(w);
+      }
+      this.data.array[index + 0] = x;
+      this.data.array[index + 1] = y;
+      this.data.array[index + 2] = z;
+      this.data.array[index + 3] = w;
+      return this;
+    }
+    /**
+     * Returns a new buffer attribute with copied values from this instance.
+     *
+     * If no parameter is provided, cloning an interleaved buffer attribute will de-interleave buffer data.
+     *
+     * @param {Object} [data] - An object with interleaved buffers that allows to retain the interleaved property.
+     * @return {BufferAttribute|InterleavedBufferAttribute} A clone of this instance.
+     */
+    clone(data) {
+      if (data === void 0) {
+        log("InterleavedBufferAttribute.clone(): Cloning an interleaved buffer attribute will de-interleave buffer data.");
+        const array = [];
+        for (let i = 0; i < this.count; i++) {
+          const index = i * this.data.stride + this.offset;
+          for (let j = 0; j < this.itemSize; j++) {
+            array.push(this.data.array[index + j]);
+          }
+        }
+        return new BufferAttribute(new this.array.constructor(array), this.itemSize, this.normalized);
+      } else {
+        if (data.interleavedBuffers === void 0) {
+          data.interleavedBuffers = {};
+        }
+        if (data.interleavedBuffers[this.data.uuid] === void 0) {
+          data.interleavedBuffers[this.data.uuid] = this.data.clone(data);
+        }
+        return new _InterleavedBufferAttribute(data.interleavedBuffers[this.data.uuid], this.itemSize, this.offset, this.normalized);
+      }
+    }
+    /**
+     * Serializes the buffer attribute into JSON.
+     *
+     * If no parameter is provided, cloning an interleaved buffer attribute will de-interleave buffer data.
+     *
+     * @param {Object} [data] - An optional value holding meta information about the serialization.
+     * @return {Object} A JSON object representing the serialized buffer attribute.
+     */
+    toJSON(data) {
+      if (data === void 0) {
+        log("InterleavedBufferAttribute.toJSON(): Serializing an interleaved buffer attribute will de-interleave buffer data.");
+        const array = [];
+        for (let i = 0; i < this.count; i++) {
+          const index = i * this.data.stride + this.offset;
+          for (let j = 0; j < this.itemSize; j++) {
+            array.push(this.data.array[index + j]);
+          }
+        }
+        return {
+          itemSize: this.itemSize,
+          type: this.array.constructor.name,
+          array,
+          normalized: this.normalized
+        };
+      } else {
+        if (data.interleavedBuffers === void 0) {
+          data.interleavedBuffers = {};
+        }
+        if (data.interleavedBuffers[this.data.uuid] === void 0) {
+          data.interleavedBuffers[this.data.uuid] = this.data.toJSON(data);
+        }
+        return {
+          isInterleavedBufferAttribute: true,
+          itemSize: this.itemSize,
+          data: this.data.uuid,
+          offset: this.offset,
+          normalized: this.normalized
+        };
+      }
+    }
+    /**
+     * Denormalizes the value using cached normalization factor.
+     *
+     * @private
+     */
+    _denormalize(value) {
+      const scale = this._normalizationScale;
+      return scale !== void 0 ? Math.max(value / scale, -1) : denormalize(value, this.data.array);
+    }
+    /**
+     * Normalizes the value using cached normalization factor.
+     *
+     * @private
+     */
+    _normalize(value) {
+      const scale = this._normalizationScale;
+      return scale !== void 0 ? Math.round(value * scale) : normalize(value, this.data.array);
+    }
+  };
   var _vector1 = /* @__PURE__ */ new Vector3();
   var _vector2 = /* @__PURE__ */ new Vector3();
   var _normalMatrix = /* @__PURE__ */ new Matrix3();
@@ -11867,6 +12390,180 @@
       if (value === true) this.version++;
     }
   };
+  var SpriteMaterial = class extends Material {
+    /**
+     * Constructs a new sprite material.
+     *
+     * @param {Object} [parameters] - An object with one or more properties
+     * defining the material's appearance. Any property of the material
+     * (including any property from inherited materials) can be passed
+     * in here. Color values can be passed any type of value accepted
+     * by {@link Color#set}.
+     */
+    constructor(parameters) {
+      super();
+      this.isSpriteMaterial = true;
+      this.type = "SpriteMaterial";
+      this.color = new Color(16777215);
+      this.map = null;
+      this.alphaMap = null;
+      this.rotation = 0;
+      this.sizeAttenuation = true;
+      this.transparent = true;
+      this.fog = true;
+      this.setValues(parameters);
+    }
+    copy(source) {
+      super.copy(source);
+      this.color.copy(source.color);
+      this.map = source.map;
+      this.alphaMap = source.alphaMap;
+      this.rotation = source.rotation;
+      this.sizeAttenuation = source.sizeAttenuation;
+      this.fog = source.fog;
+      return this;
+    }
+  };
+  var _geometry;
+  var _intersectPoint = /* @__PURE__ */ new Vector3();
+  var _worldScale = /* @__PURE__ */ new Vector3();
+  var _mvPosition = /* @__PURE__ */ new Vector3();
+  var _alignedPosition = /* @__PURE__ */ new Vector2();
+  var _rotatedPosition = /* @__PURE__ */ new Vector2();
+  var _viewWorldMatrix = /* @__PURE__ */ new Matrix4();
+  var _vA$1 = /* @__PURE__ */ new Vector3();
+  var _vB$1 = /* @__PURE__ */ new Vector3();
+  var _vC$1 = /* @__PURE__ */ new Vector3();
+  var _uvA = /* @__PURE__ */ new Vector2();
+  var _uvB = /* @__PURE__ */ new Vector2();
+  var _uvC = /* @__PURE__ */ new Vector2();
+  var Sprite = class extends Object3D {
+    /**
+     * Constructs a new sprite.
+     *
+     * @param {(SpriteMaterial|SpriteNodeMaterial)} [material] - The sprite material.
+     */
+    constructor(material = new SpriteMaterial()) {
+      super();
+      this.isSprite = true;
+      this.type = "Sprite";
+      if (_geometry === void 0) {
+        _geometry = new BufferGeometry();
+        const float32Array = new Float32Array([
+          -0.5,
+          -0.5,
+          0,
+          0,
+          0,
+          0.5,
+          -0.5,
+          0,
+          1,
+          0,
+          0.5,
+          0.5,
+          0,
+          1,
+          1,
+          -0.5,
+          0.5,
+          0,
+          0,
+          1
+        ]);
+        const interleavedBuffer = new InterleavedBuffer(float32Array, 5);
+        _geometry.setIndex([0, 1, 2, 0, 2, 3]);
+        _geometry.setAttribute("position", new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false));
+        _geometry.setAttribute("uv", new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false));
+      }
+      this.geometry = _geometry;
+      this.material = material;
+      this.center = new Vector2(0.5, 0.5);
+      this.count = 1;
+    }
+    /**
+     * Returns `true` if this sprite intersects the given frustum.
+     *
+     * @param {Frustum|FrustumArray} frustum - The frustum to test.
+     * @return {boolean} Whether this sprite intersects the given frustum or not.
+     */
+    intersectsFrustum(frustum) {
+      return frustum.intersectsSprite(this);
+    }
+    /**
+     * Computes intersection points between a casted ray and this sprite.
+     *
+     * @param {Raycaster} raycaster - The raycaster.
+     * @param {Array<Object>} intersects - The target array that holds the intersection points.
+     */
+    raycast(raycaster, intersects2) {
+      if (raycaster.camera === null) {
+        error('Sprite: "Raycaster.camera" needs to be set in order to raycast against sprites.');
+      }
+      _worldScale.setFromMatrixScale(this.matrixWorld);
+      _viewWorldMatrix.copy(raycaster.camera.matrixWorld);
+      this.modelViewMatrix.multiplyMatrices(raycaster.camera.matrixWorldInverse, this.matrixWorld);
+      _mvPosition.setFromMatrixPosition(this.modelViewMatrix);
+      if (raycaster.camera.isPerspectiveCamera && this.material.sizeAttenuation === false) {
+        _worldScale.multiplyScalar(-_mvPosition.z);
+      }
+      const rotation = this.material.rotation;
+      let sin, cos;
+      if (rotation !== 0) {
+        cos = Math.cos(rotation);
+        sin = Math.sin(rotation);
+      }
+      const center = this.center;
+      transformVertex(_vA$1.set(-0.5, -0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+      transformVertex(_vB$1.set(0.5, -0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+      transformVertex(_vC$1.set(0.5, 0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+      _uvA.set(0, 0);
+      _uvB.set(1, 0);
+      _uvC.set(1, 1);
+      let intersect = raycaster.ray.intersectTriangle(_vA$1, _vB$1, _vC$1, false, _intersectPoint);
+      if (intersect === null) {
+        transformVertex(_vB$1.set(-0.5, 0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+        _uvB.set(0, 1);
+        intersect = raycaster.ray.intersectTriangle(_vA$1, _vC$1, _vB$1, false, _intersectPoint);
+        if (intersect === null) {
+          return;
+        }
+      }
+      const distance = raycaster.ray.origin.distanceTo(_intersectPoint);
+      if (distance < raycaster.near || distance > raycaster.far) return;
+      intersects2.push({
+        distance,
+        point: _intersectPoint.clone(),
+        uv: Triangle.getInterpolation(_intersectPoint, _vA$1, _vB$1, _vC$1, _uvA, _uvB, _uvC, new Vector2()),
+        face: null,
+        object: this
+      });
+    }
+    copy(source, recursive) {
+      super.copy(source, recursive);
+      if (source.center !== void 0) this.center.copy(source.center);
+      this.material = source.material;
+      return this;
+    }
+    toJSON(meta) {
+      const data = super.toJSON(meta);
+      data.object.center = this.center.toArray();
+      return data;
+    }
+  };
+  function transformVertex(vertexPosition, mvPosition, center, scale, sin, cos) {
+    _alignedPosition.subVectors(vertexPosition, center).addScalar(0.5).multiply(scale);
+    if (sin !== void 0) {
+      _rotatedPosition.x = cos * _alignedPosition.x - sin * _alignedPosition.y;
+      _rotatedPosition.y = sin * _alignedPosition.x + cos * _alignedPosition.y;
+    } else {
+      _rotatedPosition.copy(_alignedPosition);
+    }
+    vertexPosition.copy(mvPosition);
+    vertexPosition.x += _rotatedPosition.x;
+    vertexPosition.y += _rotatedPosition.y;
+    vertexPosition.applyMatrix4(_viewWorldMatrix);
+  }
   var _vector$7 = /* @__PURE__ */ new Vector3();
   var _segCenter = /* @__PURE__ */ new Vector3();
   var _segDir = /* @__PURE__ */ new Vector3();
@@ -37996,6 +38693,12 @@ void main() {
       this.sunLight = null;
       this.ambientLight = null;
       this.hemiLight = null;
+      this.skyDome = null;
+      this.sunDisc = null;
+      this.sunGlow = null;
+      this.clouds = [];
+      this.stars = null;
+      this.atmosphereTime = 0;
       this.currentWeather = "day";
       this.rainParticles = null;
       this.rainGeo = null;
@@ -38011,34 +38714,227 @@ void main() {
       this.initRainSystem();
       this.initAITrain();
     }
-    // ---------------------------------------------------------
-    // Sun, Hemispheric & Ambient Lighting
-    // ---------------------------------------------------------
+    // ==========================================================================
+    // SKY AND LIGHTING
+    // ==========================================================================
     initSkyAndLighting() {
-      this.scene.background = new Color(8900331);
-      this.scene.fog = new FogExp2(8900331, 6e-4);
-      this.sunLight = new DirectionalLight(16775917, 2.6);
+      const skyGeometry = new SphereGeometry(1800, 48, 32);
+      const skyMaterial = new ShaderMaterial({
+        side: BackSide,
+        depthWrite: false,
+        uniforms: {
+          topColor: { value: new Color(1472712) },
+          horizonColor: { value: new Color(13232373) },
+          bottomColor: { value: new Color(10205125) },
+          sunColor: { value: new Color(16770211) },
+          sunDirection: {
+            value: new Vector3(0.35, 0.55, 0.7).normalize()
+          }
+        },
+        vertexShader: `
+        varying vec3 vWorldDirection;
+
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldDirection = normalize(worldPosition.xyz);
+
+          gl_Position =
+            projectionMatrix *
+            modelViewMatrix *
+            vec4(position, 1.0);
+        }
+      `,
+        fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 horizonColor;
+        uniform vec3 bottomColor;
+        uniform vec3 sunColor;
+        uniform vec3 sunDirection;
+
+        varying vec3 vWorldDirection;
+
+        void main() {
+          float h = normalize(vWorldDirection).y;
+
+          float upper = smoothstep(-0.08, 0.72, h);
+          float lower = smoothstep(-0.45, -0.02, h);
+
+          vec3 sky = mix(bottomColor, horizonColor, lower);
+          sky = mix(sky, topColor, upper);
+
+          float sun = pow(
+            max(dot(normalize(vWorldDirection),
+            normalize(sunDirection)), 0.0),
+            180.0
+          );
+
+          float halo = pow(
+            max(dot(normalize(vWorldDirection),
+            normalize(sunDirection)), 0.0),
+            12.0
+          );
+
+          sky += sunColor * (sun * 1.8 + halo * 0.16);
+
+          gl_FragColor = vec4(sky, 1.0);
+        }
+      `
+      });
+      this.skyDome = new Mesh(skyGeometry, skyMaterial);
+      this.skyDome.renderOrder = -1e3;
+      this.scene.add(this.skyDome);
+      this.scene.background = new Color(10209768);
+      this.scene.fog = new FogExp2(12047845, 42e-5);
+      this.sunLight = new DirectionalLight(16773590, 2.3);
       this.sunLight.position.set(300, 450, 200);
       this.sunLight.castShadow = true;
-      this.sunLight.shadow.mapSize.width = 2048;
-      this.sunLight.shadow.mapSize.height = 2048;
+      this.sunLight.shadow.mapSize.set(2048, 2048);
       this.sunLight.shadow.camera.near = 10;
       this.sunLight.shadow.camera.far = 1200;
-      const d = 160;
-      this.sunLight.shadow.camera.left = -d;
-      this.sunLight.shadow.camera.right = d;
-      this.sunLight.shadow.camera.top = d;
-      this.sunLight.shadow.camera.bottom = -d;
+      const d = 180;
+      Object.assign(this.sunLight.shadow.camera, {
+        left: -d,
+        right: d,
+        top: d,
+        bottom: -d
+      });
+      this.sunLight.shadow.bias = -15e-5;
+      this.sunLight.shadow.normalBias = 0.025;
+      this.sunLight.target.position.set(0, 0, 0);
       this.scene.add(this.sunLight);
-      this.hemiLight = new HemisphereLight(16777215, 4473924, 1.1);
+      this.scene.add(this.sunLight.target);
+      this.hemiLight = new HemisphereLight(
+        14282751,
+        5858124,
+        1.25
+      );
       this.hemiLight.position.set(0, 200, 0);
       this.scene.add(this.hemiLight);
-      this.ambientLight = new AmbientLight(16777215, 0.45);
+      this.ambientLight = new AmbientLight(16777215, 0.28);
       this.scene.add(this.ambientLight);
+      this.sunDisc = new Mesh(
+        new SphereGeometry(13, 24, 16),
+        new MeshBasicMaterial({
+          color: 16772541,
+          fog: false
+        })
+      );
+      this.sunDisc.position.set(650, 360, -900);
+      this.scene.add(this.sunDisc);
+      const glowCanvas = document.createElement("canvas");
+      glowCanvas.width = 256;
+      glowCanvas.height = 256;
+      const glowCtx = glowCanvas.getContext("2d");
+      const gradient = glowCtx.createRadialGradient(
+        128,
+        128,
+        5,
+        128,
+        128,
+        126
+      );
+      gradient.addColorStop(0, "rgba(255,238,190,0.72)");
+      gradient.addColorStop(0.22, "rgba(255,218,150,0.28)");
+      gradient.addColorStop(1, "rgba(255,218,150,0)");
+      glowCtx.fillStyle = gradient;
+      glowCtx.fillRect(0, 0, 256, 256);
+      this.sunGlow = new Sprite(
+        new SpriteMaterial({
+          map: new CanvasTexture(glowCanvas),
+          color: 16770992,
+          transparent: true,
+          depthWrite: false,
+          blending: AdditiveBlending
+        })
+      );
+      this.sunGlow.position.copy(this.sunDisc.position);
+      this.sunGlow.scale.set(150, 150, 1);
+      this.scene.add(this.sunGlow);
+      this.initCloudLayer();
+      this.initStarField();
     }
-    // ---------------------------------------------------------
-    // Monsoon Raindrop Particles
-    // ---------------------------------------------------------
+    // ==========================================================================
+    // PROCEDURAL CLOUDS
+    // ==========================================================================
+    initCloudLayer() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext("2d");
+      const gradient = ctx.createRadialGradient(
+        256,
+        128,
+        20,
+        256,
+        128,
+        220
+      );
+      gradient.addColorStop(0, "rgba(255,255,255,0.78)");
+      gradient.addColorStop(0.45, "rgba(255,255,255,0.42)");
+      gradient.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 512, 256);
+      const texture = new CanvasTexture(canvas);
+      for (let i = 0; i < 18; i++) {
+        const material = new MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 0.45,
+          depthWrite: false,
+          side: DoubleSide,
+          fog: false
+        });
+        const cloud = new Mesh(
+          new PlaneGeometry(150, 62),
+          material
+        );
+        cloud.position.set(
+          (Math.random() - 0.5) * 1500,
+          115 + Math.random() * 150,
+          (Math.random() - 0.5) * 1500
+        );
+        cloud.rotation.y = Math.random() * Math.PI;
+        cloud.userData.drift = 1.2 + Math.random() * 2.2;
+        this.scene.add(cloud);
+        this.clouds.push(cloud);
+      }
+    }
+    // ==========================================================================
+    // NIGHT SKY STARS
+    // ==========================================================================
+    initStarField() {
+      const count = 900;
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const radius = 1200;
+        const theta = Math.random() * Math.PI * 2;
+        const y = 80 + Math.random() * 900;
+        const ring = Math.sqrt(
+          Math.max(0, radius * radius - y * y)
+        );
+        positions[i * 3] = Math.cos(theta) * ring;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = Math.sin(theta) * ring;
+      }
+      const geometry = new BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new BufferAttribute(positions, 3)
+      );
+      const material = new PointsMaterial({
+        color: 15398143,
+        size: 2.4,
+        transparent: true,
+        opacity: 0,
+        sizeAttenuation: false,
+        depthWrite: false
+      });
+      this.stars = new Points(geometry, material);
+      this.scene.add(this.stars);
+    }
+    // ==========================================================================
+    // RAIN PARTICLE SYSTEM
+    // ==========================================================================
     initRainSystem() {
       const rainCount = 4e3;
       this.rainGeo = new BufferGeometry();
@@ -38048,20 +38944,26 @@ void main() {
         positions[i + 1] = Math.random() * 80;
         positions[i + 2] = (Math.random() - 0.5) * 160;
       }
-      this.rainGeo.setAttribute("position", new BufferAttribute(positions, 3));
+      this.rainGeo.setAttribute(
+        "position",
+        new BufferAttribute(positions, 3)
+      );
       const rainMat = new PointsMaterial({
         color: 9684477,
         size: 0.18,
         transparent: true,
-        opacity: 0
+        opacity: 0,
+        depthWrite: false
       });
-      this.rainParticles = new Points(this.rainGeo, rainMat);
+      this.rainParticles = new Points(
+        this.rainGeo,
+        rainMat
+      );
       this.scene.add(this.rainParticles);
     }
-    // ---------------------------------------------------------
-    // High-Fidelity Oncoming Indian Railways Train (WAG-9 + ICF Rake)
-    // Fully articulated: Every car follows Track 2 curve with 100% precision
-    // ---------------------------------------------------------
+    // ==========================================================================
+    // WAG-9 LOCOMOTIVE AND ICF COACHES
+    // ==========================================================================
     initAITrain() {
       const canvasL = document.createElement("canvas");
       canvasL.width = 1024;
@@ -38074,7 +38976,11 @@ void main() {
       ctxL.fillStyle = "#111";
       ctxL.font = "bold 20px sans-serif";
       ctxL.textAlign = "center";
-      ctxL.fillText("INDIAN RAILWAYS  \u2022  \u092D\u093E\u0930\u0924\u0940\u092F \u0930\u0947\u0932  \u2022  WAG-9 #31085", 512, 136);
+      ctxL.fillText(
+        "INDIAN RAILWAYS \u2022 \u092D\u093E\u0930\u0924\u0940\u092F \u0930\u0947\u0932 \u2022 WAG-9 #31085",
+        512,
+        136
+      );
       ctxL.fillStyle = "#1f2937";
       ctxL.fillRect(0, 210, 1024, 46);
       const wag9Tex = new CanvasTexture(canvasL);
@@ -38106,14 +39012,45 @@ void main() {
       }
       const icfCoachTex = new CanvasTexture(canvasC);
       const materials = {
-        wag9Side: new MeshStandardMaterial({ map: wag9Tex, roughness: 0.35, metalness: 0.3 }),
-        wag9Front: new MeshStandardMaterial({ map: wag9FrontTex, roughness: 0.35, metalness: 0.2 }),
-        coachSide: new MeshStandardMaterial({ map: icfCoachTex, roughness: 0.35, metalness: 0.3 }),
-        roof: new MeshStandardMaterial({ color: 6583435, roughness: 0.4, metalness: 0.5 }),
-        darkSteel: new MeshStandardMaterial({ color: 2040877, roughness: 0.6, metalness: 0.7 }),
-        wheelSteel: new MeshStandardMaterial({ color: 7041664, roughness: 0.2, metalness: 0.9 }),
-        cowcatcher: new MeshStandardMaterial({ color: 14427686, roughness: 0.4 }),
-        glass: new MeshPhysicalMaterial({ color: 1121838, roughness: 0.1, transmission: 0.5 })
+        wag9Side: new MeshStandardMaterial({
+          map: wag9Tex,
+          roughness: 0.35,
+          metalness: 0.3
+        }),
+        wag9Front: new MeshStandardMaterial({
+          map: wag9FrontTex,
+          roughness: 0.35,
+          metalness: 0.2
+        }),
+        coachSide: new MeshStandardMaterial({
+          map: icfCoachTex,
+          roughness: 0.35,
+          metalness: 0.3
+        }),
+        roof: new MeshStandardMaterial({
+          color: 6583435,
+          roughness: 0.4,
+          metalness: 0.5
+        }),
+        darkSteel: new MeshStandardMaterial({
+          color: 2040877,
+          roughness: 0.6,
+          metalness: 0.7
+        }),
+        wheelSteel: new MeshStandardMaterial({
+          color: 7041664,
+          roughness: 0.2,
+          metalness: 0.9
+        }),
+        cowcatcher: new MeshStandardMaterial({
+          color: 14427686,
+          roughness: 0.4
+        }),
+        glass: new MeshPhysicalMaterial({
+          color: 1121838,
+          roughness: 0.1,
+          transmission: 0.5
+        })
       };
       this.aiLoco = new Group();
       const lWidth = 3.15;
@@ -38127,42 +39064,97 @@ void main() {
         materials.wag9Front,
         materials.wag9Front
       ];
-      const locoBody = new Mesh(new BoxGeometry(lWidth, lHeight, lLen), locoMats);
+      const locoBody = new Mesh(
+        new BoxGeometry(lWidth, lHeight, lLen),
+        locoMats
+      );
       locoBody.position.y = 1.95;
       locoBody.castShadow = true;
+      locoBody.receiveShadow = true;
       this.aiLoco.add(locoBody);
       [-0.65, 0.65].forEach((x) => {
-        const win = new Mesh(new PlaneGeometry(0.95, 0.75), materials.glass);
+        const win = new Mesh(
+          new PlaneGeometry(0.95, 0.75),
+          materials.glass
+        );
         win.position.set(x, 2.5, lLen / 2 + 0.02);
         this.aiLoco.add(win);
       });
-      const hl = new Mesh(new CylinderGeometry(0.12, 0.12, 0.1, 16).rotateX(Math.PI / 2), new MeshBasicMaterial({ color: 16777215 }));
+      const hl = new Mesh(
+        new CylinderGeometry(0.12, 0.12, 0.1, 16).rotateX(Math.PI / 2),
+        new MeshBasicMaterial({
+          color: 16777215
+        })
+      );
       hl.position.set(0, 3.2, lLen / 2 + 0.06);
       this.aiLoco.add(hl);
-      const aiHeadlightBeam = new SpotLight(16775917, 7, 130, Math.PI / 7, 0.4, 1.2);
-      aiHeadlightBeam.position.set(0, 3.2, lLen / 2 + 0.5);
-      aiHeadlightBeam.target.position.set(0, 0, lLen / 2 + 60);
+      const aiHeadlightBeam = new SpotLight(
+        16775917,
+        7,
+        130,
+        Math.PI / 7,
+        0.4,
+        1.2
+      );
+      aiHeadlightBeam.position.set(
+        0,
+        3.2,
+        lLen / 2 + 0.5
+      );
+      aiHeadlightBeam.target.position.set(
+        0,
+        0,
+        lLen / 2 + 60
+      );
       this.aiLoco.add(aiHeadlightBeam);
       this.aiLoco.add(aiHeadlightBeam.target);
-      const cowcatcher = new Mesh(new ConeGeometry(1.5, 0.65, 4).rotateY(Math.PI / 4).scale(1.1, 0.6, 0.8), materials.cowcatcher);
-      cowcatcher.position.set(0, 0.48, lLen / 2 + 0.3);
+      const cowcatcher = new Mesh(
+        new ConeGeometry(1.5, 0.65, 4).rotateY(Math.PI / 4).scale(1.1, 0.6, 0.8),
+        materials.cowcatcher
+      );
+      cowcatcher.position.set(
+        0,
+        0.48,
+        lLen / 2 + 0.3
+      );
       this.aiLoco.add(cowcatcher);
       const panto = new Group();
-      panto.position.set(0, 3.55, -lLen * 0.28);
-      const pArm1 = new Mesh(new CylinderGeometry(0.025, 0.025, 1.3), materials.darkSteel);
+      panto.position.set(
+        0,
+        3.55,
+        -lLen * 0.28
+      );
+      const pArm1 = new Mesh(
+        new CylinderGeometry(0.025, 0.025, 1.3),
+        materials.darkSteel
+      );
       pArm1.position.set(0, 0.55, 0);
       pArm1.rotation.x = 0.65;
-      const pArm2 = new Mesh(new CylinderGeometry(0.02, 0.02, 1.2), materials.darkSteel);
+      const pArm2 = new Mesh(
+        new CylinderGeometry(0.02, 0.02, 1.2),
+        materials.darkSteel
+      );
       pArm2.position.set(0, 1.15, 0);
       pArm2.rotation.x = -1.15;
-      const pHead = new Mesh(new BoxGeometry(1.8, 0.04, 0.12), new MeshStandardMaterial({ color: 14251782 }));
+      const pHead = new Mesh(
+        new BoxGeometry(1.8, 0.04, 0.12),
+        new MeshStandardMaterial({
+          color: 14251782
+        })
+      );
       pHead.position.set(0, 1.75, 0);
-      panto.add(pArm1);
-      panto.add(pArm2);
-      panto.add(pHead);
+      panto.add(pArm1, pArm2, pHead);
       this.aiLoco.add(panto);
-      this.buildAIBogie(this.aiLoco, lLen * 0.28, materials);
-      this.buildAIBogie(this.aiLoco, -lLen * 0.28, materials);
+      this.buildAIBogie(
+        this.aiLoco,
+        lLen * 0.28,
+        materials
+      );
+      this.buildAIBogie(
+        this.aiLoco,
+        -lLen * 0.28,
+        materials
+      );
       this.scene.add(this.aiLoco);
       this.aiCoaches = [];
       for (let i = 0; i < this.aiCoachCount; i++) {
@@ -38178,25 +39170,49 @@ void main() {
           materials.roof,
           materials.roof
         ];
-        const coachBody = new Mesh(new BoxGeometry(cWidth, cHeight, cLen), coachMats);
+        const coachBody = new Mesh(
+          new BoxGeometry(cWidth, cHeight, cLen),
+          coachMats
+        );
         coachBody.position.y = 1.9;
         coachBody.castShadow = true;
+        coachBody.receiveShadow = true;
         coach.add(coachBody);
-        const roofCyl = new CylinderGeometry(cWidth / 2, cWidth / 2, cLen, 16, 1, false, 0, Math.PI);
-        roofCyl.rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
-        const cRoof = new Mesh(roofCyl, materials.roof);
+        const roofGeometry = new CylinderGeometry(
+          cWidth / 2,
+          cWidth / 2,
+          cLen,
+          16,
+          1,
+          false,
+          0,
+          Math.PI
+        );
+        roofGeometry.rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
+        const cRoof = new Mesh(
+          roofGeometry,
+          materials.roof
+        );
         cRoof.position.y = 3.25;
         cRoof.scale.set(1, 0.38, 1);
         coach.add(cRoof);
-        this.buildAIBogie(coach, cLen * 0.35, materials);
-        this.buildAIBogie(coach, -cLen * 0.35, materials);
+        this.buildAIBogie(
+          coach,
+          cLen * 0.35,
+          materials
+        );
+        this.buildAIBogie(
+          coach,
+          -cLen * 0.35,
+          materials
+        );
         this.scene.add(coach);
         this.aiCoaches.push(coach);
       }
     }
-    // ---------------------------------------------------------
-    // AI Bogie with Steel Flanged Wheels
-    // ---------------------------------------------------------
+    // ==========================================================================
+    // BOGIE AND WHEELS
+    // ==========================================================================
     buildAIBogie(parent, zCenter, mats) {
       const bogie = new Group();
       bogie.position.set(0, 0, zCenter);
@@ -38205,10 +39221,21 @@ void main() {
       [-1.2, 1.2].forEach((z) => {
         const axle = new Group();
         axle.position.set(0, wheelRadius, z);
-        const shaft = new Mesh(new CylinderGeometry(0.08, 0.08, 1.9).rotateZ(Math.PI / 2), mats.darkSteel);
+        const shaft = new Mesh(
+          new CylinderGeometry(0.08, 0.08, 1.9).rotateZ(Math.PI / 2),
+          mats.darkSteel
+        );
         axle.add(shaft);
         [-railX, railX].forEach((x) => {
-          const wheel = new Mesh(new CylinderGeometry(wheelRadius, wheelRadius, 0.12, 16).rotateZ(Math.PI / 2), mats.wheelSteel);
+          const wheel = new Mesh(
+            new CylinderGeometry(
+              wheelRadius,
+              wheelRadius,
+              0.12,
+              16
+            ).rotateZ(Math.PI / 2),
+            mats.wheelSteel
+          );
           wheel.position.x = x;
           axle.add(wheel);
         });
@@ -38216,93 +39243,229 @@ void main() {
       });
       parent.add(bogie);
     }
-    // ---------------------------------------------------------
-    // Weather & Time Presets
-    // ---------------------------------------------------------
+    // ==========================================================================
+    // WEATHER PRESETS
+    // ==========================================================================
     setWeather(type) {
-      this.currentWeather = type;
-      if (type === "day") {
-        this.scene.background.setHex(8900331);
-        this.scene.fog.color.setHex(8900331);
-        this.scene.fog.density = 6e-4;
-        this.sunLight.color.setHex(16775917);
-        this.sunLight.intensity = 2.6;
-        this.ambientLight.intensity = 0.45;
-        this.hemiLight.color.setHex(16777215);
-        this.hemiLight.groundColor.setHex(4473924);
-        this.hemiLight.intensity = 1.1;
-        this.rainParticles.material.opacity = 0;
-      } else if (type === "sunset") {
-        this.scene.background.setHex(16347926);
-        this.scene.fog.color.setHex(16347926);
-        this.scene.fog.density = 9e-4;
-        this.sunLight.color.setHex(16628340);
-        this.sunLight.intensity = 2.2;
-        this.sunLight.position.set(400, 80, 200);
-        this.ambientLight.intensity = 0.5;
-        this.hemiLight.color.setHex(16701354);
-        this.hemiLight.groundColor.setHex(4528643);
-        this.hemiLight.intensity = 1;
-        this.rainParticles.material.opacity = 0;
-      } else if (type === "night") {
-        this.scene.background.setHex(330258);
-        this.scene.fog.color.setHex(330258);
-        this.scene.fog.density = 15e-4;
-        this.sunLight.color.setHex(6333946);
-        this.sunLight.intensity = 0.2;
-        this.ambientLight.intensity = 0.15;
-        this.hemiLight.color.setHex(1976635);
-        this.hemiLight.groundColor.setHex(132631);
-        this.hemiLight.intensity = 0.3;
-        this.rainParticles.material.opacity = 0;
-      } else if (type === "monsoon") {
-        this.scene.background.setHex(4674921);
-        this.scene.fog.color.setHex(4674921);
-        this.scene.fog.density = 2e-3;
-        this.sunLight.color.setHex(9741240);
-        this.sunLight.intensity = 1;
-        this.ambientLight.intensity = 0.4;
-        this.hemiLight.intensity = 0.7;
-        this.rainParticles.material.opacity = 0.75;
+      const palettes = {
+        day: {
+          top: 1472712,
+          horizon: 13232373,
+          bottom: 10205125,
+          sun: 16770211,
+          fog: 12047845,
+          density: 42e-5,
+          sunlight: 2.3,
+          ambient: 0.28,
+          hemi: 1.25,
+          clouds: 0.52,
+          stars: 0,
+          rain: 0,
+          sunHeight: 360
+        },
+        sunset: {
+          top: 3681122,
+          horizon: 16095848,
+          bottom: 7164512,
+          sun: 16753500,
+          fog: 13732726,
+          density: 9e-4,
+          sunlight: 2,
+          ambient: 0.35,
+          hemi: 0.9,
+          clouds: 0.42,
+          stars: 0,
+          rain: 0,
+          sunHeight: 95
+        },
+        night: {
+          top: 198679,
+          horizon: 1518408,
+          bottom: 1055530,
+          sun: 9152985,
+          fog: 1055530,
+          density: 12e-4,
+          sunlight: 0.2,
+          ambient: 0.15,
+          hemi: 0.3,
+          clouds: 0.12,
+          stars: 0.95,
+          rain: 0,
+          sunHeight: 360
+        },
+        monsoon: {
+          top: 3491931,
+          horizon: 7438732,
+          bottom: 4938848,
+          sun: 10399675,
+          fog: 6583426,
+          density: 18e-4,
+          sunlight: 0.8,
+          ambient: 0.35,
+          hemi: 0.7,
+          clouds: 0.78,
+          stars: 0,
+          rain: 0.75,
+          sunHeight: 360
+        }
+      };
+      const p = palettes[type];
+      if (!p) {
+        console.warn("Unknown weather preset:", type);
+        return;
       }
+      this.currentWeather = type;
+      this.skyDome.material.uniforms.topColor.value.setHex(p.top);
+      this.skyDome.material.uniforms.horizonColor.value.setHex(
+        p.horizon
+      );
+      this.skyDome.material.uniforms.bottomColor.value.setHex(
+        p.bottom
+      );
+      this.skyDome.material.uniforms.sunColor.value.setHex(
+        p.sun
+      );
+      this.scene.background.setHex(p.horizon);
+      this.scene.fog.color.setHex(p.fog);
+      this.scene.fog.density = p.density;
+      this.sunLight.color.setHex(p.sun);
+      this.sunLight.intensity = p.sunlight;
+      this.ambientLight.intensity = p.ambient;
+      this.hemiLight.intensity = p.hemi;
+      this.clouds.forEach((cloud) => {
+        cloud.material.opacity = p.clouds;
+      });
+      this.stars.material.opacity = p.stars;
+      this.sunDisc.visible = type !== "night";
+      this.sunGlow.visible = type !== "night";
+      this.rainParticles.material.opacity = p.rain;
     }
-    // ---------------------------------------------------------
-    // Update Loop (Rain, Sun follow, Articulated AI Train on Track 2)
-    // ---------------------------------------------------------
+    // ==========================================================================
+    // MAIN UPDATE LOOP
+    // ==========================================================================
     update(dt, playerPosition) {
+      this.atmosphereTime += dt;
+      if (playerPosition) {
+        this.skyDome.position.copy(playerPosition);
+        this.stars.position.copy(playerPosition);
+        this.sunDisc.position.set(
+          playerPosition.x + 650,
+          playerPosition.y + (this.currentWeather === "sunset" ? 95 : 360),
+          playerPosition.z - 900
+        );
+        this.sunGlow.position.copy(this.sunDisc.position);
+        this.clouds.forEach((cloud) => {
+          cloud.position.x += cloud.userData.drift * dt;
+          if (cloud.position.x > playerPosition.x + 850) {
+            cloud.position.x = playerPosition.x - 850;
+          }
+          if (Math.abs(cloud.position.z - playerPosition.z) > 900) {
+            cloud.position.z = playerPosition.z + (Math.random() - 0.5) * 1500;
+          }
+        });
+      }
       if (this.sunLight && playerPosition) {
-        this.sunLight.position.set(playerPosition.x + 150, playerPosition.y + 250, playerPosition.z + 100);
+        this.sunLight.position.set(
+          playerPosition.x + 150,
+          playerPosition.y + 250,
+          playerPosition.z + 100
+        );
         this.sunLight.target.position.copy(playerPosition);
         this.sunLight.target.updateMatrixWorld();
       }
       if (this.currentWeather === "monsoon" && this.rainParticles && playerPosition) {
         this.rainParticles.position.copy(playerPosition);
         const positions = this.rainGeo.attributes.position.array;
-        for (let i = 1; i < positions.length; i += 3) {
-          positions[i] -= 85 * dt;
-          if (positions[i] < 0) {
-            positions[i] = 75;
+        for (let i = 0; i < positions.length; i += 3) {
+          positions[i] += 12 * dt;
+          positions[i + 1] -= 85 * dt;
+          positions[i + 2] += 4 * dt;
+          if (positions[i + 1] < 0) {
+            positions[i] = (Math.random() - 0.5) * 160;
+            positions[i + 1] = 75 + Math.random() * 15;
+            positions[i + 2] = (Math.random() - 0.5) * 160;
           }
         }
         this.rainGeo.attributes.position.needsUpdate = true;
       }
-      if (this.aiLoco && this.trackSystem) {
+      if (this.aiLoco && this.trackSystem && this.trackSystem.totalLength > 0) {
         const aiSpeedMs = this.aiSpeedKmh / 3.6;
         this.aiTrainProgress -= aiSpeedMs * dt / this.trackSystem.totalLength;
-        if (this.aiTrainProgress < 0) this.aiTrainProgress += 1;
-        const locoT = this.trackSystem.getCarTransform(this.aiTrainProgress, this.aiLocoLength, 1);
+        if (this.aiTrainProgress < 0) {
+          this.aiTrainProgress += 1;
+        }
+        const locoT = this.trackSystem.getCarTransform(
+          this.aiTrainProgress,
+          this.aiLocoLength,
+          1
+        );
         this.aiLoco.position.copy(locoT.position);
-        this.aiLoco.lookAt(locoT.position.clone().sub(locoT.heading));
+        this.aiLoco.lookAt(
+          locoT.position.clone().sub(locoT.heading)
+        );
         let cumDist = this.aiLocoLength / 2 + this.aiCouplerGap + this.aiCoachLength / 2;
         for (let i = 0; i < this.aiCoaches.length; i++) {
           const coachProg = (this.aiTrainProgress + cumDist / this.trackSystem.totalLength + 1) % 1;
-          const coachT = this.trackSystem.getCarTransform(coachProg, this.aiCoachLength, 1);
+          const coachT = this.trackSystem.getCarTransform(
+            coachProg,
+            this.aiCoachLength,
+            1
+          );
           const coachGroup = this.aiCoaches[i];
           coachGroup.position.copy(coachT.position);
-          coachGroup.lookAt(coachT.position.clone().sub(coachT.heading));
+          coachGroup.lookAt(
+            coachT.position.clone().sub(coachT.heading)
+          );
           cumDist += this.aiCoachLength + this.aiCouplerGap;
         }
       }
+    }
+    // ==========================================================================
+    // CLEANUP
+    // ==========================================================================
+    dispose() {
+      const disposeObject = (object) => {
+        if (!object) return;
+        object.traverse((child) => {
+          if (child.geometry) {
+            child.geometry.dispose();
+          }
+          if (child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach((material) => {
+              if (material.map) {
+                material.map.dispose();
+              }
+              material.dispose();
+            });
+          }
+        });
+        this.scene.remove(object);
+      };
+      [
+        this.skyDome,
+        this.sunDisc,
+        this.sunGlow,
+        this.stars,
+        this.rainParticles,
+        this.aiLoco,
+        ...this.aiCoaches,
+        ...this.clouds
+      ].forEach(disposeObject);
+      if (this.sunLight) {
+        this.scene.remove(
+          this.sunLight,
+          this.sunLight.target
+        );
+      }
+      if (this.hemiLight) {
+        this.scene.remove(this.hemiLight);
+      }
+      if (this.ambientLight) {
+        this.scene.remove(this.ambientLight);
+      }
+      this.clouds = [];
+      this.aiCoaches = [];
     }
   };
 
