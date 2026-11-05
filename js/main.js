@@ -39,15 +39,22 @@ class SimulatorApp {
     this.isRescueSlowMo = false;
     this.rescueSlowMoTimer = 0;
 
-    // Orbit Controls for Chase Camera
+    // Simulation Run / Pause State
+    this.isPaused = false;
+    this.aiSensorAuto = true;
+    this.autoSpin = false;
+    this.beamDischargingTimer = 0;
+    this.activeSpeedPreset = 120;
+
+    // Orbit Controls for Chase / Orbit Camera
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
-    this.controls.maxDistance = 120;
+    this.controls.maxDistance = 140;
     this.controls.minDistance = 3;
 
-    // Camera Modes: 'action', 'net', 'chase', 'cab', 'railfan', 'window', 'drone'
-    this.cameraMode = 'action';
+    // Camera Modes: 'orbit', 'beam', 'cab', 'target', 'action', 'drone', 'net', 'railfan', 'window'
+    this.cameraMode = 'orbit';
     this.railfanPos = new THREE.Vector3();
     this.railfanLookTarget = new THREE.Vector3();
     this.isRailfanInitialized = false;
@@ -61,35 +68,14 @@ class SimulatorApp {
 
     // DOM UI elements
     this.dom = {
-      speedDigital: document.getElementById('speed-digital'),
-      speedGaugeFill: document.getElementById('speedo-fill'),
-      teBar: document.getElementById('te-bar'),
-      teVal: document.getElementById('te-val'),
-      bpVal: document.getElementById('bp-val'),
-      bcVal: document.getElementById('bc-val'),
-      notchVal: document.getElementById('notch-val'),
-      brakeVal: document.getElementById('brake-val'),
-      throttleHandle: document.getElementById('throttle-handle'),
-      brakeHandle: document.getElementById('brake-handle'),
-      signalAspectText: document.getElementById('signal-aspect-text'),
-      signalDistText: document.getElementById('signal-dist-text'),
-      aspectGreen: document.getElementById('aspect-green'),
-      aspectYellow1: document.getElementById('aspect-yellow1'),
-      aspectYellow2: document.getElementById('aspect-yellow2'),
-      aspectRed: document.getElementById('aspect-red'),
-      oheVal: document.getElementById('ohe-val'),
-      pantoStatus: document.getElementById('panto-status'),
-      reverserBtn: document.getElementById('btn-reverser'),
       stationDistText: document.getElementById('station-dist'),
       alertBanner: document.getElementById('alert-banner'),
-      emergencyBtn: document.getElementById('btn-emergency'),
-      startOverlay: document.getElementById('start-overlay'),
-      startBtn: document.getElementById('start-btn'),
       helpModal: document.getElementById('help-modal'),
       btnHelp: document.getElementById('btn-help'),
       btnCloseHelp: document.getElementById('close-help'),
       // AI Kavach Sensor Fusion & Safety Controller elements
       kavachCard: document.getElementById('ai-kavach-card'),
+      btnKavachMinimize: document.getElementById('btn-kavach-minimize'),
       kavachTargetName: document.getElementById('kavach-target-name'),
       kavachTargetDist: document.getElementById('kavach-target-dist'),
       kavachTargetMass: document.getElementById('kavach-target-mass'),
@@ -101,13 +87,31 @@ class SimulatorApp {
       btnSpawnBull: document.getElementById('btn-spawn-bull'),
       btnSpawnCrate: document.getElementById('btn-spawn-crate'),
       btnClearCradle: document.getElementById('btn-clear-cradle'),
-      btnCaptureNet: document.getElementById('btn-capture-net')
+      // Floating Console Elements (Ref: media_1793808764475_89ecfc40.jpg)
+      floatingConsole: document.getElementById('floating-console-container'),
+      consoleSpeedVal: document.getElementById('console-speed-val'),
+      btnRunPause: document.getElementById('btn-run-pause'),
+      btnAiSensorMode: document.getElementById('btn-ai-sensor-mode'),
+      btnConsoleBeam: document.getElementById('btn-console-beam'),
+      btnConsoleNet: document.getElementById('btn-console-net'),
+      btnConsoleHorn: document.getElementById('btn-console-horn'),
+      btnConsoleEmergency: document.getElementById('btn-console-emergency'),
+      btnConsoleReset: document.getElementById('btn-console-reset'),
+      btnAutoSpin: document.getElementById('btn-auto-spin'),
+      deterrencePopupMenu: document.getElementById('deterrence-popup-menu'),
+      tickerSysArch: document.getElementById('ticker-sys-arch'),
+      tickerTarget: document.getElementById('ticker-target'),
+      tickerRange: document.getElementById('ticker-range'),
+      tickerBeamState: document.getElementById('ticker-beam-state'),
+      tickerPolarization: document.getElementById('ticker-polarization'),
+      tickerCarrier: document.getElementById('ticker-carrier'),
+      tickerSafety: document.getElementById('ticker-safety')
     };
 
     this.initRenderer();
     this.initEventListeners();
     this.initUIControls();
-    this.setCameraMode('action');
+    this.setCameraMode('orbit');
 
     // Start render loop
     this.animate = this.animate.bind(this);
@@ -182,9 +186,6 @@ class SimulatorApp {
         case 'KeyZ':
           this.cycleSlowMotion();
           break;
-        case 'KeyT':
-          this.switchTrainType();
-          break;
         case 'KeyL':
           this.train.cycleHeadlight();
           break;
@@ -215,7 +216,7 @@ class SimulatorApp {
 
     // Cab mouse look
     window.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.hud-interactive') || e.target.closest('#start-overlay')) return;
+      if (e.target.closest('.hud-interactive')) return;
       this.isMouseDown = true;
       this.mouseX = e.clientX;
       this.mouseY = e.clientY;
@@ -241,35 +242,24 @@ class SimulatorApp {
   // Interactive HUD Buttons and Sliders
   // ---------------------------------------------------------
   initUIControls() {
-    // Start button / Audio unlock
-    const startHandler = () => {
+    // Seamless Audio Unlock on First User Interaction
+    const unlockAudio = () => {
       try {
-        this.audio.init();
+        if (!this.audio.isInitialized) {
+          this.audio.init();
+        }
         this.audio.resume();
         this.audio.playStationChime();
       } catch (err) {
-        console.warn('Audio start warning:', err);
+        console.warn('Audio unlock warning:', err);
       }
-      if (this.dom.startOverlay) {
-        this.dom.startOverlay.style.display = 'none';
-      }
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
     };
-
-    if (this.dom.startBtn) {
-      this.dom.startBtn.addEventListener('click', startHandler);
-      this.dom.startBtn.addEventListener('touchend', startHandler);
-    }
-
-    // Train Selector cards on start screen
-    const previewCards = document.querySelectorAll('.preview-card');
-    previewCards.forEach(c => {
-      c.addEventListener('click', () => {
-        previewCards.forEach(p => p.classList.remove('selected'));
-        c.classList.add('selected');
-        const trainType = c.dataset.train;
-        this.setTrain(trainType);
-      });
-    });
+    window.addEventListener('pointerdown', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
 
     // Camera view buttons
     document.querySelectorAll('[data-cam]').forEach(btn => {
@@ -286,85 +276,11 @@ class SimulatorApp {
       });
     }
 
-    // Kavach Card Slow-Mo button
-    const btnKavachSlowmo = document.getElementById('btn-kavach-slowmo');
-    if (btnKavachSlowmo) {
-      btnKavachSlowmo.addEventListener('click', () => {
-        this.cycleSlowMotion();
-      });
-    }
-
-    // Kavach Card Net Cam button
-    const btnKavachNetcam = document.getElementById('btn-kavach-netcam');
-    if (btnKavachNetcam) {
-      btnKavachNetcam.addEventListener('click', () => {
-        this.setCameraMode('net');
-      });
-    }
-
-    // Train switch button
-    const btnTrainSwitch = document.getElementById('btn-train-switch');
-    if (btnTrainSwitch) {
-      btnTrainSwitch.addEventListener('click', () => {
-        this.switchTrainType();
-      });
-    }
-
     // Weather switcher button
     const btnWeather = document.getElementById('btn-weather');
     if (btnWeather) {
       btnWeather.addEventListener('click', () => {
         this.cycleWeather();
-      });
-    }
-
-    // Horn button
-    const btnHorn = document.getElementById('btn-horn');
-    if (btnHorn) {
-      btnHorn.addEventListener('mousedown', () => this.audio.startHorn());
-      btnHorn.addEventListener('mouseup', () => this.audio.stopHorn());
-      btnHorn.addEventListener('touchstart', (e) => { e.preventDefault(); this.audio.startHorn(); });
-      btnHorn.addEventListener('touchend', (e) => { e.preventDefault(); this.audio.stopHorn(); });
-    }
-
-    // Emergency Brake Button
-    if (this.dom.emergencyBtn) {
-      this.dom.emergencyBtn.addEventListener('click', () => {
-        this.physics.triggerEmergencyBrake();
-        this.audio.triggerBrakeHiss(1.0);
-      });
-    }
-
-    // Reverser Button
-    if (this.dom.reverserBtn) {
-      this.dom.reverserBtn.addEventListener('click', () => {
-        this.physics.toggleReverser();
-      });
-    }
-
-    // Headlight button
-    const btnLights = document.getElementById('btn-lights');
-    if (btnLights) {
-      btnLights.addEventListener('click', () => {
-        const state = this.train.cycleHeadlight();
-        btnLights.innerText = `💡 Lights: ${state.toUpperCase()}`;
-      });
-    }
-
-    // Pantograph button
-    const btnPanto = document.getElementById('btn-panto');
-    if (btnPanto) {
-      btnPanto.addEventListener('click', () => {
-        this.physics.togglePantograph();
-      });
-    }
-
-    // Capture Net button
-    if (this.dom.btnCaptureNet) {
-      this.dom.btnCaptureNet.addEventListener('click', () => {
-        const state = this.train.toggleCaptureNet(this.audio);
-        this.dom.btnCaptureNet.innerText = `🛡️ Net: ${state ? 'DEPLOYED' : 'RETRACTED'}`;
-        this.dom.btnCaptureNet.classList.toggle('active', state);
       });
     }
 
@@ -409,42 +325,283 @@ class SimulatorApp {
       });
     }
 
-    // Throttle click/drag on HUD
-    const throttleSlider = document.getElementById('throttle-slider');
-    if (throttleSlider) {
-      throttleSlider.addEventListener('click', (e) => {
-        const rect = throttleSlider.getBoundingClientRect();
-        const y = 1.0 - ((e.clientY - rect.top) / rect.height);
-        const notch = Math.round(y * 8);
-        this.physics.setNotch(notch);
+    // ----------------------------------------------------------------
+    // Floating Console Event Listeners (Ref: media_1793808764475_89ecfc40.jpg)
+    // ----------------------------------------------------------------
+    if (this.dom.btnRunPause) {
+      this.dom.btnRunPause.addEventListener('click', () => this.togglePause());
+    }
+
+    // Speed Preset Buttons (STOP, 40, 80, 120 CRUISE, 160 MAX)
+    document.querySelectorAll('.speed-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const spd = parseInt(btn.dataset.speed, 10);
+        this.physics.setTargetSpeed(spd);
+        this.activeSpeedPreset = spd;
+        this.updateSpeedPresetButtons(spd);
+        if (this.isPaused) {
+          this.togglePause();
+        }
+      });
+    });
+
+    // AI Sensor Mode Toggle (AUTO / MANUAL)
+    if (this.dom.btnAiSensorMode) {
+      this.dom.btnAiSensorMode.addEventListener('click', () => this.toggleAiSensorMode());
+    }
+
+    // Deterrence Beam Button
+    if (this.dom.btnConsoleBeam) {
+      this.dom.btnConsoleBeam.addEventListener('click', () => this.fireDeterrenceBeam());
+    }
+
+    // Front Net Button
+    if (this.dom.btnConsoleNet) {
+      this.dom.btnConsoleNet.addEventListener('click', () => this.toggleCaptureNet());
+    }
+
+    // Horn Blast Button
+    if (this.dom.btnConsoleHorn) {
+      const startHornHandler = () => this.audio.startHorn('dual');
+      const stopHornHandler = () => this.audio.stopHorn();
+      this.dom.btnConsoleHorn.addEventListener('mousedown', startHornHandler);
+      this.dom.btnConsoleHorn.addEventListener('mouseup', stopHornHandler);
+      this.dom.btnConsoleHorn.addEventListener('touchstart', (e) => { e.preventDefault(); startHornHandler(); });
+      this.dom.btnConsoleHorn.addEventListener('touchend', (e) => { e.preventDefault(); stopHornHandler(); });
+    }
+
+    // Emergency Brake Button
+    if (this.dom.btnConsoleEmergency) {
+      this.dom.btnConsoleEmergency.addEventListener('click', () => {
+        this.physics.triggerEmergencyBrake();
+        this.audio.triggerBrakeHiss(1.0);
+        this.dom.btnConsoleEmergency.classList.toggle('active', this.physics.emergencyBrake);
       });
     }
 
-    // Brake click/drag on HUD
-    const brakeSlider = document.getElementById('brake-slider');
-    if (brakeSlider) {
-      brakeSlider.addEventListener('click', (e) => {
-        const rect = brakeSlider.getBoundingClientRect();
-        const y = 1.0 - ((e.clientY - rect.top) / rect.height);
-        this.physics.setTrainBrake(y);
-        this.audio.triggerBrakeHiss(0.4);
+    // Reset Run Button
+    if (this.dom.btnConsoleReset) {
+      this.dom.btnConsoleReset.addEventListener('click', () => this.resetRun());
+    }
+
+    // Auto Spin Button
+    if (this.dom.btnAutoSpin) {
+      this.dom.btnAutoSpin.addEventListener('click', () => this.toggleAutoSpin());
+    }
+
+    // Deterrence Architecture Selector Popup
+    if (this.dom.tickerSysArch) {
+      this.dom.tickerSysArch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleDeterrencePopup();
+      });
+    }
+
+    document.querySelectorAll('.deterrence-popup-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = item.dataset.mode;
+        this.selectDeterrenceMode(mode);
+        this.hideDeterrencePopup();
+      });
+    });
+
+    window.addEventListener('click', (e) => {
+      if (!e.target.closest('#deterrence-popup-menu') && !e.target.closest('#ticker-sys-arch')) {
+        this.hideDeterrencePopup();
+      }
+    });
+
+    // Toggle AI Kavach Safety Panel (Top bar button)
+    const btnToggleKavach = document.getElementById('btn-toggle-kavach');
+    if (btnToggleKavach && this.dom.kavachCard) {
+      btnToggleKavach.addEventListener('click', () => {
+        const isClosed = this.dom.kavachCard.classList.toggle('closed');
+        btnToggleKavach.classList.toggle('active', !isClosed);
+      });
+    }
+
+    // Minimize AI Kavach Card
+    if (this.dom.btnKavachMinimize && this.dom.kavachCard) {
+      this.dom.btnKavachMinimize.addEventListener('click', () => {
+        this.dom.kavachCard.classList.toggle('closed');
+        if (btnToggleKavach) {
+          btnToggleKavach.classList.remove('active');
+        }
       });
     }
   }
 
   // ---------------------------------------------------------
+  // Floating Console Helper Methods
+  // ---------------------------------------------------------
+  togglePause() {
+    this.isPaused = !this.isPaused;
+    if (this.dom.btnRunPause) {
+      this.dom.btnRunPause.innerText = this.isPaused ? '⏸ PAUSED' : '▶ RUNNING';
+      this.dom.btnRunPause.classList.toggle('paused', this.isPaused);
+    }
+  }
+
+  updateSpeedPresetButtons(spd) {
+    document.querySelectorAll('.speed-preset-btn').forEach(btn => {
+      const s = parseInt(btn.dataset.speed, 10);
+      btn.classList.toggle('active', s === spd);
+    });
+  }
+
+  toggleAiSensorMode() {
+    this.aiSensorAuto = !this.aiSensorAuto;
+    if (this.dom.btnAiSensorMode) {
+      this.dom.btnAiSensorMode.innerText = this.aiSensorAuto ? '🛡️ AI SENSOR: AUTO' : '🛡️ AI SENSOR: MANUAL';
+      this.dom.btnAiSensorMode.classList.toggle('active-cyan', this.aiSensorAuto);
+    }
+  }
+
+  fireDeterrenceBeam() {
+    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isDeterred && o.mass > 150);
+    if (!target) {
+      target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 70);
+    }
+    if (target) {
+      this.obstacles.triggerAnimalDeterrence(target, this.audio);
+      this.beamDischargingTimer = 2.5;
+      if (this.dom.btnConsoleBeam) {
+        this.dom.btnConsoleBeam.innerText = '⚡ BEAM: FIRED';
+      }
+      if (this.dom.tickerBeamState) {
+        this.dom.tickerBeamState.innerText = 'DISCHARGING PULSE (LINK 100%)';
+        this.dom.tickerBeamState.style.color = '#38bdf8';
+      }
+    }
+  }
+
+  toggleCaptureNet() {
+    const state = this.train.toggleCaptureNet(this.audio);
+    if (this.dom.btnConsoleNet) {
+      this.dom.btnConsoleNet.innerText = `🪤 NET: ${state ? 'DEPLOYED' : 'RETRACTED'}`;
+      this.dom.btnConsoleNet.classList.toggle('active-amber', state);
+    }
+  }
+
+  resetRun() {
+    this.physics.reset();
+    this.physics.setTargetSpeed(120);
+    this.updateSpeedPresetButtons(120);
+    this.obstacles.resetCollected(this.train.captureNet);
+    this.obstacles.initDefaultObstacles();
+    this.train.setCaptureNetState(false);
+    if (this.dom.btnConsoleNet) {
+      this.dom.btnConsoleNet.innerText = '🪤 NET: RETRACTED';
+      this.dom.btnConsoleNet.classList.remove('active-amber');
+    }
+    if (this.isPaused) {
+      this.togglePause();
+    }
+    if (this.dom.btnConsoleEmergency) {
+      this.dom.btnConsoleEmergency.classList.remove('active');
+    }
+  }
+
+  toggleAutoSpin() {
+    this.autoSpin = !this.autoSpin;
+    if (this.dom.btnAutoSpin) {
+      this.dom.btnAutoSpin.classList.toggle('active', this.autoSpin);
+    }
+  }
+
+  toggleDeterrencePopup() {
+    if (this.dom.deterrencePopupMenu) {
+      const isVisible = this.dom.deterrencePopupMenu.style.display !== 'none';
+      this.dom.deterrencePopupMenu.style.display = isVisible ? 'none' : 'flex';
+    }
+  }
+
+  hideDeterrencePopup() {
+    if (this.dom.deterrencePopupMenu) {
+      this.dom.deterrencePopupMenu.style.display = 'none';
+    }
+  }
+
+  selectDeterrenceMode(mode) {
+    this.obstacles.setDeterrenceMode(mode);
+    document.querySelectorAll('.deterrence-popup-item').forEach(item => {
+      const isSelected = item.dataset.mode === mode;
+      item.classList.toggle('selected', isSelected);
+      const cleanName = item.innerText.replace('✓ ', '');
+      item.innerText = isSelected ? `✓ ${cleanName}` : cleanName;
+    });
+
+    this.updateTelemetryTicker();
+  }
+
+  updateTelemetryTicker() {
+    const tickerData = this.obstacles.getDeterrenceTickerData();
+    const t = this.lastTelemetry;
+
+    if (this.dom.tickerSysArch) {
+      this.dom.tickerSysArch.innerText = tickerData.arch;
+    }
+    if (this.dom.tickerPolarization) {
+      this.dom.tickerPolarization.innerText = tickerData.polarization;
+    }
+    if (this.dom.tickerCarrier) {
+      this.dom.tickerCarrier.innerText = tickerData.carrier;
+    }
+
+    if (this.beamDischargingTimer > 0) {
+      if (this.dom.tickerBeamState) {
+        this.dom.tickerBeamState.innerText = 'DISCHARGING PULSE (LINK 100%)';
+        this.dom.tickerBeamState.style.color = '#38bdf8';
+      }
+    } else if (t && t.targetDetected) {
+      if (this.dom.tickerBeamState) {
+        this.dom.tickerBeamState.innerText = t.canCollect ? 'SCOOP CRADLE ARMED' : 'TARGET LOCKED (TRACK-1)';
+        this.dom.tickerBeamState.style.color = t.canCollect ? '#34d399' : '#f59e0b';
+      }
+    } else {
+      if (this.dom.tickerBeamState) {
+        this.dom.tickerBeamState.innerText = tickerData.focusState;
+        this.dom.tickerBeamState.style.color = '#34d399';
+      }
+    }
+
+    if (t && t.targetDetected) {
+      if (this.dom.tickerTarget) {
+        this.dom.tickerTarget.innerText = `${t.name.toUpperCase()} (TRACK-1)`;
+      }
+      if (this.dom.tickerRange) {
+        this.dom.tickerRange.innerText = t.distance !== null ? `${Math.round(t.distance)}M (LINK VERIFIED)` : '1548M (LINK VERIFIED)';
+      }
+    } else {
+      if (this.dom.tickerTarget) {
+        this.dom.tickerTarget.innerText = 'NONE (TRACK CLEAR)';
+      }
+      if (this.dom.tickerRange) {
+        this.dom.tickerRange.innerText = '1548M (LINK VERIFIED)';
+      }
+    }
+
+    if (this.dom.tickerSafety) {
+      this.dom.tickerSafety.innerText = tickerData.safety;
+    }
+  }
+  // ---------------------------------------------------------
   // Camera Switching
   // ---------------------------------------------------------
   setCameraMode(mode) {
+    if (mode === 'chase') mode = 'orbit';
     this.cameraMode = mode;
     this.isRailfanInitialized = false;
 
-    // Update active UI tool button
+    // Update active UI tool button across both toolbars
     document.querySelectorAll('[data-cam]').forEach(b => {
-      b.classList.toggle('active', b.dataset.cam === mode);
+      const bCam = b.dataset.cam;
+      const isActive = (bCam === mode) || (mode === 'orbit' && bCam === 'chase');
+      b.classList.toggle('active', isActive);
     });
 
-    if (mode === 'chase' || mode === 'drone') {
+    if (mode === 'orbit' || mode === 'drone') {
       this.controls.enabled = true;
     } else {
       this.controls.enabled = false;
@@ -452,7 +609,7 @@ class SimulatorApp {
   }
 
   cycleCamera() {
-    const modes = ['action', 'net', 'chase', 'cab', 'railfan', 'window', 'drone'];
+    const modes = ['orbit', 'beam', 'cab', 'target', 'action', 'drone', 'net'];
     const idx = modes.indexOf(this.cameraMode);
     const nextMode = modes[(idx + 1) % modes.length];
     this.setCameraMode(nextMode);
@@ -482,17 +639,12 @@ class SimulatorApp {
     const label = isSlow ? `⏱️ SLOW-MO: ${activeScale}x` : '⏱️ SLOW-MO: 1x';
 
     const btnTop = document.getElementById('btn-slow-mo');
-    const btnKavach = document.getElementById('btn-kavach-slowmo');
     const badge = document.getElementById('slowmo-badge');
 
     if (btnTop) {
       btnTop.innerText = label;
       btnTop.classList.toggle('active', isSlow);
       btnTop.style.background = isSlow ? '#0284c7' : 'rgba(3, 105, 161, 0.4)';
-    }
-    if (btnKavach) {
-      btnKavach.innerText = label;
-      btnKavach.style.background = isSlow ? '#0284c7' : '#0369a1';
     }
     if (badge) {
       badge.style.display = isSlow ? 'block' : 'none';
@@ -505,33 +657,21 @@ class SimulatorApp {
   }
 
   // ---------------------------------------------------------
-  // Train Model Switcher (WAP-7 vs Diesel)
+  // Train Configuration (WAP-7 High-Speed Electric)
   // ---------------------------------------------------------
-  setTrain(type) {
-    this.train.setTrainType(type);
-    this.physics.isElectric = (type === 'electric');
+  setTrain(type = 'electric') {
+    this.train.setTrainType('electric');
+    this.physics.isElectric = true;
     this.cab = new CabInterior(this.train.locoCar);
 
     const titleEl = document.getElementById('train-title');
     const shedEl = document.getElementById('loco-shed');
     const locoClassEl = document.getElementById('loco-class');
 
-    if (type === 'electric') {
-      if (titleEl) titleEl.innerText = '12301 RAJDHANI EXPRESS';
-      if (shedEl) shedEl.innerText = 'GZB WAP-7 #30201';
-      if (locoClassEl) locoClassEl.innerText = 'Electric 25kV AC (6,350 HP)';
-      this.dom.oheVal.innerText = '25.0 kV';
-    } else {
-      if (titleEl) titleEl.innerText = '12952 SUPERFAST EXPRESS';
-      if (shedEl) shedEl.innerText = 'BGKT WDP-4D #40112';
-      if (locoClassEl) locoClassEl.innerText = 'Diesel-Electric 16-Cyl (4,500 HP)';
-      this.dom.oheVal.innerText = 'DIESEL';
-    }
-  }
-
-  switchTrainType() {
-    const newType = this.train.trainType === 'electric' ? 'diesel' : 'electric';
-    this.setTrain(newType);
+    if (titleEl) titleEl.innerText = '12301 RAJDHANI EXPRESS';
+    if (shedEl) shedEl.innerText = 'GZB WAP-7 #30201';
+    if (locoClassEl) locoClassEl.innerText = 'Electric 25kV AC (6,350 HP)';
+    if (this.dom.oheVal) this.dom.oheVal.innerText = '25.0 kV';
   }
 
   cycleWeather() {
@@ -556,9 +696,64 @@ class SimulatorApp {
     const right = new THREE.Vector3(1, 0, 0).applyEuler(locoRot);
     const up = new THREE.Vector3(0, 1, 0);
 
-    if (this.cameraMode === 'action') {
-      // Cinematic low-angle front-left 3/4 perspective tracking locomotive nose, capture net, and rails
-      // Matches uploaded reference image media_1793697380357_f8b6e0ba.png
+    if (this.cameraMode === 'orbit' || this.cameraMode === 'chase') {
+      // ORBIT 360°: Smooth orbit camera with damping and auto-spin
+      this.controls.target.copy(locoPos).add(new THREE.Vector3(0, 2.5, 0));
+      if (this.camera.position.y < locoPos.y + 1.2) {
+        this.camera.position.y = locoPos.y + 1.2;
+      }
+      this.controls.autoRotate = this.autoSpin;
+      this.controls.autoRotateSpeed = 2.0;
+      this.controls.update();
+
+    } else if (this.cameraMode === 'beam') {
+      // BEAM POV: Forward POV mounted at front nose beam projector looking at upcoming obstacles
+      const fwdDist = this.train.locoLength / 2 + 0.6;
+      const camPos = locoPos.clone()
+        .add(forward.clone().multiplyScalar(fwdDist))
+        .add(up.clone().multiplyScalar(2.1));
+      this.camera.position.copy(camPos);
+
+      let targetObs = this.obstacles.obstacles.find(o => !o.isCollected && !o.isDeterred && o.mesh);
+      if (targetObs) {
+        this.camera.lookAt(targetObs.mesh.position.clone().add(up.clone().multiplyScalar(1.0)));
+      } else {
+        const lookTarget = camPos.clone().add(forward.clone().multiplyScalar(80)).add(up.clone().multiplyScalar(-0.4));
+        this.camera.lookAt(lookTarget);
+      }
+
+    } else if (this.cameraMode === 'target') {
+      // RX TARGET: Camera placed ahead at target/obstacle looking back at oncoming train
+      let targetObs = this.obstacles.obstacles.find(o => !o.isCollected && o.mesh);
+      if (targetObs) {
+        const targetPos = targetObs.mesh.position;
+        const camPos = targetPos.clone()
+          .add(forward.clone().multiplyScalar(5.5))
+          .add(right.clone().multiplyScalar(-2.5))
+          .add(up.clone().multiplyScalar(1.6));
+        this.camera.position.copy(camPos);
+        this.camera.lookAt(locoPos.clone().add(up.clone().multiplyScalar(2.0)));
+      } else {
+        const aheadProg = (this.physics.trackProgress + (85 / this.track.totalLength)) % 1.0;
+        const spot = this.track.getTrackTransform(aheadProg, 0);
+        const camPos = spot.position.clone().add(spot.normal.clone().multiplyScalar(2.8)).setY(spot.position.y + 1.8);
+        this.camera.position.copy(camPos);
+        this.camera.lookAt(locoPos.clone().add(up.clone().multiplyScalar(2.0)));
+      }
+
+    } else if (this.cameraMode === 'cab') {
+      // TX CAB: Driver Seat inside Cockpit looking out front windshield
+      const eyeOffset = new THREE.Vector3(0.55, 2.4, this.train.locoLength / 2 - 1.2).applyEuler(locoRot);
+      this.camera.position.copy(locoPos).add(eyeOffset);
+
+      // Look direction + mouse yaw/pitch
+      const lookDir = forward.clone();
+      lookDir.applyAxisAngle(up, this.cabYaw);
+      lookDir.applyAxisAngle(right, this.cabPitch);
+      this.camera.lookAt(this.camera.position.clone().add(lookDir));
+
+    } else if (this.cameraMode === 'action') {
+      // COACH SHIELD: Low-angle front-left 3/4 perspective tracking locomotive nose, capture net, and rails
       const fwdDist = this.train.locoLength / 2 + 10.5;
       const camOffset = forward.clone().multiplyScalar(fwdDist)
         .add(right.clone().multiplyScalar(-5.4))
@@ -571,9 +766,7 @@ class SimulatorApp {
       this.camera.lookAt(lookTarget);
 
     } else if (this.cameraMode === 'net') {
-      // Dedicated Close-Up Capture Net & Rescue Scoop Action Cam
-      // Intimate, dramatic view positioned just ahead and to the left of the scoop opening,
-      // looking right into the hammock cradle, pick-up lip, and oncoming track
+      // CAPTURE NET: Dedicated Close-Up Capture Net & Scoop Action Cam
       const fwdDist = this.train.locoLength / 2 + 4.9;
       const camOffset = forward.clone().multiplyScalar(fwdDist)
         .add(right.clone().multiplyScalar(-2.5))
@@ -585,30 +778,16 @@ class SimulatorApp {
       this.camera.position.copy(locoPos).add(camOffset);
       this.camera.lookAt(lookTarget);
 
-    } else if (this.cameraMode === 'chase') {
-      // Smooth orbit tracking locomotive
-      this.controls.target.copy(locoPos).add(new THREE.Vector3(0, 2.5, 0));
-      if (this.camera.position.y < locoPos.y + 1.4) {
-        this.camera.position.y = locoPos.y + 1.4;
-      }
+    } else if (this.cameraMode === 'drone') {
+      // TOP RADAR: High bird's-eye vantage point
+      this.controls.target.copy(locoPos);
+      this.controls.autoRotate = this.autoSpin;
+      this.controls.autoRotateSpeed = 1.5;
       this.controls.update();
-
-    } else if (this.cameraMode === 'cab') {
-      // Driver Seat inside Cockpit looking out front windshield
-      const eyeOffset = new THREE.Vector3(0.55, 2.4, this.train.locoLength / 2 - 1.2).applyEuler(locoRot);
-      this.camera.position.copy(locoPos).add(eyeOffset);
-
-      // Look direction + mouse yaw/pitch
-      const lookDir = forward.clone();
-      lookDir.applyAxisAngle(up, this.cabYaw);
-      lookDir.applyAxisAngle(right, this.cabPitch);
-
-      this.camera.lookAt(this.camera.position.clone().add(lookDir));
 
     } else if (this.cameraMode === 'railfan') {
       // Fixed trackside spotter camera
       if (!this.isRailfanInitialized) {
-        // Place camera 80m ahead of the train along track
         const aheadProg = (this.physics.trackProgress + (80 / this.track.totalLength)) % 1.0;
         const spot = this.track.getTrackTransform(aheadProg, 0);
         this.railfanPos.copy(spot.position).add(spot.normal.clone().multiplyScalar(6.5)).setY(spot.position.y + 1.6);
@@ -616,10 +795,7 @@ class SimulatorApp {
         this.isRailfanInitialized = true;
       }
 
-      // Track train passing
       this.camera.lookAt(locoPos.clone().add(new THREE.Vector3(0, 2.0, 0)));
-
-      // If train has passed 50m beyond the camera, reset camera ahead!
       const dist = locoPos.distanceTo(this.railfanPos);
       const isPast = locoPos.clone().sub(this.railfanPos).dot(forward) > 40;
       if (isPast || dist > 110) {
@@ -636,11 +812,6 @@ class SimulatorApp {
         const cFwd = new THREE.Vector3(0, 0, 1).applyEuler(c1.rotation);
         this.camera.lookAt(this.camera.position.clone().add(cRight.clone().multiplyScalar(8)).add(cFwd.clone().multiplyScalar(4)));
       }
-
-    } else if (this.cameraMode === 'drone') {
-      // High bird's-eye vantage point
-      this.controls.target.copy(locoPos);
-      this.controls.update();
     }
   }
 
@@ -650,71 +821,38 @@ class SimulatorApp {
   updateHUD() {
     const p = this.physics;
 
-    // Speedometer Digital & Dial
-    this.dom.speedDigital.innerText = Math.round(p.speedKmh);
-    const speedDashoffset = 440 - (Math.min(1.0, p.speedKmh / 160) * 440);
-    this.dom.speedGaugeFill.style.strokeDashoffset = speedDashoffset;
-
-    // Tractive Effort bar & text
-    this.dom.teVal.innerText = `${p.tractiveEffortKn} kN`;
-    const teWidth = Math.min(100, (Math.abs(p.tractiveEffortKn) / 460) * 100);
-    this.dom.teBar.style.width = `${teWidth}%`;
-
-    // Pressures
-    this.dom.bpVal.innerText = `${p.bpPressure.toFixed(1)} bar`;
-    this.dom.bcVal.innerText = `${p.bcPressure.toFixed(1)} bar`;
-
-    // Levers
-    this.dom.notchVal.innerText = `N${p.notch}`;
-    this.dom.brakeVal.innerText = `${Math.round(p.trainBrakePercent * 100)}%`;
-
-    const notchPx = 12 + (p.notch / 8.0) * 76;
-    this.dom.throttleHandle.style.bottom = `${notchPx}px`;
-
-    const brakePx = 12 + (p.trainBrakePercent * 76);
-    this.dom.brakeHandle.style.bottom = `${brakePx}px`;
-
-    // Reverser
-    const revText = p.reverser === 1 ? 'FORWARD (F)' : (p.reverser === 0 ? 'NEUTRAL (N)' : 'REVERSE (R)');
-    this.dom.reverserBtn.innerText = `⚙️ ${revText}`;
-
-    // Emergency button state
-    this.dom.emergencyBtn.classList.toggle('engaged', p.emergencyBrake);
-
-    // Pantograph status
-    if (this.dom.pantoStatus) {
-      this.dom.pantoStatus.innerText = p.pantographRaised ? 'UP (25kV)' : 'LOWERED';
-      this.dom.pantoStatus.style.color = p.pantographRaised ? '#00e676' : '#ff1744';
+    // Digital Speed in Floating Console Pod (Ref: media_1793808764475_89ecfc40.jpg)
+    if (this.dom.consoleSpeedVal) {
+      this.dom.consoleSpeedVal.innerText = Math.round(p.speedKmh);
     }
 
-    // Station distance
-    const distToStationMeters = ((this.track.stationProgress - p.trackProgress + 1.0) % 1.0) * this.track.totalLength;
-    if (distToStationMeters < 1000) {
-      this.dom.stationDistText.innerText = `${Math.round(distToStationMeters)} m`;
-    } else {
-      this.dom.stationDistText.innerText = `${(distToStationMeters / 1000).toFixed(1)} km`;
+    // Console Emergency Brake Button State Sync
+    if (this.dom.btnConsoleEmergency) {
+      this.dom.btnConsoleEmergency.classList.toggle('active', p.emergencyBrake);
     }
 
-    // Cab Signalling & SPAD detection
-    this.track.updateSignals(p.trackProgress);
-    const activeSig = this.track.signals[0]; // Nearest signal
-    if (activeSig) {
-      const sigAspect = activeSig.currentAspect;
-      this.dom.signalAspectText.innerText = sigAspect.toUpperCase().replace('_', ' ');
+    // Console Net Button State Sync
+    if (this.dom.btnConsoleNet && this.train && this.train.captureNetDeployed !== undefined) {
+      const isNetOut = this.train.captureNetDeployed;
+      this.dom.btnConsoleNet.innerText = `🪤 NET: ${isNetOut ? 'DEPLOYED' : 'RETRACTED'}`;
+      this.dom.btnConsoleNet.classList.toggle('active-amber', isNetOut);
+    }
 
-      // Update HUD Signal lamps
-      this.dom.aspectGreen.classList.toggle('lit', sigAspect === 'green');
-      this.dom.aspectYellow1.classList.toggle('lit', sigAspect === 'yellow' || sigAspect === 'double_yellow');
-      this.dom.aspectYellow2.classList.toggle('lit', sigAspect === 'double_yellow');
-      this.dom.aspectRed.classList.toggle('lit', sigAspect === 'red');
+    // Live Technical Telemetry Ticker update
+    this.updateTelemetryTicker();
 
-      // Signal aspect lamps updated (Cab Signal cluster displays status cleanly without blocking view)
-      if (!this.lastTelemetry || !this.lastTelemetry.alertMessage) {
-        if (!this.lastDisplayedAlert) {
-          this.dom.alertBanner.style.display = 'none';
-        }
+    // Station distance (Top route card)
+    if (this.dom.stationDistText) {
+      const distToStationMeters = ((this.track.stationProgress - p.trackProgress + 1.0) % 1.0) * this.track.totalLength;
+      if (distToStationMeters < 1000) {
+        this.dom.stationDistText.innerText = `${Math.round(distToStationMeters)} m`;
+      } else {
+        this.dom.stationDistText.innerText = `${(distToStationMeters / 1000).toFixed(1)} km`;
       }
     }
+
+    // Track Signalling
+    this.track.updateSignals(p.trackProgress);
 
     // AI Kavach Sensor Fusion & Safety Controller HUD Telemetry
     if (this.lastTelemetry && this.dom.kavachTargetName) {
@@ -756,7 +894,7 @@ class SimulatorApp {
         this.dom.kavachPayloadBar.style.width = `${payloadPct}%`;
       }
 
-      // Dynamic Alert Notification Pill for AI Detection & Rescue Events (Sleek, unobtrusive top pill)
+      // Dynamic Alert Notification Pill for AI Detection & Rescue Events
       if (t.alertMessage) {
         if (t.alertMessage !== this.lastDisplayedAlert) {
           this.lastDisplayedAlert = t.alertMessage;
@@ -786,6 +924,10 @@ class SimulatorApp {
           }, 3800);
         }
       }
+    } else {
+      if (!this.lastDisplayedAlert && this.dom.alertBanner) {
+        this.dom.alertBanner.style.display = 'none';
+      }
     }
   }
 
@@ -796,6 +938,24 @@ class SimulatorApp {
     requestAnimationFrame(this.animate);
 
     const rawDt = Math.min(this.clock.getDelta(), 0.1);
+
+    // Count down deterrence beam discharging indicator
+    if (this.beamDischargingTimer > 0) {
+      this.beamDischargingTimer -= rawDt;
+      if (this.beamDischargingTimer <= 0) {
+        if (this.dom.btnConsoleBeam) {
+          this.dom.btnConsoleBeam.innerText = '⚡ BEAM: ARMED';
+        }
+      }
+    }
+
+    // Pause handling: keep camera active, but freeze physical world
+    if (this.isPaused) {
+      this.updateCamera();
+      this.updateHUD();
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
 
     // Automated Cinematic Slow-Motion Trigger during close-range rescue events
     if (this.autoSlowMo && this.lastTelemetry && this.lastTelemetry.targetDetected && this.lastTelemetry.canCollect) {
@@ -847,7 +1007,8 @@ class SimulatorApp {
       this.train.captureNet,
       this.audio,
       this.physics,
-      this.track.totalLength
+      this.track.totalLength,
+      this.aiSensorAuto
     );
     this.lastTelemetry = telemetry;
 

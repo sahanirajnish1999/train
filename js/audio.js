@@ -450,6 +450,150 @@ export class TrainAudio {
   }
 
   // ---------------------------------------------------------
+  // Active Non-Lethal Deterrence Sound Effects (>150kg Animals)
+  // ---------------------------------------------------------
+
+  // 1. High-Voltage Track Electric Pulse / Arc Crackle
+  playElectricShockDischarge() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+
+      // High-voltage sharp capacitive arc crackle (noise burst + filter sweep)
+      const bufferSize = this.ctx.sampleRate * 0.45;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        // High density random spark pulse spikes
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.12));
+      }
+
+      const noiseNode = this.ctx.createBufferSource();
+      noiseNode.buffer = buffer;
+
+      const bpf = this.ctx.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.setValueAtTime(3200, now);
+      bpf.frequency.exponentialRampToValueAtTime(1400, now + 0.4);
+      bpf.Q.value = 4.0;
+
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.75, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+      noiseNode.connect(bpf);
+      bpf.connect(noiseGain);
+      noiseGain.connect(this.masterGain);
+      noiseNode.start(now);
+
+      // Rapid high-voltage ionization zapping tones
+      [420, 840, 1680].forEach((freq, idx) => {
+        const zapOsc = this.ctx.createOscillator();
+        const zapGain = this.ctx.createGain();
+        zapOsc.type = 'sawtooth';
+        zapOsc.frequency.setValueAtTime(freq + Math.random() * 120, now);
+        zapOsc.frequency.exponentialRampToValueAtTime(180, now + 0.35);
+
+        zapGain.gain.setValueAtTime(0.35 / (idx + 1), now);
+        zapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+        zapOsc.connect(zapGain);
+        zapGain.connect(this.masterGain);
+        zapOsc.start(now);
+        zapOsc.stop(now + 0.4);
+      });
+    } catch (e) {}
+  }
+
+  // 2. Indian Railways Plan Bee - Bio-Acoustic Honeybee Swarm Frequency
+  playBeeSwarmSound() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+      [280, 310, 345, 390].forEach(f => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const lfo = this.ctx.createOscillator();
+        const lfoGain = this.ctx.createGain();
+
+        // 35Hz frequency vibrato simulating wing flutters of angry swarm
+        lfo.frequency.setValueAtTime(34 + Math.random() * 8, now);
+        lfoGain.gain.setValueAtTime(18, now);
+        lfo.connect(osc.frequency);
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(f, now);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        lfo.start(now);
+        osc.start(now);
+        lfo.stop(now + 0.95);
+        osc.stop(now + 0.95);
+      });
+    } catch (e) {}
+  }
+
+  // 3. Acoustic LRAD - Focused Directional Long-Range Siren Pulse
+  playLRADSirenSound() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1800, now);
+      osc.frequency.linearRampToValueAtTime(2600, now + 0.25);
+      osc.frequency.linearRampToValueAtTime(1800, now + 0.55);
+
+      gain.gain.setValueAtTime(0.55, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.7);
+    } catch (e) {}
+  }
+
+  // 4. Pulsed Millimeter Wave / Active Denial Carrier Hum
+  playActiveDenialHum() {
+    if (!this.ctx || this.isMuted) return;
+    try {
+      this.resume();
+      const now = this.ctx.currentTime;
+      const sub = this.ctx.createOscillator();
+      const carrier = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(95, now); // 95Hz sub-bass thump representing 95GHz carrier pulse rate
+      carrier.type = 'sawtooth';
+      carrier.frequency.setValueAtTime(1420, now);
+
+      gain.gain.setValueAtTime(0.40, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      sub.connect(gain);
+      carrier.connect(gain);
+      gain.connect(this.masterGain);
+
+      sub.start(now);
+      carrier.start(now);
+      sub.stop(now + 0.55);
+      carrier.stop(now + 0.55);
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------
   // Main Audio Update Loop
   // ---------------------------------------------------------
   update(speedKmh, throttlePercent, brakePercent, isElectric = true) {

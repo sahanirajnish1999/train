@@ -1281,26 +1281,32 @@ export class ObstacleCaptureNet {
   }
 
   beginCaptureSequence(obstacleMesh, obstacleInfo) {
-    const zOffset = (this.collectedList.length * 0.40) - 0.20;
+    const isHuman = obstacleInfo.type === 'human';
+    const isAnimal = obstacleInfo.type === 'animal';
+    const count = this.collectedList.length;
+
+    // Stagger laterally and longitudinally so multiple rescues sit naturally in hammock cradle
+    const xPattern = [0, -0.34, 0.34, -0.18, 0.18];
+    const targetX = isHuman ? xPattern[count % xPattern.length] : 0;
+    const zOffset = -0.22 + (Math.floor(count / 2) * 0.42);
+
     this.cradleCargoGroup.add(obstacleMesh);
     this.collectedList.push(obstacleInfo);
     this.totalPayloadWeight += obstacleInfo.mass;
 
     // Start position: right at the front scoop mouth entrance lip (z = 1.55m in cradleCargoGroup local space)
-    const isHuman = obstacleInfo.type === 'human';
-    const isAnimal = obstacleInfo.type === 'animal';
-
     obstacleMesh.position.set(0, isHuman ? -0.32 : (isAnimal ? -0.16 : -0.15), 1.55);
     obstacleMesh.rotation.set(0, 0, 0);
 
     const targetPos = new THREE.Vector3(
-      0,
+      targetX,
       isHuman ? -0.38 : (isAnimal ? -0.22 : -0.15),
       isHuman ? zOffset - 0.05 : (isAnimal ? zOffset + 0.08 : zOffset)
     );
 
     const targetRotX = isHuman ? -0.16 : (isAnimal ? -0.25 : 0);
-    const targetRotZ = isAnimal ? 0.12 : 0;
+    const targetRotY = isHuman ? (count % 2 === 1 ? -0.14 : 0.14) : 0;
+    const targetRotZ = isAnimal ? 0.12 : (isHuman ? (count % 2 === 1 ? 0.05 : -0.05) : 0);
 
     const animItem = {
       mesh: obstacleMesh,
@@ -1310,6 +1316,7 @@ export class ObstacleCaptureNet {
       startPos: new THREE.Vector3(0, isHuman ? -0.32 : (isAnimal ? -0.16 : -0.15), 1.55),
       targetPos: targetPos,
       targetRotX: targetRotX,
+      targetRotY: targetRotY,
       targetRotZ: targetRotZ,
       settled: false,
       userData: obstacleMesh.userData || {}
@@ -1474,12 +1481,14 @@ export class ObstacleCaptureNet {
           const elasticDip = -0.16 * Math.sin(Math.max(0.0, Math.min(1.0, (p - 0.30) / 0.55)) * Math.PI);
           const baseCurY = THREE.MathUtils.lerp(cap.startPos.y, cap.targetPos.y, s);
           const curY = baseCurY + rampHump + elasticDip;
+          const curX = THREE.MathUtils.lerp(cap.startPos.x, cap.targetPos.x, s);
 
-          cap.mesh.position.set(0, curY, curZ);
+          cap.mesh.position.set(curX, curY, curZ);
 
           // Reclining rotation into supportive safety hammock
           const rotS = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1.0, p / 0.75));
           cap.mesh.rotation.x = THREE.MathUtils.lerp(0, cap.targetRotX, rotS);
+          cap.mesh.rotation.y = THREE.MathUtils.lerp(0, cap.targetRotY || 0, rotS);
           cap.mesh.rotation.z = THREE.MathUtils.lerp(0, cap.targetRotZ, rotS);
 
           // Biomechanical joint articulation during scoop
@@ -1513,17 +1522,27 @@ export class ObstacleCaptureNet {
             // Head nods forward slightly to protect cervical vertebrae then looks alertly out front
             if (ud.headGroup) ud.headGroup.rotation.x = THREE.MathUtils.lerp(0, -0.25, rotS);
           } else if (ud.type === 'animal') {
-            // Quadruped safely curls legs under body in recumbent shelter posture
+            // Elephant / Quadruped safely cradled in supportive hammock
             if (ud.legs) {
               ud.legs.forEach(leg => {
-                leg.group.rotation.x = THREE.MathUtils.lerp(0, leg.isFront ? 1.30 : -1.05, rotS);
+                const grp = leg.group || leg;
+                grp.rotation.x = THREE.MathUtils.lerp(0, 0.55, rotS);
                 if (leg.kneeGroup) {
                   leg.kneeGroup.rotation.x = THREE.MathUtils.lerp(0, leg.isFront ? -1.80 : 1.70, rotS);
                 }
               });
             }
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              ud.trunkSegments[0].rotation.x = THREE.MathUtils.lerp(-0.42, -0.30, rotS);
+              ud.trunkSegments[1].rotation.x = THREE.MathUtils.lerp(-0.36, -0.25, rotS);
+              ud.trunkSegments[2].rotation.x = THREE.MathUtils.lerp(-0.28, -0.15, rotS);
+              ud.trunkSegments[3].rotation.x = THREE.MathUtils.lerp(0.70, 0.55, rotS);
+              ud.trunkSegments[4].rotation.x = THREE.MathUtils.lerp(0.75, 0.65, rotS);
+            }
+            if (ud.earL) ud.earL.rotation.y = THREE.MathUtils.lerp(-0.45, -0.25, rotS);
+            if (ud.earR) ud.earR.rotation.y = THREE.MathUtils.lerp(0.45, 0.25, rotS);
             if (ud.headGroup) {
-              ud.headGroup.rotation.x = THREE.MathUtils.lerp(0, -0.20, rotS);
+              ud.headGroup.rotation.x = THREE.MathUtils.lerp(0, -0.15, rotS);
             }
           }
 
@@ -1536,6 +1555,7 @@ export class ObstacleCaptureNet {
             cap.settled = true;
             cap.mesh.position.copy(cap.targetPos);
             cap.mesh.rotation.x = cap.targetRotX;
+            cap.mesh.rotation.y = cap.targetRotY || 0;
             cap.mesh.rotation.z = cap.targetRotZ;
           }
         } else {
@@ -1544,6 +1564,20 @@ export class ObstacleCaptureNet {
           const t = this.aeroTime;
 
           if (ud.type === 'human') {
+            // Dynamic eye blinking in hammock net
+            if (ud.faceData) {
+              const blinkCycle = (t * 0.32) % 1.0;
+              let blinkFactor = 0;
+              if (blinkCycle < 0.04) {
+                blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
+              }
+              if (ud.faceData.lastBlink === undefined || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || (blinkFactor === 0 && ud.faceData.lastBlink !== 0)) {
+                ud.faceData.drawFace(blinkFactor);
+                ud.faceData.tex.needsUpdate = true;
+                ud.faceData.lastBlink = blinkFactor;
+              }
+            }
+
             // 1. Deep, rhythmic relief breathing with periodic relief sigh
             const breath = Math.sin(t * 2.8);
             const deepReliefSigh = Math.pow(Math.max(0, Math.sin(t * 0.45)), 4.0) * 0.08;
@@ -1583,37 +1617,57 @@ export class ObstacleCaptureNet {
             cap.mesh.rotation.x = cap.targetRotX + 0.018 * Math.cos(t * 3.8) * vNorm;
 
           } else if (ud.type === 'animal') {
-            // Continuous living behavior for rescued quadruped in the net
-            const breathAnim = Math.sin(t * 4.2);
+            // Dynamic eye blinking for elephant in net cradle
+            if (ud.faceData) {
+              const blinkCycle = (t * 0.25) % 1.0;
+              let blinkFactor = 0;
+              if (blinkCycle < 0.05) {
+                blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
+              }
+              if (ud.faceData.lastBlink === undefined || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || (blinkFactor === 0 && ud.faceData.lastBlink !== 0)) {
+                ud.faceData.drawFace(blinkFactor);
+                ud.faceData.tex.needsUpdate = true;
+                ud.faceData.lastBlink = blinkFactor;
+              }
+            }
+
+            // Continuous living behavior for rescued elephant in the net cradle
+            const breathAnim = Math.sin(t * 2.8);
             if (ud.body) {
-              ud.body.scale.set(0.92 + 0.045 * breathAnim, 1.15 + 0.035 * breathAnim, 1.0);
+              ud.body.scale.set(1.05 + 0.03 * breathAnim, 1.18 + 0.025 * breathAnim, 1.0);
             }
 
-            // Head looks around alertly
+            // Head looks around curiously
             if (ud.headGroup) {
-              ud.headGroup.rotation.y = Math.sin(t * 1.4) * 0.35;
-              ud.headGroup.rotation.x = -0.18 + Math.sin(t * 2.4) * 0.08;
+              ud.headGroup.rotation.y = Math.sin(t * 1.2) * 0.22;
+              ud.headGroup.rotation.x = -0.12 + Math.sin(t * 2.0) * 0.05;
             }
 
-            // Ears twitching independently
-            if (ud.ears && ud.ears.length >= 2) {
-              ud.ears[0].rotation.z = -0.55 + Math.sin(t * 7.5) * 0.25;
-              ud.ears[1].rotation.z = 0.55 + Math.sin(t * 6.0 + 1.2) * 0.25;
+            // Trunk curls peacefully forward and upward in hammock
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              const curlWave = Math.sin(t * 2.0);
+              ud.trunkSegments[0].rotation.x = -0.30 + 0.05 * curlWave;
+              ud.trunkSegments[1].rotation.x = -0.25 + 0.04 * curlWave;
+              ud.trunkSegments[2].rotation.x = -0.15 + 0.03 * curlWave;
+              ud.trunkSegments[3].rotation.x = 0.55 + 0.06 * curlWave;
+              ud.trunkSegments[4].rotation.x = 0.65 + 0.08 * curlWave;
             }
+
+            // Ears flap gently against hammock sides
+            if (ud.earL) ud.earL.rotation.y = -0.30 + 0.08 * Math.sin(t * 1.8);
+            if (ud.earR) ud.earR.rotation.y = 0.30 - 0.08 * Math.sin(t * 1.8);
 
             // Tail swishes against orange net webbing
             if (ud.tail) {
-              ud.tail.rotation.z = Math.sin(t * 4.5) * 0.55;
-              ud.tail.rotation.x = 0.35 + Math.abs(Math.sin(t * 2.2)) * 0.25;
+              ud.tail.rotation.z = Math.sin(t * 3.5) * 0.45;
+              ud.tail.rotation.x = 0.35 + Math.abs(Math.sin(t * 1.8)) * 0.20;
             }
 
-            // Maintain comfortable recumbent curled posture
+            // Legs resting comfortably in hammock
             if (ud.legs) {
               ud.legs.forEach(leg => {
-                leg.group.rotation.x = leg.isFront ? 1.30 : -1.05;
-                if (leg.kneeGroup) {
-                  leg.kneeGroup.rotation.x = leg.isFront ? -1.80 : 1.70;
-                }
+                const grp = leg.group || leg;
+                grp.rotation.x = 0.55;
               });
             }
           }

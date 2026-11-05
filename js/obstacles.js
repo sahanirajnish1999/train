@@ -16,6 +16,65 @@ export class ObstacleManager {
     this.obstacles = [];
     this.nextId = 1;
 
+    // Active Non-Lethal Deterrence Suite for Over-150kg Animals (Track Clearance)
+    this.activeDeterrenceMode = 'electric_shock';
+    this.deterrenceSpecs = {
+      electric_shock: {
+        id: 'electric_shock',
+        name: 'Track Electric Shock (High-Voltage Safety Analysis)',
+        shortTitle: 'TRACK ELECTRIC SHOCK',
+        badge: '6.5kV PULSE',
+        color: '#38bdf8',
+        detail: 'Discharges non-lethal pulsed electrical gradient (6.5 kV, < 3.8 mA, micro-joule duration) across track rails and forward contact sweepers (compliant with IEC 60335-2-76 / RDSO). Induces involuntary muscular jump reflex through hooves to compel immediate flight off track without tissue burns or physical injury.'
+      },
+      bio_acoustic: {
+        id: 'bio_acoustic',
+        name: 'Bio-Acoustic Swarm (Zero-Harm Repellent)',
+        shortTitle: 'PLAN BEE BIO-SWARM',
+        badge: '380Hz SWARM',
+        color: '#f59e0b',
+        detail: "Indian Railways 'Plan Bee' award-winning acoustic deterrent. Broadcasts directional 280–420 Hz audio signature replicating swarming honeybees. Triggers innate evolutionary flight response in heavy cattle and elephants fearing bee stings to sensitive snouts and eyes."
+      },
+      lrad: {
+        id: 'lrad',
+        name: 'Acoustic LRAD (Directional Sound 1-1.5km)',
+        shortTitle: 'ACOUSTIC LRAD',
+        badge: '138dB BEAM',
+        color: '#06b6d4',
+        detail: 'Long Range Acoustic Device emitting focused 138 dB directional acoustic wave front (2.5 kHz siren pulses) penetrating wind noise up to 1.5 km ahead. Projects clear auditory alarm exclusively along rail corridor to disperse wildlife.'
+      },
+      mmw_denial: {
+        id: 'mmw_denial',
+        name: 'Pulsed Millimeter Wave (Active Denial)',
+        shortTitle: 'PULSED MMW DENIAL',
+        badge: '95GHz PULSE',
+        color: '#ec4899',
+        detail: '95 GHz directed electromagnetic micro-pulses penetrating only 0.4 mm of epidermal moisture. Rapidly excites surface water molecules, inducing an instantaneous, harmless surface heat sensation that triggers an instinctive retreat reflex without tissue damage.'
+      },
+      holographic_mimo: {
+        id: 'holographic_mimo',
+        name: 'Holographic MIMO (Continuous Metasurface)',
+        shortTitle: 'HOLOGRAPHIC MIMO',
+        badge: 'METASURFACE',
+        color: '#10b981',
+        detail: 'Reconfigurable Intelligent Surface (RIS) holographic metasurface antenna. Dynamically synthesizes targeted electromagnetic wavefronts focused on the animal\'s exact spatial coordinates to guide it away from the track.'
+      },
+      retrodirective: {
+        id: 'retrodirective',
+        name: 'Retrodirective (Zero-Latency Conjugate)',
+        shortTitle: 'RETRODIRECTIVE',
+        badge: 'PHASE-CONJUGATE',
+        color: '#8b5cf6',
+        detail: 'Phase-conjugate retrodirective array. Automatically steers non-lethal deterrence pulses along the exact received radar line-of-sight vector with zero digital processing latency, continuously tracking the obstacle as the train approaches.'
+      }
+    };
+
+    // 3D Visual Effects Group for Active Deterrence Discharges
+    this.fxGroup = new THREE.Group();
+    this.scene.add(this.fxGroup);
+    this.activeFX = null;
+    this.fxTimer = 0;
+
     // Detection telemetry fed to HUD and Safety Controller
     this.telemetry = {
       targetDetected: false,
@@ -28,34 +87,78 @@ export class ObstacleManager {
       alertMessage: null,
       alertType: 'info', // 'info' | 'deploy' | 'hazard' | 'success'
       collectedCount: 0,
-      collectedWeight: 0
+      collectedWeight: 0,
+      deterrenceActive: false,
+      deterrenceMode: 'electric_shock'
     };
 
     this.animTime = 0;
 
     // High-Fidelity Anatomical & Industrial Obstacle Materials
     this.materials = {
-      humanSkin: new THREE.MeshStandardMaterial({ color: 0xdf9b77, roughness: 0.65 }),
-      humanShirt: new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.7 }),
-      humanVest: new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.45 }), // Fluorescent Indian Railways Safety Orange
-      humanReflective: new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.18, metalness: 0.8 }), // 3M Microprismatic Silver
-      humanPants: new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.65 }), // Indian Railways Navy Blue Work Trousers
-      humanBoots: new THREE.MeshStandardMaterial({ color: 0x3a2a1d, roughness: 0.55 }), // Heavy Oiled Work Leather
-      bootSole: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.9 }), // Black Lugged Rubber Tread
-      humanBelt: new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.75 }),
-      humanEyes: new THREE.MeshBasicMaterial({ color: 0x09090b }),
-      helmetYellow: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.25, metalness: 0.15 }), // High-Gloss Fiber Hard Hat
-      radioPlastic: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.4 }),
+      // Modern Stylized Human Character Materials (Exact match to media_1793819995371_c74a70f7.png)
+      humanSkinPeach: new THREE.MeshStandardMaterial({ color: 0xfcc7a7, roughness: 0.62 }), // Warm peach skin tone
+      humanSkinShadow: new THREE.MeshStandardMaterial({ color: 0xebad8b, roughness: 0.68 }),
+      humanBlush: new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.55, transparent: true, opacity: 0.85 }), // Rosy blush cheeks
+      humanHairGinger: new THREE.MeshStandardMaterial({ color: 0xd9572b, roughness: 0.78 }), // Auburn / ginger swept quiff hair
+      humanEyesWhite: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      humanEyesIris: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.2 }), // Deep dark friendly cartoon pupil
+      humanEyeReflex: new THREE.MeshBasicMaterial({ color: 0xffffff }), // Specular catchlight dot
+      humanBrow: new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.7 }), // Arched brows
+      humanSmile: new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.6 }), // Sweet curved mouth
+      humanPoloCream: new THREE.MeshStandardMaterial({ color: 0xf4eee4, roughness: 0.72 }), // Beige / cream polo shirt
+      humanPoloCollar: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55 }), // Crisp white folded collar
+      humanPantsBrown: new THREE.MeshStandardMaterial({ color: 0x784a32, roughness: 0.75 }), // Tailored warm brown chinos
+      humanShoesDark: new THREE.MeshStandardMaterial({ color: 0x1f1f23, roughness: 0.65 }), // Dark casual loafers
+
+      // Indian Elephant Materials (Exact match to media_1793820037213_e448b2e7.jpg)
+      elephantSkin: new THREE.MeshStandardMaterial({ color: 0x567b8d, roughness: 0.74 }), // Slate blue-grey body skin
+      elephantSkinDark: new THREE.MeshStandardMaterial({ color: 0x3d5c6b, roughness: 0.78 }), // Dark contour accents & creases
+      elephantEarInner: new THREE.MeshStandardMaterial({ color: 0x4a6b7a, roughness: 0.82 }), // Ear contour / inner face
+      elephantTusk: new THREE.MeshStandardMaterial({ color: 0xfffae5, roughness: 0.32, metalness: 0.05 }), // Smooth ivory tusks
+      elephantTuskTip: new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.35 }), // Warm golden tusk tip
+      elephantNails: new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.42 }), // 3 cute yellow toenails per foot
+      elephantEyeWhite: new THREE.MeshBasicMaterial({ color: 0xf8fafc }), // Big cartoon white sclera
+      elephantEyePupil: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.15 }), // Deep dark cartoon pupil
+      elephantEyeCatchlight: new THREE.MeshBasicMaterial({ color: 0xffffff }), // Eye specular highlight
+      elephantSmile: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }), // Curved smile line
+      elephantTailBrush: new THREE.MeshStandardMaterial({ color: 0x22323d, roughness: 0.85 }), // Dark brush tuft
+
+      // Legacy Trackman / Industrial Materials
+      humanSkin: new THREE.MeshStandardMaterial({ color: 0xbd7b54, roughness: 0.72 }),
+      humanShirt: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.75 }),
+      humanVest: new THREE.MeshStandardMaterial({ color: 0xff5500, roughness: 0.45 }),
+      humanVestTrim: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 }),
+      humanReflective: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15, metalness: 0.5 }),
+      humanPants: new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.75 }),
+      humanBoots: new THREE.MeshStandardMaterial({ color: 0x2e2017, roughness: 0.52 }),
+      bootSole: new THREE.MeshStandardMaterial({ color: 0x111215, roughness: 0.95 }),
+      humanBelt: new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.75 }),
+      leatherGlove: new THREE.MeshStandardMaterial({ color: 0x483222, roughness: 0.65 }),
+      helmetYellow: new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.22, metalness: 0.1 }),
+      radioPlastic: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.35 }),
       darkHousing: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35 }),
       glassLens: new THREE.MeshPhysicalMaterial({ color: 0x38bdf8, roughness: 0.05, transmission: 0.85, thickness: 0.1 }),
       brass: new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.25, metalness: 0.88 }),
+
+      // Wildlife / Spotted Deer / Calf Materials
+      animalFur: new THREE.MeshStandardMaterial({ color: 0xb85d19, roughness: 0.74 }),
+      animalFurDark: new THREE.MeshStandardMaterial({ color: 0x7c340a, roughness: 0.78 }),
+      animalUnderbelly: new THREE.MeshStandardMaterial({ color: 0xfdf6e2, roughness: 0.82 }),
+      animalSpot: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88 }),
+      animalMuzzle: new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.35 }),
+      animalEyeWhite: new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }),
+      animalEye: new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.08, metalness: 0.1 }),
+      animalEyeReflex: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+      animalEarInner: new THREE.MeshStandardMaterial({ color: 0xdfa394, roughness: 0.85 }),
+      animalAntler: new THREE.MeshStandardMaterial({ color: 0xd6c2a4, roughness: 0.45 }),
+      animalHoof: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.75 }), // Dark cloven hooves
+
+      // Heavy Cattle & Debris Materials
       cattleHide: new THREE.MeshStandardMaterial({ color: 0x948b7e, roughness: 0.72 }), // Authentic Indian Desi Zebu Dun Hide
       cattleDark: new THREE.MeshStandardMaterial({ color: 0x27272a, roughness: 0.65 }),
       cattleHorn: new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.35, metalness: 0.08 }),
       cattleEye: new THREE.MeshBasicMaterial({ color: 0x09090b }),
-      animalFur: new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.75 }), // Warm Golden Wildlife Fur
-      animalMuzzle: new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.5 }),
-      animalHoof: new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.8 }),
       woodCrate: new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.85 }), // Weathered Railway Teak Wood
       industrialSteel: new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.25, metalness: 0.88 }),
       hazardYellow: new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.35 })
@@ -69,187 +172,491 @@ export class ObstacleManager {
   // 3D Model Builders for Human, Animal, Heavy Cattle, Debris
   // ------------------------------------------------------------------
 
-  // 1. Human Track Worker / Railway Inspector (Mass: 72 kg <= 150 kg -> SCOOPABLE)
-  // Realistic Indian Railways trackman with fluorescent high-vis jacket, 3M reflective cross-harness,
-  // walkie-talkie, sculpted anatomical head, hard hat with brim, articulated joints, and steel-toe boots
+  // ------------------------------------------------------------------
+  // Canvas Texture Generators for Living Expressive Facial Features
+  // (Prevents disconnected geometric primitives, clipping, and z-fighting)
+  // ------------------------------------------------------------------
+
+  createHumanFaceTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    const drawFace = (blinkFactor = 0) => {
+      ctx.clearRect(0, 0, 1024, 1024);
+
+      // Base skin tone (peach)
+      ctx.fillStyle = '#fcd5ba';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // Upper back / hair transition on sphere (Canvas Y < 320 represents top of head)
+      const hairGrad = ctx.createLinearGradient(0, 180, 0, 320);
+      hairGrad.addColorStop(0, '#d9572b');
+      hairGrad.addColorStop(0.85, '#d9572b');
+      hairGrad.addColorStop(1, 'rgba(217, 87, 43, 0)');
+      ctx.fillStyle = hairGrad;
+      ctx.fillRect(0, 0, 1024, 320);
+
+      // Back of head hair coverage (sides of canvas map to back of head on sphere)
+      ctx.fillStyle = '#d9572b';
+      ctx.fillRect(0, 0, 160, 1024);
+      ctx.fillRect(864, 0, 160, 1024);
+
+      // Rosy Airbrushed Blush on Cheeks (Exact match to Reference Image 1)
+      [-1, 1].forEach(side => {
+        const cx = 512 + side * 115;
+        const cy = 540;
+        const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 85);
+        grad.addColorStop(0, 'rgba(244, 114, 182, 0.85)');
+        grad.addColorStop(0.5, 'rgba(251, 113, 133, 0.40)');
+        grad.addColorStop(1, 'rgba(252, 213, 186, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 85, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Expressive Cartoon Eyes with Specular Highlights & Blinking (Center at X=512, Y=460)
+      [-1, 1].forEach(side => {
+        const ex = 512 + side * 75;
+        const ey = 460;
+        const ew = 28;
+        const eh = 38;
+
+        // Clean white sclera
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark Iris & Pupil
+        ctx.fillStyle = '#1c1917';
+        ctx.beginPath();
+        ctx.ellipse(ex + side * 3, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Specular Catchlight Highlight Dots
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(ex + side * 3 + 8, ey - 10, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(ex + side * 3 - 8, ey + 10, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dynamic Eyelid blink
+        if (blinkFactor > 0.02) {
+          ctx.fillStyle = '#fcd5ba';
+          ctx.beginPath();
+          const lidHeight = eh * 2 * blinkFactor;
+          ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
+          ctx.fill();
+
+          // Eyelash line
+          ctx.strokeStyle = '#27272a';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(ex - ew, ey - eh + lidHeight);
+          ctx.lineTo(ex + ew, ey - eh + lidHeight);
+          ctx.stroke();
+        }
+
+        // Arched Gentle Eyebrow
+        ctx.strokeStyle = '#27272a';
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(ex - ew * 1.15, ey - eh - 16);
+        ctx.quadraticCurveTo(ex, ey - eh - 32, ex + ew * 1.15, ey - eh - 14);
+        ctx.stroke();
+      });
+
+      // Cute subtle peach nose button / contour
+      ctx.strokeStyle = '#e09f7a';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(512, 515, 14, 0.2 * Math.PI, 0.8 * Math.PI);
+      ctx.stroke();
+
+      // Sweet Friendly Smile Line
+      ctx.strokeStyle = '#9a3412';
+      ctx.lineWidth = 7;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(512, 565, 36, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+    };
+
+    drawFace(0);
+    const tex = new THREE.CanvasTexture(canvas);
+    return { tex, canvas, ctx, drawFace };
+  }
+
+  createElephantFaceTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+
+    const drawFace = (blinkFactor = 0) => {
+      ctx.clearRect(0, 0, 1024, 1024);
+
+      // Base slate blue-grey tone
+      ctx.fillStyle = '#567b8d';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // Expressive Cartoon Elephant Eyes matching Reference Image 2
+      [-1, 1].forEach(side => {
+        const ex = 512 + side * 125;
+        const ey = 425;
+        const ew = 48;
+        const eh = 64;
+
+        // White Sclera
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark Iris / Pupil
+        ctx.fillStyle = '#18181b';
+        ctx.beginPath();
+        ctx.ellipse(ex + side * 5, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Specular Catchlight Highlights (Disney / Pixar cartoon style)
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(ex + side * 5 + 12, ey - 15, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(ex + side * 5 - 12, ey + 15, 6.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyelid on blink
+        if (blinkFactor > 0.02) {
+          ctx.fillStyle = '#567b8d';
+          ctx.beginPath();
+          const lidHeight = eh * 2 * blinkFactor;
+          ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
+          ctx.fill();
+
+          ctx.strokeStyle = '#2d4554';
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(ex - ew, ey - eh + lidHeight);
+          ctx.lineTo(ex + ew, ey - eh + lidHeight);
+          ctx.stroke();
+        }
+
+        // Curved Friendly Eyebrow
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 9;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(ex - ew * 1.1, ey - eh - 18);
+        ctx.quadraticCurveTo(ex, ey - eh - 36, ex + ew * 1.1, ey - eh - 16);
+        ctx.stroke();
+      });
+
+      // Sweet Curved Smile Creases on both cheeks under tusks
+      [-1, 1].forEach(side => {
+        ctx.strokeStyle = '#2d4554';
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(512 + side * 95, 560, 34, (side > 0 ? 0.8 : 0.0) * Math.PI, (side > 0 ? 1.4 : 0.6) * Math.PI);
+        ctx.stroke();
+      });
+
+      // Center Trunk Root Wrinkle Creases
+      ctx.strokeStyle = '#3d5c6b';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      [490, 525, 560].forEach(wy => {
+        ctx.beginPath();
+        ctx.arc(512, wy, 48, 0.2 * Math.PI, 0.8 * Math.PI);
+        ctx.stroke();
+      });
+    };
+
+    drawFace(0);
+    const tex = new THREE.CanvasTexture(canvas);
+    return { tex, canvas, ctx, drawFace };
+  }
+
+  // 1. Modern Stylized Human Character (Mass: 72 kg <= 150 kg -> SCOOPABLE)
+  // Exact anatomical & aesthetic match to media_1793819995371_c74a70f7.png:
+  // Auburn/ginger swept-crest quiff hair, warm peach skin, blushing rosy cheeks, friendly eyes with catchlights,
+  // cream short-sleeve polo shirt with crisp white collar, warm brown chinos, and dark casual loafers
   buildHumanMesh() {
     const group = new THREE.Group();
-    group.name = 'humanWorker';
+    group.name = 'stylizedHuman';
 
-    // A. Pelvis / Hips (Root of body)
-    const pelvis = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.18, 12), this.materials.humanPants);
+    const faceData = this.createHumanFaceTexture();
+
+    // A. Pelvis / Hips in Warm Brown Chinos (Root of body at y = 0.88)
+    const pelvis = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.150, 0.138, 0.16, 22),
+      this.materials.humanPantsBrown
+    );
     pelvis.position.y = 0.88;
+    pelvis.scale.set(1.02, 1.0, 0.76);
     pelvis.castShadow = true;
     group.add(pelvis);
 
-    // Leather Utility Belt with Brass Buckle & Tool Pouches
-    const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.05, 14), this.materials.humanBelt);
-    belt.position.y = 0.95;
-    group.add(belt);
-    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, 0.03), this.materials.brass);
-    buckle.position.set(0, 0.95, 0.17);
-    group.add(buckle);
-    const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.10, 0.05), this.materials.humanBelt);
-    pouch.position.set(0.18, 0.92, 0.04);
-    group.add(pouch);
+    const saddle = new THREE.Mesh(
+      new THREE.SphereGeometry(0.142, 18, 14),
+      this.materials.humanPantsBrown
+    );
+    saddle.position.set(0, 0.84, 0);
+    saddle.scale.set(1.02, 0.85, 0.76);
+    group.add(saddle);
 
-    // B. Anatomical Torso (Chest + High-Vis Jacket)
+    // B. Torso Group (Cream Polo Shirt + Folded White Collar) pivoted at y = 0.94
     const torsoGroup = new THREE.Group();
-    torsoGroup.position.set(0, 0.98, 0);
+    torsoGroup.position.set(0, 0.94, 0);
 
-    // Inner collared work shirt
-    const shirt = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.16, 0.38, 14), this.materials.humanShirt);
-    shirt.position.y = 0.19;
-    shirt.castShadow = true;
-    torsoGroup.add(shirt);
+    // Athletic Tapered Polo Shirt Chest & Waist
+    const chest = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.185, 0.165, 0.22, 24),
+      this.materials.humanPoloCream
+    );
+    chest.position.y = 0.29;
+    chest.scale.set(1.08, 1.0, 0.75);
+    chest.castShadow = true;
+    torsoGroup.add(chest);
 
-    // High-Vis Fluorescent Safety Vest over shirt
-    const vest = new THREE.Mesh(new THREE.CylinderGeometry(0.205, 0.175, 0.36, 14), this.materials.humanVest);
-    vest.position.y = 0.18;
-    vest.castShadow = true;
-    torsoGroup.add(vest);
+    const midriff = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.165, 0.148, 0.20, 24),
+      this.materials.humanPoloCream
+    );
+    midriff.position.y = 0.11;
+    midriff.scale.set(1.04, 1.0, 0.75);
+    midriff.castShadow = true;
+    torsoGroup.add(midriff);
 
-    // 3M Silver Microprismatic Reflective Harness Stripes (Cross-over chest & waist tape - flush with jacket)
-    [-0.09, 0.09].forEach((rx, idx) => {
-      // Front chest vertical reflective bands
-      const refFront = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.32, 0.012), this.materials.humanReflective);
-      refFront.position.set(rx, 0.18, 0.188);
-      refFront.rotation.y = idx === 0 ? 0.06 : -0.06;
-      torsoGroup.add(refFront);
+    const hem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.152, 0.152, 0.04, 24),
+      this.materials.humanPoloCream
+    );
+    hem.position.y = 0.01;
+    hem.scale.set(1.04, 1.0, 0.76);
+    torsoGroup.add(hem);
 
-      // Back vertical reflective bands
-      const refBack = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.32, 0.012), this.materials.humanReflective);
-      refBack.position.set(rx, 0.18, -0.188);
-      refBack.rotation.y = idx === 0 ? -0.06 : 0.06;
-      torsoGroup.add(refBack);
+    // Smooth Rounded Deltoid Caps (Connecting shoulders smoothly into arms)
+    [-0.17, 0.17].forEach(sx => {
+      const deltoid = new THREE.Mesh(
+        new THREE.SphereGeometry(0.068, 18, 14),
+        this.materials.humanPoloCream
+      );
+      deltoid.position.set(sx, 0.33, 0);
+      deltoid.scale.set(1.0, 0.85, 0.95);
+      torsoGroup.add(deltoid);
     });
 
-    const refWaist = new THREE.Mesh(new THREE.CylinderGeometry(0.208, 0.178, 0.042, 14), this.materials.humanReflective);
-    refWaist.position.y = 0.05;
-    torsoGroup.add(refWaist);
+    // Center Button Placket on Chest with Pearl Buttons
+    const placket = new THREE.Mesh(
+      new THREE.BoxGeometry(0.026, 0.16, 0.012),
+      this.materials.humanPoloCollar
+    );
+    placket.position.set(0, 0.26, 0.112);
+    torsoGroup.add(placket);
 
-    // Walkie-Talkie Radio on Left Lapel
-    const radio = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.10, 0.035), this.materials.radioPlastic);
-    radio.position.set(-0.14, 0.28, 0.16);
-    radio.rotation.z = -0.15;
-    torsoGroup.add(radio);
-    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.08, 6), this.materials.radioPlastic);
-    antenna.position.set(-0.15, 0.35, 0.16);
-    torsoGroup.add(antenna);
+    [0.30, 0.24].forEach(by => {
+      const button = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.006, 8).rotateX(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.3 })
+      );
+      button.position.set(0, by, 0.119);
+      torsoGroup.add(button);
+    });
 
-    // C. Neck & Sculpted Head (Attached to TorsoGroup for natural anatomical movement)
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.12, 10), this.materials.humanSkin);
-    neck.position.set(0, 0.38, 0);
+    // Peach Skin Neck
+    const neck = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.046, 0.052, 0.12, 18),
+      this.materials.humanSkinPeach
+    );
+    neck.position.y = 0.42;
     torsoGroup.add(neck);
 
+    // Crisp Folded White Polo Collar (Neckband + Flat Folded Collar Wings)
+    const collarBand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.060, 0.072, 0.045, 20),
+      this.materials.humanPoloCollar
+    );
+    collarBand.position.y = 0.39;
+    torsoGroup.add(collarBand);
+
+    [-1, 1].forEach(side => {
+      const collarWing = new THREE.Mesh(
+        new THREE.BoxGeometry(0.070, 0.085, 0.014),
+        this.materials.humanPoloCollar
+      );
+      collarWing.position.set(side * 0.048, 0.36, 0.076);
+      collarWing.rotation.set(-0.35, side * 0.28, side * -0.36);
+      torsoGroup.add(collarWing);
+    });
+
+    // C. Sculpted Head Group pivoted at neck top (y = 0.50 on torso)
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.48, 0.02);
+    headGroup.position.set(0, 0.50, 0.010);
 
-    // Cranium
-    const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.115, 16, 14), this.materials.humanSkin);
-    cranium.scale.set(1.0, 1.15, 1.05);
-    cranium.castShadow = true;
-    headGroup.add(cranium);
+    // Seamless Head Sphere with Integrated Canvas Texture (Zero clipping, zero planes!)
+    const headGeo = new THREE.SphereGeometry(0.122, 32, 24);
+    headGeo.rotateY(-Math.PI / 2); // Aligns center UV to face forward (+Z)
 
-    // Facial features: Nose, Jaw, Eyes, Ears
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.045, 8).rotateX(Math.PI / 2), this.materials.humanSkin);
-    nose.position.set(0, -0.01, 0.125);
-    headGroup.add(nose);
+    const headMesh = new THREE.Mesh(
+      headGeo,
+      new THREE.MeshStandardMaterial({
+        map: faceData.tex,
+        roughness: 0.65
+      })
+    );
+    headMesh.scale.set(0.94, 1.05, 0.96);
+    headMesh.castShadow = true;
+    headGroup.add(headMesh);
 
-    [-0.04, 0.04].forEach(ex => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), this.materials.humanEyes);
-      eye.position.set(ex, 0.025, 0.112);
-      headGroup.add(eye);
-    });
+    // Auburn / Ginger Sculpted 3D Quiff Hair (Volumetric sweep on top/back, zero face clipping!)
+    const hairShape = new THREE.Shape();
+    hairShape.moveTo(-0.09, 0);
+    hairShape.bezierCurveTo(-0.13, 0.08, -0.07, 0.20, 0.05, 0.22);
+    hairShape.bezierCurveTo(0.14, 0.23, 0.18, 0.14, 0.14, 0.05);
+    hairShape.bezierCurveTo(0.09, -0.01, 0.02, -0.02, -0.09, 0);
+    hairShape.closePath();
 
-    [-0.12, 0.12].forEach(ex => {
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 8), this.materials.humanSkin);
-      ear.scale.set(0.4, 1.0, 0.7);
-      ear.position.set(ex, 0, 0);
+    const hairQuiff = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(hairShape, {
+        depth: 0.14,
+        bevelEnabled: true,
+        bevelThickness: 0.025,
+        bevelSize: 0.020,
+        bevelSegments: 4
+      }),
+      this.materials.humanHairGinger
+    );
+    hairQuiff.position.set(0, 0.05, 0.015);
+    hairQuiff.rotation.set(-0.30, 0.15, -0.10);
+    headGroup.add(hairQuiff);
+
+    // Crown & Back Hair Volume Cap (Covers top and back only, leaving face clear)
+    const backHair = new THREE.Mesh(
+      new THREE.SphereGeometry(0.124, 24, 16, -Math.PI * 0.70, Math.PI * 1.40, 0, Math.PI * 0.65),
+      this.materials.humanHairGinger
+    );
+    backHair.position.set(0, 0.015, -0.015);
+    backHair.scale.set(0.96, 1.05, 1.0);
+    headGroup.add(backHair);
+
+    // Sideburns & Stylized Ears
+    [-1, 1].forEach(side => {
+      const sideburn = new THREE.Mesh(
+        new THREE.BoxGeometry(0.016, 0.055, 0.032),
+        this.materials.humanHairGinger
+      );
+      sideburn.position.set(side * 0.108, 0.012, 0.018);
+      headGroup.add(sideburn);
+
+      const ear = new THREE.Mesh(
+        new THREE.SphereGeometry(0.026, 14, 10),
+        this.materials.humanSkinPeach
+      );
+      ear.scale.set(0.35, 1.15, 0.75);
+      ear.position.set(side * 0.115, -0.008, -0.005);
+      ear.rotation.y = side * 0.18;
       headGroup.add(ear);
-    });
-
-    // Construction Hard Hat / Safety Helmet (Realistic Indian Railways standard with peak & rib)
-    const helmetCrown = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), this.materials.helmetYellow);
-    helmetCrown.position.set(0, 0.05, -0.01);
-    helmetCrown.scale.set(1.02, 0.85, 1.12);
-    headGroup.add(helmetCrown);
-
-    // Helmet Front Peak Brim
-    const brimGeo = new THREE.CylinderGeometry(0.165, 0.165, 0.02, 16);
-    const helmetBrim = new THREE.Mesh(brimGeo, this.materials.helmetYellow);
-    helmetBrim.position.set(0, 0.03, 0.02);
-    helmetBrim.rotation.x = 0.08;
-    headGroup.add(helmetBrim);
-
-    // Central Reinforcement Crown Ridge Rib
-    const helmetRib = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.22), this.materials.helmetYellow);
-    helmetRib.position.set(0, 0.14, -0.01);
-    headGroup.add(helmetRib);
-
-    // Protective Eyewear / Safety Goggles pushed up on helmet brim
-    const goggleFrame = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.04), this.materials.darkHousing);
-    goggleFrame.position.set(0, 0.05, 0.12);
-    headGroup.add(goggleFrame);
-    [-0.038, 0.038].forEach(gx => {
-      const gLens = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.024, 0.01), this.materials.glassLens);
-      gLens.position.set(gx, 0.05, 0.142);
-      headGroup.add(gLens);
     });
 
     torsoGroup.add(headGroup);
 
-    group.userData = {
-      type: 'human',
-      torsoGroup,
-      headGroup,
-      armL: null,
-      armR: null,
-      forearmL: null,
-      forearmR: null,
-      legL: null,
-      legR: null,
-      lowerLegL: null,
-      lowerLegR: null,
-      toolShaft: null
-    };
-
-    // D. Articulated Arms with Elbows and Gloved Hands (Attached to torsoGroup shoulders)
+    // D. Articulated Arms (Short polo sleeves + peach bare arms + relaxed hands)
     [-1, 1].forEach(side => {
       const armGroup = new THREE.Group();
-      armGroup.position.set(side * 0.23, 0.34, 0);
+      armGroup.position.set(side * 0.17, 0.33, 0);
 
-      // Shoulder Deltoid Cap
-      const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 10), this.materials.humanVest);
-      armGroup.add(shoulder);
+      // Sleeve Cylinder wrapping around the upper bicep
+      const sleeve = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.066, 0.054, 0.15, 18),
+        this.materials.humanPoloCream
+      );
+      sleeve.position.set(side * 0.008, -0.07, 0);
+      sleeve.rotation.z = side * -0.06;
+      armGroup.add(sleeve);
 
-      // Upper Arm (with high-vis orange sleeve & reflective band)
-      const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.046, 0.26, 10), this.materials.humanVest);
-      upperArm.position.set(side * 0.02, -0.13, 0);
-      upperArm.rotation.z = side * -0.08;
-      armGroup.add(upperArm);
+      const sleeveCuff = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.056, 0.056, 0.02, 18),
+        this.materials.humanPoloCream
+      );
+      sleeveCuff.position.set(side * 0.014, -0.14, 0);
+      armGroup.add(sleeveCuff);
 
-      const armStripe = new THREE.Mesh(new THREE.CylinderGeometry(0.054, 0.054, 0.035, 10), this.materials.humanReflective);
-      armStripe.position.set(side * 0.02, -0.16, 0);
-      armGroup.add(armStripe);
+      // Bare Peach Upper Arm below sleeve
+      const bareBicep = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.048, 0.042, 0.14, 16),
+        this.materials.humanSkinPeach
+      );
+      bareBicep.position.set(side * 0.014, -0.15, 0);
+      armGroup.add(bareBicep);
 
-      // Forearm & Elbow group (Navy/Khaki sleeve)
+      // Elbow Pivot Group at y = -0.22
       const forearmGroup = new THREE.Group();
-      forearmGroup.position.set(side * 0.04, -0.26, 0.02);
+      forearmGroup.position.set(side * 0.014, -0.22, 0.005);
 
-      const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.038, 0.24, 10), this.materials.humanShirt);
-      forearm.position.set(0, -0.08, 0.02);
-      forearm.rotation.x = -0.22;
+      const elbow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.043, 14, 10),
+        this.materials.humanSkinPeach
+      );
+      forearmGroup.add(elbow);
+
+      // Bare Peach Skin Forearm
+      const forearm = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.042, 0.034, 0.22, 16),
+        this.materials.humanSkinPeach
+      );
+      forearm.position.set(0, -0.11, 0.008);
+      forearm.rotation.x = -0.08;
       forearmGroup.add(forearm);
 
-      // Heavy Work Glove / Hand with thumb
-      const palm = new THREE.Mesh(new THREE.BoxGeometry(0.048, 0.075, 0.036), this.materials.humanBoots);
-      palm.position.set(side * 0.01, -0.22, 0.06);
-      forearmGroup.add(palm);
-      const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 6), this.materials.humanBoots);
-      thumb.position.set(side * -0.015, -0.20, 0.08);
-      forearmGroup.add(thumb);
+      // Sculpted Stylized Hand matching Reference Image 1
+      const handGroup = new THREE.Group();
+      handGroup.position.set(0, -0.22, 0.015);
 
+      const wrist = new THREE.Mesh(
+        new THREE.SphereGeometry(0.033, 12, 10),
+        this.materials.humanSkinPeach
+      );
+      handGroup.add(wrist);
+
+      const palm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.042, 0.065, 0.028),
+        this.materials.humanSkinPeach
+      );
+      palm.position.set(0, -0.032, 0);
+      handGroup.add(palm);
+
+      // Thumb
+      const thumb = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.011, 0.009, 0.036, 8),
+        this.materials.humanSkinPeach
+      );
+      thumb.position.set(-side * 0.022, -0.022, 0.012);
+      thumb.rotation.set(-0.35, 0, -side * 0.45);
+      handGroup.add(thumb);
+
+      // 4 Tapered Fingers
+      [-0.014, -0.005, 0.005, 0.014].forEach(fx => {
+        const finger = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.009, 0.007, 0.042, 8),
+          this.materials.humanSkinPeach
+        );
+        finger.position.set(fx, -0.075, 0.003);
+        finger.rotation.x = 0.20;
+        handGroup.add(finger);
+      });
+
+      forearmGroup.add(handGroup);
       armGroup.add(forearmGroup);
       torsoGroup.add(armGroup);
 
@@ -264,57 +671,81 @@ export class ObstacleManager {
 
     group.add(torsoGroup);
 
-    // E. Articulated Legs with Knees, Creases & Heavy Steel-Toe Boots
+    // E. Articulated Legs in Tailored Warm Brown Chinos & Dark Casual Loafers
     [-1, 1].forEach(side => {
       const legGroup = new THREE.Group();
-      legGroup.position.set(side * 0.11, 0.85, 0);
+      legGroup.position.set(side * 0.074, 0.86, 0);
 
-      // Thigh with navy work pants
-      const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.065, 0.38, 12), this.materials.humanPants);
-      thigh.position.set(0, -0.18, 0.01);
-      thigh.rotation.x = 0.04;
+      // Spherical Hip Joint connecting seamlessly into pelvis
+      const hip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.068, 16, 12),
+        this.materials.humanPantsBrown
+      );
+      legGroup.add(hip);
+
+      // Brown Chinos Thigh
+      const thigh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.068, 0.056, 0.40, 20),
+        this.materials.humanPantsBrown
+      );
+      thigh.position.set(0, -0.20, 0.005);
+      thigh.rotation.x = 0.02;
       legGroup.add(thigh);
 
-      // Lower leg group pivoted at knee joint
+      // Spherical Knee Joint
+      const knee = new THREE.Mesh(
+        new THREE.SphereGeometry(0.056, 16, 12),
+        this.materials.humanPantsBrown
+      );
+      knee.position.set(0, -0.40, 0.012);
+      legGroup.add(knee);
+
+      // Lower Leg Group (Knee joint at y = -0.40)
       const lowerLegGroup = new THREE.Group();
-      lowerLegGroup.position.set(0, -0.37, 0.02);
+      lowerLegGroup.position.set(0, -0.40, 0.012);
 
-      const knee = new THREE.Mesh(new THREE.SphereGeometry(0.062, 10, 8), this.materials.humanPants);
-      lowerLegGroup.add(knee);
-
-      const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.054, 0.36, 12), this.materials.humanPants);
-      calf.position.set(0, -0.18, -0.01);
+      const calf = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.056, 0.048, 0.38, 20),
+        this.materials.humanPantsBrown
+      );
+      calf.position.set(0, -0.19, -0.006);
       lowerLegGroup.add(calf);
 
-      const ankleReflector = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.064, 0.035, 12), this.materials.humanReflective);
-      ankleReflector.position.set(0, -0.31, -0.01);
-      lowerLegGroup.add(ankleReflector);
+      // Chinos Trouser Cuff
+      const cuff = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.052, 0.052, 0.025, 20),
+        this.materials.humanPantsBrown
+      );
+      cuff.position.set(0, -0.37, -0.006);
+      lowerLegGroup.add(cuff);
 
-      // Heavy Leather Work Boot with Lugged Rubber Sole
-      const bootGroup = new THREE.Group();
-      bootGroup.position.set(0, -0.36, -0.02);
+      // Dark Casual Slip-On Loafer / Shoe (Exact match to Reference Image 1)
+      const shoeGroup = new THREE.Group();
+      shoeGroup.position.set(0, -0.40, 0.025);
 
-      const bootAnkle = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.058, 0.10, 10), this.materials.humanBoots);
-      bootAnkle.position.y = 0.04;
-      bootGroup.add(bootAnkle);
+      const shoeBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.076, 0.046, 0.17),
+        this.materials.humanShoesDark
+      );
+      shoeBody.position.set(0, 0, 0.01);
+      shoeGroup.add(shoeBody);
 
-      const bootUpper = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.075, 0.20), this.materials.humanBoots);
-      bootUpper.position.set(0, -0.01, 0.05);
-      bootGroup.add(bootUpper);
+      const toeCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 14, 10),
+        this.materials.humanShoesDark
+      );
+      toeCap.scale.set(1.0, 0.65, 1.0);
+      toeCap.position.set(0, 0, 0.085);
+      shoeGroup.add(toeCap);
 
-      const toeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.09, 10).rotateZ(Math.PI / 2), this.materials.bootSole);
-      toeCap.position.set(0, -0.015, 0.13);
-      bootGroup.add(toeCap);
+      const sole = new THREE.Mesh(
+        new THREE.BoxGeometry(0.082, 0.016, 0.185),
+        this.materials.humanShoesDark
+      );
+      sole.position.set(0, -0.028, 0.015);
+      shoeGroup.add(sole);
 
-      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.026, 0.24), this.materials.bootSole);
-      sole.position.set(0, -0.06, 0.045);
-      bootGroup.add(sole);
-
-      const heel = new THREE.Mesh(new THREE.BoxGeometry(0.112, 0.022, 0.08), this.materials.bootSole);
-      heel.position.set(0, -0.045, -0.04);
-      bootGroup.add(heel);
-
-      lowerLegGroup.add(bootGroup);
+      lowerLegGroup.add(shoeGroup);
       legGroup.add(lowerLegGroup);
       group.add(legGroup);
 
@@ -327,123 +758,376 @@ export class ObstacleManager {
       }
     });
 
-    // Handheld Railway Track Gauge & Tool in Left Glove
-    const toolShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.55, 8), this.materials.industrialSteel);
-    toolShaft.position.set(-0.02, -0.28, 0.08);
-    const toolHead = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.04), this.materials.hazardYellow);
-    toolHead.position.set(0, 0.24, 0);
-    toolShaft.add(toolHead);
-    if (group.userData.forearmL) {
-      group.userData.forearmL.add(toolShaft);
-    }
-    group.userData.toolShaft = toolShaft;
+    group.userData.type = 'human';
+    group.userData.torsoGroup = torsoGroup;
+    group.userData.headGroup = headGroup;
+    group.userData.faceData = faceData;
 
     return group;
   }
 
-  // 2. Wildlife / Stray Animal (Deer / Stray Calf - Mass: 55 kg <= 150 kg -> SCOOPABLE)
-  // Sculpted anatomical quadruped with contoured head, alert ears, articulated legs, and tail
+  // 2. Indian Elephant (Mass: 110 kg <= 150 kg -> SCOOPABLE IN RESCUE NET)
+  // Exact anatomical & artistic match to media_1793820037213_e448b2e7.jpg:
+  // Plump slate blue-grey rounded body, big floppy flapping fan ears with dark contours,
+  // multi-segment articulated flexible curling/raising trunk, upward curved ivory tusks with golden tips,
+  // friendly cartoon eyes with white sclera and specular catchlights, sweet smile,
+  // 4 sturdy pillar legs with 3 cute yellow semi-circular toenails per foot, and brush-tufted tail
   buildAnimalMesh() {
     const group = new THREE.Group();
-    group.name = 'wildlifeCalf';
+    group.name = 'indianElephant';
 
-    // Barrel Body
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.21, 0.88, 12).rotateX(Math.PI / 2), this.materials.animalFur);
-    body.position.set(0, 0.68, 0);
-    body.scale.set(0.92, 1.15, 1.0);
+    const elephantFaceData = this.createElephantFaceTexture();
+
+    // A. Plump Rounded Slate Blue-Grey Body Barrel & Spine Contours
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.44, 0.46, 0.92, 24).rotateX(Math.PI / 2),
+      this.materials.elephantSkin
+    );
+    body.position.set(0, 0.65, 0);
+    body.scale.set(1.05, 1.18, 1.0);
     body.castShadow = true;
     group.add(body);
 
-    const chest = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), this.materials.animalFur);
-    chest.position.set(0, 0.70, 0.36);
+    // Front Chest Brisket / Withers
+    const chest = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 22, 18),
+      this.materials.elephantSkin
+    );
+    chest.position.set(0, 0.70, 0.32);
+    chest.scale.set(0.98, 1.15, 0.92);
+    chest.castShadow = true;
     group.add(chest);
 
-    const rump = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), this.materials.animalFur);
-    rump.position.set(0, 0.70, -0.36);
+    // Arched Back Spine Hump (Signature Indian Elephant Profile)
+    const spineHump = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.35, 0.78, 18).rotateX(Math.PI / 2),
+      this.materials.elephantSkin
+    );
+    spineHump.position.set(0, 0.88, 0.02);
+    spineHump.scale.set(0.75, 0.85, 1.0);
+    spineHump.castShadow = true;
+    group.add(spineHump);
+
+    // Rounded Pelvic Rump Haunches
+    const rump = new THREE.Mesh(
+      new THREE.SphereGeometry(0.43, 22, 18),
+      this.materials.elephantSkin
+    );
+    rump.position.set(0, 0.70, -0.34);
+    rump.scale.set(0.95, 1.12, 0.92);
+    rump.castShadow = true;
     group.add(rump);
 
-    // Neck
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 0.45, 10), this.materials.animalFur);
-    neck.position.set(0, 0.92, 0.48);
-    neck.rotation.x = -0.55;
-    group.add(neck);
+    // Deep Rounded Underbelly
+    const belly = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.36, 0.40, 0.64, 18).rotateX(Math.PI / 2),
+      this.materials.elephantSkin
+    );
+    belly.position.set(0, 0.50, 0);
+    belly.scale.set(0.90, 0.72, 1.0);
+    group.add(belly);
 
-    // Contoured Head
+    // B. Expressive Elephant Head Group (Pivoted at y = 0.88, z = 0.45)
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 1.14, 0.68);
-    headGroup.rotation.x = 0.15;
+    headGroup.position.set(0, 0.88, 0.45);
 
-    const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 10), this.materials.animalFur);
-    cranium.scale.set(0.95, 1.05, 1.15);
+    // Seamless Domed Elephant Head with Integrated Canvas Texture (Zero planes, zero clipping!)
+    const headGeo = new THREE.SphereGeometry(0.28, 32, 24);
+    headGeo.rotateY(-Math.PI / 2); // Aligns center UV to face forward (+Z)
+
+    const cranium = new THREE.Mesh(
+      headGeo,
+      new THREE.MeshStandardMaterial({
+        map: elephantFaceData.tex,
+        roughness: 0.68
+      })
+    );
+    cranium.scale.set(0.94, 1.06, 1.04);
+    cranium.castShadow = true;
     headGroup.add(cranium);
 
-    const muzzle = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 10).rotateX(Math.PI / 2), this.materials.animalFur);
-    muzzle.position.set(0, -0.04, 0.18);
-    headGroup.add(muzzle);
-
-    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), this.materials.animalMuzzle);
-    nose.position.set(0, -0.02, 0.29);
-    headGroup.add(nose);
-
-    [-0.085, 0.085].forEach(ex => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), this.materials.cattleEye);
-      eye.position.set(ex, 0.05, 0.09);
-      headGroup.add(eye);
+    // Twin Forehead Bumps (Distinct Indian Elephant cranial profile)
+    [-0.095, 0.095].forEach(bx => {
+      const bump = new THREE.Mesh(
+        new THREE.SphereGeometry(0.095, 16, 12),
+        this.materials.elephantSkin
+      );
+      bump.position.set(bx, 0.22, 0.03);
+      bump.scale.set(0.95, 1.0, 1.1);
+      headGroup.add(bump);
     });
 
-    const ears = [];
-    [-1, 1].forEach(side => {
-      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 6), this.materials.animalFur);
-      ear.position.set(side * 0.11, 0.12, -0.04);
-      ear.rotation.z = side * -0.55;
-      ear.rotation.x = -0.2;
-      headGroup.add(ear);
-      ears.push(ear);
+    // Big Floppy Fan Ears with Extruded Wavy Contours (Exact match to Reference Image 2)
+    const earL = new THREE.Group();
+    earL.position.set(-0.24, 0.06, -0.04);
+    const earR = new THREE.Group();
+    earR.position.set(0.24, 0.06, -0.04);
+
+    // Left Ear Extruded Shape
+    const earShapeL = new THREE.Shape();
+    earShapeL.moveTo(0, 0.05);
+    earShapeL.bezierCurveTo(-0.08, 0.22, -0.26, 0.28, -0.36, 0.16);
+    earShapeL.bezierCurveTo(-0.44, 0.06, -0.42, -0.14, -0.32, -0.28);
+    earShapeL.bezierCurveTo(-0.20, -0.40, -0.08, -0.32, 0, -0.18);
+    earShapeL.closePath();
+
+    const earGeoL = new THREE.ExtrudeGeometry(earShapeL, {
+      depth: 0.025,
+      bevelEnabled: true,
+      bevelThickness: 0.018,
+      bevelSize: 0.015,
+      bevelSegments: 4
     });
+    const earMeshL = new THREE.Mesh(earGeoL, this.materials.elephantSkin);
+    earL.add(earMeshL);
+
+    const innerEarL = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(earShapeL, { depth: 0.005, bevelEnabled: false }),
+      this.materials.elephantEarInner
+    );
+    innerEarL.scale.set(0.82, 0.82, 1.0);
+    innerEarL.position.set(-0.02, 0, 0.026);
+    earL.add(innerEarL);
+
+    // Right Ear Extruded Shape (Mirrored)
+    const earShapeR = new THREE.Shape();
+    earShapeR.moveTo(0, 0.05);
+    earShapeR.bezierCurveTo(0.08, 0.22, 0.26, 0.28, 0.36, 0.16);
+    earShapeR.bezierCurveTo(0.44, 0.06, 0.42, -0.14, 0.32, -0.28);
+    earShapeR.bezierCurveTo(0.20, -0.40, 0.08, -0.32, 0, -0.18);
+    earShapeR.closePath();
+
+    const earGeoR = new THREE.ExtrudeGeometry(earShapeR, {
+      depth: 0.025,
+      bevelEnabled: true,
+      bevelThickness: 0.018,
+      bevelSize: 0.015,
+      bevelSegments: 4
+    });
+    const earMeshR = new THREE.Mesh(earGeoR, this.materials.elephantSkin);
+    earR.add(earMeshR);
+
+    const innerEarR = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(earShapeR, { depth: 0.005, bevelEnabled: false }),
+      this.materials.elephantEarInner
+    );
+    innerEarR.scale.set(0.82, 0.82, 1.0);
+    innerEarR.position.set(0.02, 0, 0.026);
+    earR.add(innerEarR);
+
+    // Resting rotation: naturally angled back over shoulders
+    earL.rotation.set(-0.15, -0.45, -0.10);
+    earR.rotation.set(-0.15, 0.45, 0.10);
+
+    headGroup.add(earL);
+    headGroup.add(earR);
+
+    // Upward-Curved Ivory Tusks with Golden Tips (Smooth 3D Catmull-Rom Tube Curves)
+    const tuskCurveL = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.13, -0.14, 0.22),
+      new THREE.Vector3(-0.19, -0.25, 0.38),
+      new THREE.Vector3(-0.24, -0.10, 0.54)
+    ]);
+    const tuskGeoL = new THREE.TubeGeometry(tuskCurveL, 20, 0.035, 12, false);
+    const tuskMeshL = new THREE.Mesh(tuskGeoL, this.materials.elephantTusk);
+    headGroup.add(tuskMeshL);
+
+    const tuskTipL = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 10, 8),
+      this.materials.elephantTuskTip
+    );
+    tuskTipL.position.set(-0.24, -0.10, 0.54);
+    headGroup.add(tuskTipL);
+
+    const tuskCurveR = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0.13, -0.14, 0.22),
+      new THREE.Vector3(0.19, -0.25, 0.38),
+      new THREE.Vector3(0.24, -0.10, 0.54)
+    ]);
+    const tuskGeoR = new THREE.TubeGeometry(tuskCurveR, 20, 0.035, 12, false);
+    const tuskMeshR = new THREE.Mesh(tuskGeoR, this.materials.elephantTusk);
+    headGroup.add(tuskMeshR);
+
+    const tuskTipR = new THREE.Mesh(
+      new THREE.SphereGeometry(0.022, 10, 8),
+      this.materials.elephantTuskTip
+    );
+    tuskTipR.position.set(0.24, -0.10, 0.54);
+    headGroup.add(tuskTipR);
+
+    // Articulated 5-Segment Forward-Curling Flexible Trunk
+    // (Negative rotations arch trunk FORWARD and UP gracefully over the track)
+    const trunkSegments = [];
+
+    // Segment 0: Trunk Base (Root at front of face)
+    const trunkRoot = new THREE.Group();
+    trunkRoot.position.set(0, -0.05, 0.25);
+    trunkRoot.rotation.x = -0.42;
+    const m0 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.102, 0.088, 0.16, 18),
+      this.materials.elephantSkin
+    );
+    m0.position.y = -0.08;
+    trunkRoot.add(m0);
+
+    // Segment 1
+    const trunkSeg1 = new THREE.Group();
+    trunkSeg1.position.set(0, -0.15, 0);
+    trunkSeg1.rotation.x = -0.36;
+    const m1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.088, 0.074, 0.16, 18),
+      this.materials.elephantSkin
+    );
+    m1.position.y = -0.08;
+    trunkSeg1.add(m1);
+
+    // Segment 2
+    const trunkSeg2 = new THREE.Group();
+    trunkSeg2.position.set(0, -0.15, 0);
+    trunkSeg2.rotation.x = -0.28;
+    const m2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.074, 0.062, 0.16, 18),
+      this.materials.elephantSkin
+    );
+    m2.position.y = -0.08;
+    trunkSeg2.add(m2);
+
+    // Segment 3
+    const trunkSeg3 = new THREE.Group();
+    trunkSeg3.position.set(0, -0.14, 0);
+    trunkSeg3.rotation.x = 0.70; // Curls UPWARD
+    const m3 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.062, 0.050, 0.14, 16),
+      this.materials.elephantSkin
+    );
+    m3.position.y = -0.07;
+    trunkSeg3.add(m3);
+
+    // Segment 4: Curled Trunk Tip with Nostrils
+    const trunkTip = new THREE.Group();
+    trunkTip.position.set(0, -0.13, 0);
+    trunkTip.rotation.x = 0.75; // Upward-pointing tip
+    const m4 = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.050, 0.040, 0.12, 14),
+      this.materials.elephantSkin
+    );
+    m4.position.y = -0.06;
+    trunkTip.add(m4);
+
+    const tipBulb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.044, 14, 10),
+      this.materials.elephantSkin
+    );
+    tipBulb.position.set(0, -0.11, 0.025);
+    tipBulb.scale.set(0.9, 0.8, 1.2);
+    trunkTip.add(tipBulb);
+
+    [-0.012, 0.012].forEach(nx => {
+      const nostril = new THREE.Mesh(
+        new THREE.SphereGeometry(0.009, 8, 8),
+        this.materials.elephantSkinDark
+      );
+      nostril.position.set(nx, -0.11, 0.062);
+      trunkTip.add(nostril);
+    });
+
+    trunkSeg3.add(trunkTip);
+    trunkSeg2.add(trunkSeg3);
+    trunkSeg1.add(trunkSeg2);
+    trunkRoot.add(trunkSeg1);
+    headGroup.add(trunkRoot);
+
+    trunkSegments.push(trunkRoot, trunkSeg1, trunkSeg2, trunkSeg3, trunkTip);
 
     group.add(headGroup);
 
-    // 4 Quadruped Legs with Anatomical Hip/Shoulder Pivots and Knee Joints
+    // C. 4 Sturdy Pillar Legs with 3 Cute Yellow Toenails Each (Exact match to Reference Image 2)
     const legs = [];
     [
-      { x: -0.16, z: 0.30, isFront: true },
-      { x:  0.16, z: 0.30, isFront: true },
-      { x: -0.15, z: -0.32, isFront: false },
-      { x:  0.15, z: -0.32, isFront: false }
-    ].forEach(leg => {
-      // Hip / Shoulder Pivot Group at y = 0.62
+      { x: -0.25, z:  0.30, isFront: true },
+      { x:  0.25, z:  0.30, isFront: true },
+      { x: -0.23, z: -0.30, isFront: false },
+      { x:  0.23, z: -0.30, isFront: false }
+    ].forEach(lp => {
       const legGroup = new THREE.Group();
-      legGroup.position.set(leg.x, 0.62, leg.z);
+      legGroup.position.set(lp.x, 0.62, lp.z);
 
-      const upperRadius = leg.isFront ? 0.065 : 0.075;
-      const upper = new THREE.Mesh(new THREE.CylinderGeometry(upperRadius, 0.045, 0.30, 8), this.materials.animalFur);
-      upper.position.y = -0.14;
-      legGroup.add(upper);
+      // Spherical Shoulder/Hip Socket blending smoothly into body
+      const hipSocket = new THREE.Mesh(
+        new THREE.SphereGeometry(0.145, 18, 14),
+        this.materials.elephantSkin
+      );
+      legGroup.add(hipSocket);
 
-      // Knee / Hock Pivot Group at y = -0.28
-      const kneeGroup = new THREE.Group();
-      kneeGroup.position.set(0, -0.28, leg.isFront ? 0.01 : -0.02);
+      // Upper Pillar Leg
+      const pillarUpper = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.138, 0.122, 0.34, 20),
+        this.materials.elephantSkin
+      );
+      pillarUpper.position.y = -0.16;
+      legGroup.add(pillarUpper);
 
-      const knee = new THREE.Mesh(new THREE.SphereGeometry(0.046, 8, 8), this.materials.animalFur);
-      kneeGroup.add(knee);
+      // Knee Joint Bulge
+      const knee = new THREE.Mesh(
+        new THREE.SphereGeometry(0.124, 16, 12),
+        this.materials.elephantSkin
+      );
+      knee.position.y = -0.34;
+      legGroup.add(knee);
 
-      const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.032, 0.28, 8), this.materials.animalFur);
-      lower.position.y = -0.14;
-      kneeGroup.add(lower);
+      // Lower Pillar Foot
+      const lowerPillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.122, 0.140, 0.26, 20),
+        this.materials.elephantSkin
+      );
+      lowerPillar.position.y = -0.48;
+      legGroup.add(lowerPillar);
 
-      const paw = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.042, 0.08), this.materials.animalHoof);
-      paw.position.set(0, -0.28, 0.015);
-      kneeGroup.add(paw);
+      // Round Padded Foot Base
+      const footPad = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.140, 0.145, 0.06, 20),
+        this.materials.elephantSkin
+      );
+      footPad.position.y = -0.59;
+      legGroup.add(footPad);
 
-      legGroup.add(kneeGroup);
-      legs.push({ group: legGroup, kneeGroup: kneeGroup, isFront: leg.isFront });
+      // 3 Cute Yellow Semi-Circular Toenails along the front curve
+      const nailRadius = 0.144;
+      [-0.060, 0.0, 0.060].forEach((nx) => {
+        const nail = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.028, 0.028, 0.044, 12).rotateX(Math.PI / 2),
+          this.materials.elephantNails
+        );
+        const nz = Math.sqrt(Math.max(0, nailRadius * nailRadius - nx * nx));
+        nail.position.set(nx, -0.61, nz);
+        nail.scale.set(1.0, 0.65, 0.85);
+        legGroup.add(nail);
+      });
+
       group.add(legGroup);
+      legs.push(legGroup);
     });
 
-    // Tail
-    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.01, 0.28, 6), this.materials.animalFur);
-    tail.position.set(0, 0.65, -0.52);
-    tail.rotation.x = 0.4;
+    // D. Cute Slender Tail with Dark Brush Tuft
+    const tail = new THREE.Group();
+    tail.position.set(0, 0.66, -0.44);
+
+    const tailCord = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.015, 0.34, 10),
+      this.materials.elephantSkin
+    );
+    tailCord.position.set(0, -0.16, -0.06);
+    tailCord.rotation.x = 0.35;
+    tail.add(tailCord);
+
+    const tailTuft = new THREE.Mesh(
+      new THREE.ConeGeometry(0.042, 0.12, 10),
+      this.materials.elephantTailBrush
+    );
+    tailTuft.position.set(0, -0.32, -0.12);
+    tailTuft.rotation.x = 0.35;
+    tail.add(tailTuft);
+
     group.add(tail);
 
     group.userData = {
@@ -452,9 +1136,12 @@ export class ObstacleManager {
       chest,
       rump,
       headGroup,
+      faceData: elephantFaceData,
+      trunkSegments,
+      earL,
+      earR,
       legs,
-      tail,
-      ears
+      tail
     };
 
     return group;
@@ -699,13 +1386,13 @@ export class ObstacleManager {
     switch (type) {
       case 'human':
         mesh = this.buildHumanMesh();
-        name = 'Human (Track Worker)';
-        mass = 72; // kg
+        name = 'Human (Trackside Pedestrian)';
+        mass = 72; // kg <= 150 kg SCOOPABLE
         break;
       case 'animal':
         mesh = this.buildAnimalMesh();
-        name = 'Wildlife (Stray Deer/Calf)';
-        mass = 55; // kg
+        name = 'Wildlife (Indian Elephant)';
+        mass = 110; // kg <= 150 kg SCOOPABLE
         break;
       case 'cattle':
         mesh = this.buildHeavyCattleMesh();
@@ -765,6 +1452,259 @@ export class ObstacleManager {
   }
 
   // ------------------------------------------------------------------
+  // Active Non-Lethal Animal Deterrence Protocol (>150kg Obstacles)
+  // ------------------------------------------------------------------
+  setDeterrenceMode(mode) {
+    if (this.deterrenceSpecs[mode]) {
+      this.activeDeterrenceMode = mode;
+      this.telemetry.deterrenceMode = mode;
+      return this.deterrenceSpecs[mode];
+    }
+    return this.deterrenceSpecs[this.activeDeterrenceMode];
+  }
+
+  getDeterrenceSpecs(mode) {
+    return this.deterrenceSpecs[mode] || this.deterrenceSpecs[this.activeDeterrenceMode];
+  }
+
+  getDeterrenceTickerData(mode) {
+    const m = mode || this.activeDeterrenceMode;
+    switch (m) {
+      case 'holographic_mimo':
+        return {
+          arch: 'HMIMO',
+          polarization: 'CIRCULAR / METASURFACE',
+          carrier: '10.00 CM',
+          focusState: 'COLLIMATED',
+          safety: '100% SAFE (99.9% CLEARANCE)'
+        };
+      case 'retrodirective':
+        return {
+          arch: 'RETRODIRECTIVE',
+          polarization: 'DUAL-LINEAR / CONJUGATE',
+          carrier: '5.00 CM',
+          focusState: 'PHASE-LOCKED',
+          safety: '100% SAFE (99.8% CLEARANCE)'
+        };
+      case 'lrad':
+        return {
+          arch: 'ACOUSTIC LRAD',
+          polarization: 'DIRECTIONAL 138dB',
+          carrier: '13.6 CM (2.5 kHz)',
+          focusState: 'BEAM FOCUS 1.5KM',
+          safety: '100% SAFE (99.9% CLEARANCE)'
+        };
+      case 'bio_acoustic':
+        return {
+          arch: 'BIO-SWARM',
+          polarization: 'PLAN BEE AURA',
+          carrier: '380 Hz SWARM',
+          focusState: 'DISPERSION AURA',
+          safety: '100% SAFE (100% CLEARANCE)'
+        };
+      case 'mmw_denial':
+        return {
+          arch: 'PULSED MMW',
+          polarization: '95 GHz ACTIVE',
+          carrier: '3.16 MM',
+          focusState: 'COLLIMATED BEAM',
+          safety: '100% SAFE (99.7% CLEARANCE)'
+        };
+      case 'electric_shock':
+      default:
+        return {
+          arch: 'E-SHOCK (RDSO)',
+          polarization: 'PULSED GRADIENT',
+          carrier: '6.5 kV / 3.8 mA',
+          focusState: 'CONTACT SWEEP ARMED',
+          safety: '100% SAFE (99.9% CLEARANCE)'
+        };
+    }
+  }
+
+  triggerAnimalDeterrence(obs, audio) {
+    if (!obs || obs.isDeterred) return;
+
+    obs.isDeterred = true;
+    obs.deterMode = this.activeDeterrenceMode;
+    obs.fleeStartTime = this.animTime;
+    obs.fleeDirection = (Math.random() > 0.5 ? 1 : -1);
+    obs.isCleared = false;
+    this.fxTimer = 1.2;
+
+    // Trigger procedural Web Audio synthesis
+    if (audio) {
+      if (this.activeDeterrenceMode === 'electric_shock') {
+        audio.playElectricShockDischarge();
+      } else if (this.activeDeterrenceMode === 'bio_acoustic') {
+        audio.playBeeSwarmSound();
+      } else if (this.activeDeterrenceMode === 'lrad') {
+        audio.playLRADSirenSound();
+      } else if (this.activeDeterrenceMode === 'mmw_denial') {
+        audio.playActiveDenialHum();
+      } else {
+        audio.playElectricShockDischarge();
+      }
+    }
+
+    // Spawn 3D Visual FX in world scene
+    this.spawnDeterrenceFX(obs);
+  }
+
+  spawnDeterrenceFX(obs) {
+    // Clear previous FX
+    while (this.fxGroup.children.length > 0) {
+      const c = this.fxGroup.children[0];
+      if (c.geometry) c.geometry.dispose();
+      this.fxGroup.remove(c);
+    }
+
+    const obsPos = obs.mesh.position.clone();
+    const transform = this.track.getTrackTransform(obs.progress, 0);
+    const tangent = transform.tangent.clone().normalize();
+    const forwardMeters = Math.max(15, Math.min(obs.forwardMeters || 65, 80));
+    const trainFrontPos = obsPos.clone().sub(tangent.clone().multiplyScalar(forwardMeters));
+
+    if (this.activeDeterrenceMode === 'electric_shock') {
+      // 1. Dynamic Electric Lightning Arcs between rails/train and hooves
+      const sparkColor = 0x67e8f9;
+      const arcOffsets = [
+        { pA: new THREE.Vector3(-0.84, 0.35, 0), pB: new THREE.Vector3(-0.35, 0.35, 0) },
+        { pA: new THREE.Vector3( 0.84, 0.35, 0), pB: new THREE.Vector3( 0.35, 0.35, 0) },
+        { pA: new THREE.Vector3(-0.60, 0.38, -2), pB: new THREE.Vector3(-0.25, 0.40, 1) },
+        { pA: new THREE.Vector3( 0.60, 0.38, -2), pB: new THREE.Vector3( 0.25, 0.40, 1) }
+      ];
+
+      arcOffsets.forEach(arc => {
+        const p1 = trainFrontPos.clone().add(arc.pA);
+        const p2 = obsPos.clone().add(arc.pB);
+        const pts = [];
+        const segs = 10;
+        for (let i = 0; i <= segs; i++) {
+          const t = i / segs;
+          const p = p1.clone().lerp(p2, t);
+          if (i > 0 && i < segs) {
+            p.x += (Math.random() - 0.5) * 0.45;
+            p.y += (Math.random() - 0.5) * 0.35;
+          }
+          pts.push(p);
+        }
+        const geo = new THREE.BufferGeometry().setFromPoints(pts);
+        const mat = new THREE.LineBasicMaterial({ color: sparkColor, transparent: true, opacity: 0.95 });
+        const line = new THREE.Line(geo, mat);
+        line.userData = { isLightning: true, pA: p1, pB: p2 };
+        this.fxGroup.add(line);
+      });
+
+      // Flashing discharge point light
+      const sparkLight = new THREE.PointLight(0x38bdf8, 6, 25);
+      sparkLight.position.copy(obsPos.clone().add(new THREE.Vector3(0, 0.75, 0)));
+      this.fxGroup.add(sparkLight);
+
+      // Spark particles at ground hooves
+      const sparkCount = 28;
+      const sparkGeo = new THREE.BufferGeometry();
+      const sPos = [];
+      for (let s = 0; s < sparkCount; s++) {
+        sPos.push(
+          obsPos.x + (Math.random() - 0.5) * 1.2,
+          obsPos.y + Math.random() * 0.6,
+          obsPos.z + (Math.random() - 0.5) * 1.2
+        );
+      }
+      sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sPos, 3));
+      const sparkMat = new THREE.PointsMaterial({ color: 0xe0f2fe, size: 0.08, transparent: true, opacity: 0.9 });
+      this.fxGroup.add(new THREE.Points(sparkGeo, sparkMat));
+
+    } else if (this.activeDeterrenceMode === 'bio_acoustic') {
+      // 2. Plan Bee - Concentric amber acoustic wavefront rings pulsing forward
+      const ringGeo = new THREE.TorusGeometry(0.85, 0.04, 8, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.85 });
+      for (let r = 1; r <= 4; r++) {
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(trainFrontPos.clone().lerp(obsPos, r * 0.22));
+        ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        ring.userData = { isAcousticRing: true };
+        this.fxGroup.add(ring);
+      }
+    } else if (this.activeDeterrenceMode === 'lrad') {
+      // 3. Acoustic LRAD - Focused directional sound shockwave cone
+      const coneLength = Math.max(10, forwardMeters);
+      const coneGeo = new THREE.ConeGeometry(2.2, coneLength, 16, 4, true);
+      coneGeo.rotateX(Math.PI / 2);
+      const coneMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, wireframe: true, transparent: true, opacity: 0.65 });
+      const cone = new THREE.Mesh(coneGeo, coneMat);
+      cone.position.copy(trainFrontPos.clone().lerp(obsPos, 0.5));
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+      this.fxGroup.add(cone);
+    } else if (this.activeDeterrenceMode === 'mmw_denial') {
+      // 4. Pulsed Millimeter Wave - Shimmering directed energy ray
+      const beamGeo = new THREE.CylinderGeometry(0.08, 0.18, forwardMeters, 12);
+      beamGeo.rotateX(Math.PI / 2);
+      const beamMat = new THREE.MeshBasicMaterial({ color: 0xec4899, transparent: true, opacity: 0.75 });
+      const beam = new THREE.Mesh(beamGeo, beamMat);
+      beam.position.copy(trainFrontPos.clone().lerp(obsPos, 0.5));
+      beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+      this.fxGroup.add(beam);
+    } else {
+      // 5. Holographic MIMO / Retrodirective - Multi-beam phase-conjugate laser targeting
+      [-1, 1].forEach(side => {
+        const p1 = trainFrontPos.clone().add(new THREE.Vector3(side * 0.9, 1.8, 0));
+        const p2 = obsPos.clone().add(new THREE.Vector3(0, 1.2, 0));
+        const pts = [p1, p2];
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.9 });
+        this.fxGroup.add(new THREE.Line(lineGeo, lineMat));
+      });
+      // Reticle targeting ring around animal
+      const reticle = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.03, 8, 24), new THREE.MeshBasicMaterial({ color: 0x10b981 }));
+      reticle.position.copy(obsPos.clone().add(new THREE.Vector3(0, 1.1, 0)));
+      reticle.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+      this.fxGroup.add(reticle);
+    }
+  }
+
+  updateDeterrenceFX(dt) {
+    if (this.fxTimer > 0) {
+      this.fxTimer -= dt;
+      this.fxGroup.children.forEach(child => {
+        if (child.isLine && child.userData.isLightning) {
+          const pA = child.userData.pA;
+          const pB = child.userData.pB;
+          const posAttr = child.geometry.attributes.position;
+          const arr = posAttr.array;
+          const segs = 10;
+          for (let i = 0; i <= segs; i++) {
+            const t = i / segs;
+            const p = pA.clone().lerp(pB, t);
+            if (i > 0 && i < segs) {
+              p.x += (Math.random() - 0.5) * 0.45;
+              p.y += (Math.random() - 0.5) * 0.35;
+            }
+            arr[i * 3]     = p.x;
+            arr[i * 3 + 1] = p.y;
+            arr[i * 3 + 2] = p.z;
+          }
+          posAttr.needsUpdate = true;
+        } else if (child.isMesh && child.userData.isAcousticRing) {
+          child.scale.multiplyScalar(1.0 + dt * 1.8);
+          if (child.material) child.material.opacity = Math.max(0, this.fxTimer / 1.2);
+        } else if (child.isPointLight) {
+          child.intensity = (Math.random() > 0.2 ? 6 : 1) * (this.fxTimer / 1.2);
+        }
+      });
+
+      if (this.fxTimer <= 0) {
+        while (this.fxGroup.children.length > 0) {
+          const c = this.fxGroup.children[0];
+          if (c.geometry) c.geometry.dispose();
+          this.fxGroup.remove(c);
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
   // Living On-Track Obstacle Animation Loop
   // Simulates breathing, head scanning, contrapposto weight-shifts,
   // grazing, tail swishes, ear twitches, and startled train-avoidance panic
@@ -783,168 +1723,262 @@ export class ObstacleManager {
       const isUrgent = dist < 50;      // Desperate panic when train is < 50m
 
       // ----------------------------------------------------------------
-      // 1. HUMAN TRACK WORKER / RAILWAY INSPECTOR
+      // 1. MODERN CASUAL HUMAN (Living, Breathing, Blinking, Fluid Motion)
       // ----------------------------------------------------------------
       if (ud.type === 'human') {
-        const seed = obs.id * 2.1;
+        const seed = obs.id * 2.3;
         const localT = t + seed;
 
+        // A. Natural Periodic Eye Blinking via Dynamic Canvas Texture
+        if (ud.faceData) {
+          const blinkCycle = (localT * 0.32) % 1.0;
+          let blinkFactor = 0;
+          if (blinkCycle < 0.04) {
+            blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
+          }
+          if (ud.faceData.lastBlink === undefined || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || (blinkFactor === 0 && ud.faceData.lastBlink !== 0)) {
+            ud.faceData.drawFace(blinkFactor);
+            ud.faceData.tex.needsUpdate = true;
+            ud.faceData.lastBlink = blinkFactor;
+          }
+        } else if (ud.eyelids && ud.eyelids.length > 0) {
+          const blinkCycle = (localT * 0.32) % 1.0;
+          let blinkScale = 0.05; // Open eyes
+          if (blinkCycle < 0.04) {
+            blinkScale = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
+          }
+          ud.eyelids.forEach(el => {
+            el.scale.y = blinkScale;
+          });
+        }
+
         if (!isTrainClose) {
-          // A. NORMAL ACTIVE TRACK INSPECTION / IDLE (Relaxed, breathing, alive)
+          // B. Natural Idling: Chest Breathing & Gentle Contrapposto Weight Shift
           const breath = Math.sin(localT * 2.2);
           if (ud.torsoGroup) {
-            ud.torsoGroup.scale.set(1.0 + 0.015 * breath, 1.0 + 0.008 * breath, 1.0 + 0.015 * breath);
-            ud.torsoGroup.rotation.y = Math.sin(localT * 0.45) * 0.10;
-            ud.torsoGroup.rotation.x = 0.06 + Math.sin(localT * 0.6) * 0.04; // Gentle forward lean inspecting track
+            ud.torsoGroup.scale.set(1.0 + 0.018 * breath, 1.0 + 0.010 * breath, 1.0 + 0.018 * breath);
+            const weightShift = Math.sin(localT * 0.4);
+            ud.torsoGroup.rotation.z = weightShift * 0.035;
+            ud.torsoGroup.rotation.y = Math.sin(localT * 0.3) * 0.08;
+            ud.torsoGroup.rotation.x = 0.03 + Math.sin(localT * 0.5) * 0.02;
           }
 
-          // Head Scanning (checking sleepers, rail joints, and scenery)
+          // Natural Ambient Head Glancing (Checking tracks, scenery, casual tilt)
           if (ud.headGroup) {
-            const headScanY = Math.sin(localT * 0.5) * 0.35 + Math.sin(localT * 1.3) * 0.15;
-            const headScanX = 0.22 + Math.cos(localT * 0.7) * 0.12; // Looking down at rail line
-            ud.headGroup.rotation.set(headScanX, headScanY, 0);
+            const headPitch = 0.10 + Math.sin(localT * 0.6) * 0.16;
+            const headYaw = Math.sin(localT * 0.35) * 0.25 + Math.sin(localT * 0.9) * 0.10;
+            const headTilt = Math.sin(localT * 0.4) * 0.05;
+            ud.headGroup.rotation.set(headPitch, headYaw, headTilt);
           }
 
-          // Natural Arm Idling (holding gauge tool, relaxing)
+          // Natural Arm Sway & Hand Idling
           if (ud.armL) {
-            ud.armL.rotation.x = -0.18 + Math.sin(localT * 0.8) * 0.08;
-            ud.armL.rotation.z = -0.15 + Math.cos(localT * 0.5) * 0.05;
+            ud.armL.rotation.x = 0.05 + Math.sin(localT * 0.8) * 0.06;
+            ud.armL.rotation.z = -0.12 - Math.cos(localT * 0.4) * 0.04;
           }
           if (ud.forearmL) {
-            ud.forearmL.rotation.x = -0.38 + Math.sin(localT * 0.8) * 0.10;
+            ud.forearmL.rotation.x = -0.22 + Math.sin(localT * 0.8) * 0.05;
           }
-
           if (ud.armR) {
-            ud.armR.rotation.x = -0.12 - Math.sin(localT * 0.7) * 0.06;
-            ud.armR.rotation.z = 0.14 - Math.cos(localT * 0.6) * 0.04;
+            ud.armR.rotation.x = 0.05 - Math.sin(localT * 0.7) * 0.06;
+            ud.armR.rotation.z = 0.12 + Math.cos(localT * 0.4) * 0.04;
           }
           if (ud.forearmR) {
-            ud.forearmR.rotation.x = -0.30 - Math.sin(localT * 0.7) * 0.08;
+            ud.forearmR.rotation.x = -0.20 - Math.sin(localT * 0.7) * 0.05;
           }
 
-          // Natural Contrapposto Weight Shift on legs
-          const weightShift = Math.sin(localT * 0.35);
+          // Smooth Contrapposto Leg Micro-Weight Adjustments
+          const legShift = Math.sin(localT * 0.4);
           if (ud.legL) {
-            ud.legL.rotation.x = 0.03 + weightShift * 0.05;
-            ud.legL.rotation.z = weightShift * 0.02;
+            ud.legL.rotation.x = 0.02 + legShift * 0.03;
+            ud.legL.rotation.z = legShift * 0.02;
           }
           if (ud.lowerLegL) {
-            ud.lowerLegL.rotation.x = -Math.max(0, weightShift * 0.08);
+            ud.lowerLegL.rotation.x = -Math.max(0, legShift * 0.06);
           }
           if (ud.legR) {
-            ud.legR.rotation.x = 0.03 - weightShift * 0.05;
-            ud.legR.rotation.z = weightShift * 0.02;
+            ud.legR.rotation.x = 0.02 - legShift * 0.03;
+            ud.legR.rotation.z = legShift * 0.02;
           }
           if (ud.lowerLegR) {
-            ud.lowerLegR.rotation.x = -Math.max(0, -weightShift * 0.08);
+            ud.lowerLegR.rotation.x = -Math.max(0, -legShift * 0.06);
           }
+
         } else {
-          // B. STARTLED ALARM / PANIC REACTION (Train horn blaring!)
+          // C. Reactive Train Alarm / Panic Reaction (Locomotive within line-of-sight!)
           const panicLerp = isUrgent ? 1.0 : Math.min(1.0, (95 - dist) / 45);
 
-          // Head snaps directly up to lock onto approaching locomotive
+          // Head snaps directly up to lock eyes onto train
           if (ud.headGroup) {
-            ud.headGroup.rotation.x = THREE.MathUtils.lerp(0.22, -0.20, panicLerp);
-            ud.headGroup.rotation.y = THREE.MathUtils.lerp(0, Math.sin(localT * 14.0) * 0.08, panicLerp);
+            ud.headGroup.rotation.x = THREE.MathUtils.lerp(0.10, -0.25, panicLerp);
+            ud.headGroup.rotation.y = THREE.MathUtils.lerp(0, Math.sin(localT * 12.0) * 0.08, panicLerp);
+            ud.headGroup.rotation.z = 0;
           }
 
-          // Torso pulls backward in shock, hyperventilating
+          // Rapid panicked hyperventilating breathing
           if (ud.torsoGroup) {
-            ud.torsoGroup.rotation.x = THREE.MathUtils.lerp(0.06, -0.25, panicLerp);
-            const heavyBreath = Math.sin(localT * 7.0) * 0.06;
-            ud.torsoGroup.scale.set(1.0 + heavyBreath, 1.0 + heavyBreath * 0.5, 1.0 + heavyBreath);
+            ud.torsoGroup.rotation.x = THREE.MathUtils.lerp(0.03, -0.22, panicLerp);
+            ud.torsoGroup.rotation.z = 0;
+            const fastBreath = Math.sin(localT * 8.0) * 0.05;
+            ud.torsoGroup.scale.set(1.0 + fastBreath, 1.0 + fastBreath * 0.5, 1.0 + fastBreath);
           }
 
-          // Left arm frantically waving / warning oncoming train
+          // Left arm frantically waving overhead to signal oncoming train
           if (ud.armL) {
-            const waveX = THREE.MathUtils.lerp(-0.18, -1.95 + Math.sin(localT * 14.0) * 0.35, panicLerp);
-            const waveZ = THREE.MathUtils.lerp(-0.15, -0.50 + Math.cos(localT * 14.0) * 0.20, panicLerp);
+            const waveX = THREE.MathUtils.lerp(0.05, -1.95 + Math.sin(localT * 14.0) * 0.35, panicLerp);
+            const waveZ = THREE.MathUtils.lerp(-0.12, -0.55 + Math.cos(localT * 14.0) * 0.25, panicLerp);
             ud.armL.rotation.set(waveX, 0, waveZ);
           }
           if (ud.forearmL) {
-            ud.forearmL.rotation.x = THREE.MathUtils.lerp(-0.38, -0.90, panicLerp);
+            ud.forearmL.rotation.x = THREE.MathUtils.lerp(-0.22, -0.85, panicLerp);
           }
 
-          // Right arm raises defensively to protect face/body
+          // Right arm held defensively in front
           if (ud.armR) {
-            const shieldX = THREE.MathUtils.lerp(-0.12, -1.60 + Math.sin(localT * 8.0) * 0.15, panicLerp);
-            const shieldZ = THREE.MathUtils.lerp(0.14, 0.42, panicLerp);
-            ud.armR.rotation.set(shieldX, 0, shieldZ);
+            const defX = THREE.MathUtils.lerp(0.05, -1.55 + Math.sin(localT * 6.0) * 0.12, panicLerp);
+            const defZ = THREE.MathUtils.lerp(0.12, 0.40, panicLerp);
+            ud.armR.rotation.set(defX, 0, defZ);
           }
           if (ud.forearmR) {
-            ud.forearmR.rotation.x = THREE.MathUtils.lerp(-0.30, -1.15, panicLerp);
+            ud.forearmR.rotation.x = THREE.MathUtils.lerp(-0.20, -1.15, panicLerp);
           }
 
-          // Legs crouch into athletic evasive posture
-          if (ud.legL) ud.legL.rotation.x = THREE.MathUtils.lerp(0.03, 0.42, panicLerp);
-          if (ud.lowerLegL) ud.lowerLegL.rotation.x = THREE.MathUtils.lerp(0, -0.70, panicLerp);
-          if (ud.legR) ud.legR.rotation.x = THREE.MathUtils.lerp(0.03, 0.30, panicLerp);
-          if (ud.lowerLegR) ud.lowerLegR.rotation.x = THREE.MathUtils.lerp(0, -0.60, panicLerp);
+          // Athletic evasive crouch
+          if (ud.legL) ud.legL.rotation.x = THREE.MathUtils.lerp(0.02, 0.38, panicLerp);
+          if (ud.lowerLegL) ud.lowerLegL.rotation.x = THREE.MathUtils.lerp(0, -0.65, panicLerp);
+          if (ud.legR) ud.legR.rotation.x = THREE.MathUtils.lerp(0.02, 0.28, panicLerp);
+          if (ud.lowerLegR) ud.lowerLegR.rotation.x = THREE.MathUtils.lerp(0, -0.55, panicLerp);
         }
       }
 
       // ----------------------------------------------------------------
-      // 2. WILDLIFE / CALF / DEER (Alert, agile natural life)
+      // 2. INDIAN ELEPHANT (Trunk Waving, Ear Flapping, Breathing, Trumpeting)
       // ----------------------------------------------------------------
       else if (ud.type === 'animal') {
-        const localT = t + obs.id * 2.5;
-        const breath = Math.sin(localT * 2.8);
+        const seed = obs.id * 3.1;
+        const localT = t + seed;
 
-        if (ud.body) {
-          ud.body.scale.set(0.92 + 0.02 * breath, 1.15 + 0.015 * breath, 1.0);
+        // A. Natural Periodic Eye Blinking via Dynamic Canvas Texture
+        if (ud.faceData) {
+          const blinkCycle = (localT * 0.25) % 1.0;
+          let blinkFactor = 0;
+          if (blinkCycle < 0.05) {
+            blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
+          }
+          if (ud.faceData.lastBlink === undefined || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || (blinkFactor === 0 && ud.faceData.lastBlink !== 0)) {
+            ud.faceData.drawFace(blinkFactor);
+            ud.faceData.tex.needsUpdate = true;
+            ud.faceData.lastBlink = blinkFactor;
+          }
+        } else if (ud.eyelids && ud.eyelids.length > 0) {
+          const blinkCycle = (localT * 0.25) % 1.0;
+          let blinkScale = 0.05;
+          if (blinkCycle < 0.05) {
+            blinkScale = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
+          }
+          ud.eyelids.forEach(el => { el.scale.y = blinkScale; });
         }
 
-        // Tail flicking
+        // B. Deep Belly Breathing
+        const breath = Math.sin(localT * 1.8);
+        if (ud.body) {
+          ud.body.scale.set(1.05 + 0.025 * breath, 1.18 + 0.020 * breath, 1.0);
+        }
+
+        // C. Rhythmic Big Ear Flapping (Keeping cool and attentive, anchored to resting -0.45 / +0.45 baseline)
+        const earFlap = Math.sin(localT * 2.2);
+        if (!isTrainClose) {
+          if (ud.earL) {
+            ud.earL.rotation.y = -0.45 + earFlap * 0.16;
+          }
+          if (ud.earR) {
+            ud.earR.rotation.y = 0.45 - earFlap * 0.16;
+          }
+        }
+
+        // D. Tail Swishing
         if (ud.tail) {
-          ud.tail.rotation.z = Math.sin(localT * 4.5) * 0.45;
-          ud.tail.rotation.x = 0.4 + Math.sin(localT * 2.0) * 0.15;
+          ud.tail.rotation.z = Math.sin(localT * 3.5) * 0.45;
+          ud.tail.rotation.x = 0.30 + Math.abs(Math.sin(localT * 1.6)) * 0.20;
         }
 
         if (!isTrainClose) {
-          // Grazing on ballast weeds with subtle leg weight shifts
+          // E. Normal Idling: Fluid Traveling Sinusoidal Wave along 5 Trunk Segments!
+          // (Forward & upward arching wave extending proud over the track)
+          if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+            const trunkWaveTime = localT * 2.0;
+            // Segment 0 (Root): gentle forward arch with breathing dip & side sweep
+            ud.trunkSegments[0].rotation.x = -0.42 + Math.sin(trunkWaveTime) * 0.08;
+            ud.trunkSegments[0].rotation.y = Math.cos(trunkWaveTime * 0.7) * 0.10;
+
+            // Segment 1: curving forward and downward
+            ud.trunkSegments[1].rotation.x = -0.36 + Math.sin(trunkWaveTime - 0.5) * 0.10;
+            ud.trunkSegments[1].rotation.y = Math.cos(trunkWaveTime * 0.7 - 0.3) * 0.08;
+
+            // Segment 2: bottom curve arc
+            ud.trunkSegments[2].rotation.x = -0.28 + Math.sin(trunkWaveTime - 1.0) * 0.12;
+            ud.trunkSegments[2].rotation.z = Math.sin(trunkWaveTime * 0.8) * 0.10;
+
+            // Segment 3: curling upward
+            ud.trunkSegments[3].rotation.x = 0.70 + Math.sin(trunkWaveTime - 1.5) * 0.15;
+
+            // Segment 4 (Tip): graceful upward curl
+            ud.trunkSegments[4].rotation.x = 0.75 + Math.sin(trunkWaveTime - 2.0) * 0.18;
+          }
+
+          // Gentle Head Bobbing in harmony with trunk
           if (ud.headGroup) {
-            const headPitch = 0.20 + Math.sin(localT * 0.7) * 0.35;
-            const headYaw = Math.sin(localT * 1.2) * 0.25;
+            const headPitch = 0.05 + Math.sin(localT * 1.2) * 0.06;
+            const headYaw = Math.sin(localT * 0.6) * 0.15;
             ud.headGroup.rotation.set(headPitch, headYaw, 0);
           }
-          // Ears twitching independently
-          if (ud.ears) {
-            ud.ears.forEach((ear, idx) => {
-              ear.rotation.z = (idx === 0 ? -0.55 : 0.55) + Math.sin(localT * 6.0 + idx * 2.0) * 0.22;
-            });
-          }
-          // Natural quadruped idling stance weight shift
+
+          // Subtle Quadruped Stance Weight Shifting on pillar legs
           if (ud.legs) {
-            const legShift = Math.sin(localT * 0.9) * 0.04;
+            const legShift = Math.sin(localT * 0.8) * 0.03;
             ud.legs.forEach((leg, idx) => {
-              leg.group.rotation.x = (idx % 2 === 0 ? legShift : -legShift);
+              leg.rotation.x = (idx % 2 === 0 ? legShift : -legShift);
             });
           }
+
         } else {
-          // Startled wildlife: head high, ears back, alarm stance
+          // F. Startled / Alarmed Trumpet Pose (Train Approaches!)
+          const alarmLerp = isUrgent ? 1.0 : Math.min(1.0, (95 - dist) / 45);
+
+          // Head raises high
           if (ud.headGroup) {
-            ud.headGroup.rotation.x = -0.45;
-            ud.headGroup.rotation.y = Math.sin(localT * 12.0) * 0.15;
+            ud.headGroup.rotation.x = THREE.MathUtils.lerp(0.05, -0.35, alarmLerp);
+            ud.headGroup.rotation.y = THREE.MathUtils.lerp(0, Math.sin(localT * 10.0) * 0.08, alarmLerp);
           }
-          if (ud.ears) {
-            ud.ears.forEach(ear => { ear.rotation.x = 0.45; });
+
+          // Ears flare wide forward in defensive threat display
+          if (ud.earL) {
+            ud.earL.rotation.y = THREE.MathUtils.lerp(-0.45, 0.40, alarmLerp);
           }
-          if (ud.tail) {
-            ud.tail.rotation.x = 0.90;
+          if (ud.earR) {
+            ud.earR.rotation.y = THREE.MathUtils.lerp(0.45, -0.40, alarmLerp);
           }
+
+          // Magnificent Alarmed Trumpet Trunk Curl (Rearing trunk high into the air forward!)
+          if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+            ud.trunkSegments[0].rotation.x = THREE.MathUtils.lerp(-0.42, -0.85, alarmLerp);
+            ud.trunkSegments[1].rotation.x = THREE.MathUtils.lerp(-0.36, -0.70, alarmLerp);
+            ud.trunkSegments[2].rotation.x = THREE.MathUtils.lerp(-0.28, -0.55, alarmLerp);
+            ud.trunkSegments[3].rotation.x = THREE.MathUtils.lerp(0.70, -0.25, alarmLerp);
+            ud.trunkSegments[4].rotation.x = THREE.MathUtils.lerp(0.75, -0.35, alarmLerp);
+          }
+
+          // Sturdy startle stance
           if (ud.legs) {
-            ud.legs.forEach(leg => {
-              leg.group.rotation.x = leg.isFront ? -0.18 : 0.14;
-              if (leg.kneeGroup) {
-                leg.kneeGroup.rotation.x = leg.isFront ? 0.24 : -0.20;
-              }
+            ud.legs.forEach((leg, idx) => {
+              leg.rotation.x = (idx < 2 ? -0.10 : 0.08) * alarmLerp;
             });
           }
         }
       }
 
       // ----------------------------------------------------------------
-      // 3. DESI COW / ZEBU BULL (Authentic cattle behavior)
+      // 3. DESI COW / ZEBU BULL (Authentic cattle behavior & Active Escape)
       // ----------------------------------------------------------------
       else if (ud.type === 'cow' || ud.type === 'cattle') {
         const localT = t + obs.id * 1.6;
@@ -955,37 +1989,121 @@ export class ObstacleManager {
           ud.barrel.scale.set(0.95 + 0.02 * breath, 1.15 + 0.02 * breath, 1.0);
         }
 
-        // Characteristic cattle fly-swatting tail swish
-        if (ud.tail) {
-          ud.tail.rotation.z = Math.sin(localT * 3.2) * 0.60 + Math.sin(localT * 7.5) * 0.20;
-          ud.tail.rotation.x = 0.15 + Math.abs(Math.sin(localT * 1.6)) * 0.25;
-        }
+        if (obs.isDeterred) {
+          // ==============================================================
+          // ACTIVE NON-LETHAL ESCAPE REACTION (Fleeing the track safely!)
+          // ==============================================================
+          const fleeT = this.animTime - obs.fleeStartTime;
+          const fleeDir = obs.fleeDirection || 1;
+          const fleeDist = Math.min(6.5, fleeT * 3.5);
 
-        // Natural heavy leg weight shifting
-        if (ud.legs) {
-          const cowShift = Math.sin(localT * 0.6) * 0.03;
-          ud.legs.forEach((leg, idx) => {
-            leg.group.rotation.x = (idx % 2 === 0 ? cowShift : -cowShift);
-          });
-        }
+          // Track lateral offset calculation (perpendicular to track tangent)
+          const transform = this.track.getTrackTransform(obs.progress, 0);
+          const tangent = transform.tangent.clone().normalize();
+          const sideDir = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
 
-        // Chewing / Rumination & Dewlap sway
-        if (ud.headGroup) {
-          const chew = Math.sin(localT * 4.5) * 0.05;
-          const headYaw = Math.sin(localT * 0.4) * 0.22;
-          const headPitch = isTrainClose ? -0.38 : (0.12 + Math.sin(localT * 0.5) * 0.22);
-          ud.headGroup.rotation.set(headPitch + chew, headYaw, 0);
-        }
+          // Move down the embankment into the grassy pasture (6.5m offset)
+          const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+          lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.30, fleeDist * 0.08));
+          obs.mesh.position.copy(lateralPos);
 
-        if (ud.dewlap) {
-          ud.dewlap.rotation.z = Math.sin(localT * 2.0) * 0.18;
-        }
+          if (fleeDist >= 2.6) {
+            obs.isCleared = true;
+          }
 
-        // Ear droop and flick
-        if (ud.ears) {
-          ud.ears.forEach((ear, idx) => {
-            ear.rotation.z = (idx === 0 ? -1.15 : 1.15) + Math.sin(localT * 4.0 + idx * 3.0) * 0.18;
-          });
+          if (fleeT < 0.35) {
+            // A. Initial Jump / Muscular Shock Reflex
+            obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
+            if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
+            if (ud.tail) ud.tail.rotation.x = 0.95;
+            if (ud.ears) ud.ears.forEach(ear => { ear.rotation.x = 0.6; });
+          } else if (fleeT < 3.2) {
+            // B. High-Speed Quadruped Gallop off the track
+            const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
+            obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fleeHeading);
+
+            const gallopFreq = 7.5 * Math.PI;
+            const gallopCycle = (fleeT - 0.35) * gallopFreq;
+
+            // Vigorous 4-leg gallop kinematics
+            if (ud.legs && ud.legs.length === 4) {
+              ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.60;
+              ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.60;
+              ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
+              ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
+
+              ud.legs.forEach(leg => {
+                if (leg.kneeGroup) {
+                  leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
+                }
+              });
+            }
+
+            // Head galloping bob & dewlap whip
+            if (ud.headGroup) {
+              ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2.0) * 0.22;
+              ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
+            }
+            if (ud.dewlap) {
+              ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
+            }
+            if (ud.tail) {
+              ud.tail.rotation.x = 0.85;
+              ud.tail.rotation.z = Math.sin(gallopCycle) * 0.40;
+            }
+          } else {
+            // C. Safe in Meadow Pasture (Watching train pass safely from 6.5m distance)
+            const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+            obs.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), safeHeading);
+
+            if (ud.headGroup) {
+              ud.headGroup.rotation.y = -fleeDir * 0.75;
+              ud.headGroup.rotation.x = -0.10;
+            }
+            if (ud.legs) {
+              ud.legs.forEach(leg => {
+                leg.group.rotation.x = 0;
+                if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
+              });
+            }
+            if (ud.tail) {
+              ud.tail.rotation.z = Math.sin(localT * 3.0) * 0.40;
+            }
+          }
+        } else {
+          // NORMAL / GRAZING CATTLE BEHAVIOR (When not yet deterred)
+          // Characteristic cattle fly-swatting tail swish
+          if (ud.tail) {
+            ud.tail.rotation.z = Math.sin(localT * 3.2) * 0.60 + Math.sin(localT * 7.5) * 0.20;
+            ud.tail.rotation.x = 0.15 + Math.abs(Math.sin(localT * 1.6)) * 0.25;
+          }
+
+          // Natural heavy leg weight shifting
+          if (ud.legs) {
+            const cowShift = Math.sin(localT * 0.6) * 0.03;
+            ud.legs.forEach((leg, idx) => {
+              leg.group.rotation.x = (idx % 2 === 0 ? cowShift : -cowShift);
+            });
+          }
+
+          // Chewing / Rumination & Dewlap sway
+          if (ud.headGroup) {
+            const chew = Math.sin(localT * 4.5) * 0.05;
+            const headYaw = Math.sin(localT * 0.4) * 0.22;
+            const headPitch = isTrainClose ? -0.38 : (0.12 + Math.sin(localT * 0.5) * 0.22);
+            ud.headGroup.rotation.set(headPitch + chew, headYaw, 0);
+          }
+
+          if (ud.dewlap) {
+            ud.dewlap.rotation.z = Math.sin(localT * 2.0) * 0.18;
+          }
+
+          // Ear droop and flick
+          if (ud.ears) {
+            ud.ears.forEach((ear, idx) => {
+              ear.rotation.z = (idx === 0 ? -1.15 : 1.15) + Math.sin(localT * 4.0 + idx * 3.0) * 0.18;
+            });
+          }
         }
       }
     });
@@ -996,7 +2114,7 @@ export class ObstacleManager {
   // Enforces: Collect ONLY when Mass <= 150 kg AND Speed <= 150 km/h
   // Net defaults to CLOSED / STOWED; Opens with animation upon detection
   // ------------------------------------------------------------------
-  update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength) {
+  update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true) {
     let closestObstacle = null;
     let minForwardDist = Infinity;
     const speedKmh = trainSpeedMs * 3.6;
@@ -1021,6 +2139,9 @@ export class ObstacleManager {
     // Run dynamic living on-track organic animations for all obstacles
     this.animateLivingObstacles(dt, trainSpeedMs);
 
+    // Update 3D visual FX for deterrence discharges
+    this.updateDeterrenceFX(dt);
+
     // If an obstacle is detected within sensor range (up to 110m)
     if (closestObstacle && minForwardDist < 110) {
       this.telemetry.targetDetected = true;
@@ -1044,8 +2165,8 @@ export class ObstacleManager {
         this.telemetry.action = 'AIRBAG NET RAPID DEPLOY & RESCUE SCOOP';
         this.telemetry.alertType = 'deploy';
 
-        // 1. Rapid Pneumatic Inflation Trigger: Opens with animation at <= 80m
-        if (minForwardDist <= 80 && !captureNet.isDeployed) {
+        // 1. Rapid Pneumatic Inflation Trigger: Opens with animation at <= 80m (Auto mode)
+        if (aiSensorAuto && minForwardDist <= 80 && !captureNet.isDeployed) {
           captureNet.triggerSolenoidDeploy(audio);
           if (audio) audio.playTargetAcquiredBeep(false);
           this.telemetry.alertMessage = `⚡ AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED (${closestObstacle.mass}KG ≤ 150KG, SPEED ≤ 160 KM/H). AIRBAG NET INFLATING!`;
@@ -1067,8 +2188,9 @@ export class ObstacleManager {
         }
       }
       // ----------------------------------------------------------------
-      // Case B: OVERWEIGHT (> 150 kg) or OVERSPEED (> 160 km/h)
-      // DO NOT OPEN NET! Apply Emergency Brake + Horn Intervention
+      // Case B: OVERWEIGHT (> 150 kg) - ACTIVE NON-LETHAL ANIMAL DETERRENCE
+      // Inflatable net stays CLOSED. We actively deliver deterrence (e.g. Electric Shock)
+      // to remove the heavy animal from tracks with ZERO HARM!
       // ----------------------------------------------------------------
       else {
         // Ensure net remains CLOSED/STOWED to avoid structural damage
@@ -1076,22 +2198,44 @@ export class ObstacleManager {
           captureNet.setDeployed(false);
         }
 
-        const reason = !isWeightSafe
-          ? `OVERWEIGHT (>150KG): ${closestObstacle.mass}KG EXCEEDS NET LIMIT`
-          : `OVERSPEED (>160 KM/H): SPEED ${Math.round(speedKmh)} KM/H TOO HIGH FOR NET`;
+        const specs = this.getDeterrenceSpecs(this.activeDeterrenceMode);
 
-        this.telemetry.action = `${reason} - EMERGENCY BRAKE ONLY`;
-        this.telemetry.alertType = 'hazard';
-        this.telemetry.alertMessage = `⚠️ HAZARD: ${closestObstacle.name.toUpperCase()} ON TRACK! NET HELD CLOSED. EMERGENCY BRAKE APPLIED!`;
+        // 1. Automatic Deterrence Discharge at <= 90m (Auto mode)
+        if (aiSensorAuto && minForwardDist <= 90 && !closestObstacle.isDeterred) {
+          this.triggerAnimalDeterrence(closestObstacle, audio);
+          if (audio) audio.playTargetAcquiredBeep(true);
+        }
 
-        // Automatically engage emergency brake & continuous warning horn
-        if (minForwardDist <= 95) {
-          if (physics && !physics.emergencyBrake) {
-            physics.setEmergencyBrake(true);
+        // 2. Track Clearance Verification
+        if (closestObstacle.isCleared) {
+          // Animal has successfully scrambled off the ballast into the pasture!
+          this.telemetry.action = `TARGET CLEARED VIA ${specs.shortTitle} - TRACK CLEAR`;
+          this.telemetry.alertType = 'success';
+          this.telemetry.alertMessage = `🎯 TRACK CLEARED! HEAVY BULL (480KG) ESCAPED SAFELY INTO FIELD VIA ${specs.shortTitle}. ZERO CASUALTIES!`;
+
+          // Release emergency brake if it was tripped earlier so train can proceed safely
+          if (physics && physics.emergencyBrake) {
+            physics.setEmergencyBrake(false);
           }
-          if (audio) {
-            audio.playTargetAcquiredBeep(true);
-            audio.startHorn();
+        } else if (closestObstacle.isDeterred) {
+          // Animal is actively galloping off the track!
+          this.telemetry.action = `⚡ ${specs.shortTitle} ACTIVE - BULL FLEEING TO MEADOW`;
+          this.telemetry.alertType = 'deploy';
+          this.telemetry.alertMessage = `⚡ AI KAVACH: ${specs.shortTitle} DELIVERED (${specs.badge})! BULL SCRAMBLING OFF RAILS!`;
+        } else {
+          // Detected ahead, deterrence armed
+          this.telemetry.action = `OVERWEIGHT (480KG) - ${specs.shortTitle} ARMED`;
+          this.telemetry.alertType = 'hazard';
+          this.telemetry.alertMessage = `⚠️ HAZARD: ${closestObstacle.name.toUpperCase()} DETECTED! ARMED WITH ${specs.shortTitle}!`;
+
+          // Fail-safe emergency brake only if animal is dangerously close (< 35m) and still on track
+          if (minForwardDist <= 35) {
+            if (physics && !physics.emergencyBrake) {
+              physics.setEmergencyBrake(true);
+            }
+            if (audio) {
+              audio.startHorn();
+            }
           }
         }
       }

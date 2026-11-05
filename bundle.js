@@ -13232,6 +13232,215 @@
       return new _FrustumArray().copy(this);
     }
   };
+  var LineBasicMaterial = class extends Material {
+    /**
+     * Constructs a new line basic material.
+     *
+     * @param {Object} [parameters] - An object with one or more properties
+     * defining the material's appearance. Any property of the material
+     * (including any property from inherited materials) can be passed
+     * in here. Color values can be passed any type of value accepted
+     * by {@link Color#set}.
+     */
+    constructor(parameters) {
+      super();
+      this.isLineBasicMaterial = true;
+      this.type = "LineBasicMaterial";
+      this.color = new Color(16777215);
+      this.map = null;
+      this.linewidth = 1;
+      this.linecap = "round";
+      this.linejoin = "round";
+      this.fog = true;
+      this.setValues(parameters);
+    }
+    copy(source) {
+      super.copy(source);
+      this.color.copy(source.color);
+      this.map = source.map;
+      this.linewidth = source.linewidth;
+      this.linecap = source.linecap;
+      this.linejoin = source.linejoin;
+      this.fog = source.fog;
+      return this;
+    }
+  };
+  var _vStart = /* @__PURE__ */ new Vector3();
+  var _vEnd = /* @__PURE__ */ new Vector3();
+  var _inverseMatrix$1 = /* @__PURE__ */ new Matrix4();
+  var _ray$1 = /* @__PURE__ */ new Ray();
+  var _sphere$1 = /* @__PURE__ */ new Sphere();
+  var _intersectPointOnRay = /* @__PURE__ */ new Vector3();
+  var _intersectPointOnSegment = /* @__PURE__ */ new Vector3();
+  var Line = class extends Object3D {
+    /**
+     * Constructs a new line.
+     *
+     * @param {BufferGeometry} [geometry] - The line geometry.
+     * @param {Material|Array<Material>} [material] - The line material.
+     */
+    constructor(geometry = new BufferGeometry(), material = new LineBasicMaterial()) {
+      super();
+      this.isLine = true;
+      this.type = "Line";
+      this.geometry = geometry;
+      this.material = material;
+      this.morphTargetDictionary = void 0;
+      this.morphTargetInfluences = void 0;
+      this.updateMorphTargets();
+    }
+    copy(source, recursive) {
+      super.copy(source, recursive);
+      if (source.morphTargetInfluences !== void 0) {
+        this.morphTargetInfluences = source.morphTargetInfluences.slice();
+      } else {
+        this.morphTargetInfluences = void 0;
+      }
+      if (source.morphTargetDictionary !== void 0) {
+        this.morphTargetDictionary = Object.assign({}, source.morphTargetDictionary);
+      } else {
+        this.morphTargetDictionary = void 0;
+      }
+      this.material = Array.isArray(source.material) ? source.material.slice() : source.material;
+      this.geometry = source.geometry;
+      return this;
+    }
+    /**
+     * Computes an array of distance values which are necessary for rendering dashed lines.
+     * For each vertex in the geometry, the method calculates the cumulative length from the
+     * current point to the very beginning of the line.
+     *
+     * @return {Line} A reference to this line.
+     */
+    computeLineDistances() {
+      const geometry = this.geometry;
+      if (geometry.index === null) {
+        const positionAttribute = geometry.attributes.position;
+        const lineDistances = [0];
+        for (let i = 1, l = positionAttribute.count; i < l; i++) {
+          _vStart.fromBufferAttribute(positionAttribute, i - 1);
+          _vEnd.fromBufferAttribute(positionAttribute, i);
+          lineDistances[i] = lineDistances[i - 1];
+          lineDistances[i] += _vStart.distanceTo(_vEnd);
+        }
+        geometry.setAttribute("lineDistance", new Float32BufferAttribute(lineDistances, 1));
+      } else {
+        warn("Line.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+      }
+      return this;
+    }
+    /**
+     * Returns `true` if this line intersects the given frustum.
+     *
+     * @param {Frustum|FrustumArray} frustum - The frustum to test.
+     * @return {boolean} Whether this line intersects the given frustum or not.
+     */
+    intersectsFrustum(frustum) {
+      return frustum.intersectsObject(this);
+    }
+    /**
+     * Computes intersection points between a casted ray and this line.
+     *
+     * @param {Raycaster} raycaster - The raycaster.
+     * @param {Array<Object>} intersects - The target array that holds the intersection points.
+     */
+    raycast(raycaster, intersects2) {
+      const geometry = this.geometry;
+      const matrixWorld = this.matrixWorld;
+      const threshold = raycaster.params.Line.threshold;
+      const drawRange = geometry.drawRange;
+      if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
+      _sphere$1.copy(geometry.boundingSphere);
+      _sphere$1.applyMatrix4(matrixWorld);
+      _sphere$1.radius += threshold;
+      if (raycaster.ray.intersectsSphere(_sphere$1) === false) return;
+      _inverseMatrix$1.copy(matrixWorld).invert();
+      _ray$1.copy(raycaster.ray).applyMatrix4(_inverseMatrix$1);
+      const localThreshold = threshold / ((this.scale.x + this.scale.y + this.scale.z) / 3);
+      const localThresholdSq = localThreshold * localThreshold;
+      const step = this.isLineSegments ? 2 : 1;
+      const index = geometry.index;
+      const attributes = geometry.attributes;
+      const positionAttribute = attributes.position;
+      if (index !== null) {
+        const start = Math.max(0, drawRange.start);
+        const end = Math.min(index.count, drawRange.start + drawRange.count);
+        for (let i = start, l = end - 1; i < l; i += step) {
+          const a = index.getX(i);
+          const b = index.getX(i + 1);
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, a, b, i);
+          if (intersect) {
+            intersects2.push(intersect);
+          }
+        }
+        if (this.isLineLoop) {
+          const a = index.getX(end - 1);
+          const b = index.getX(start);
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, a, b, end - 1);
+          if (intersect) {
+            intersects2.push(intersect);
+          }
+        }
+      } else {
+        const start = Math.max(0, drawRange.start);
+        const end = Math.min(positionAttribute.count, drawRange.start + drawRange.count);
+        for (let i = start, l = end - 1; i < l; i += step) {
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, i, i + 1, i);
+          if (intersect) {
+            intersects2.push(intersect);
+          }
+        }
+        if (this.isLineLoop) {
+          const intersect = checkIntersection(this, raycaster, _ray$1, localThresholdSq, end - 1, start, end - 1);
+          if (intersect) {
+            intersects2.push(intersect);
+          }
+        }
+      }
+    }
+    /**
+     * Sets the values of {@link Line#morphTargetDictionary} and {@link Line#morphTargetInfluences}
+     * to make sure existing morph targets can influence this 3D object.
+     */
+    updateMorphTargets() {
+      const geometry = this.geometry;
+      const morphAttributes = geometry.morphAttributes;
+      const keys = Object.keys(morphAttributes);
+      if (keys.length > 0) {
+        const morphAttribute = morphAttributes[keys[0]];
+        if (morphAttribute !== void 0) {
+          this.morphTargetInfluences = [];
+          this.morphTargetDictionary = {};
+          for (let m = 0, ml = morphAttribute.length; m < ml; m++) {
+            const name = morphAttribute[m].name || String(m);
+            this.morphTargetInfluences.push(0);
+            this.morphTargetDictionary[name] = m;
+          }
+        }
+      }
+    }
+  };
+  function checkIntersection(object, raycaster, ray, thresholdSq, a, b, i) {
+    const positionAttribute = object.geometry.attributes.position;
+    _vStart.fromBufferAttribute(positionAttribute, a);
+    _vEnd.fromBufferAttribute(positionAttribute, b);
+    const distSq = ray.distanceSqToSegment(_vStart, _vEnd, _intersectPointOnRay, _intersectPointOnSegment);
+    if (distSq > thresholdSq) return;
+    _intersectPointOnRay.applyMatrix4(object.matrixWorld);
+    const distance = raycaster.ray.origin.distanceTo(_intersectPointOnRay);
+    if (distance < raycaster.near || distance > raycaster.far) return;
+    return {
+      distance,
+      // What do we want? intersection point on the ray or on the segment??
+      // point: raycaster.ray.at( distance ),
+      point: _intersectPointOnSegment.clone().applyMatrix4(object.matrixWorld),
+      index: i,
+      face: null,
+      faceIndex: null,
+      barycoord: null,
+      object
+    };
+  }
   var PointsMaterial = class extends Material {
     /**
      * Constructs a new points material.
@@ -32909,6 +33118,7 @@ void main() {
       this.maxSpeedKmh = 160;
       this.speedMs = 0;
       this.speedKmh = 0;
+      this.targetSpeedKmh = 120;
       this.distanceTraveled = 0;
       this.trackProgress = 0;
       this.acceleration = 0;
@@ -32933,6 +33143,36 @@ void main() {
       this.wheelSlip = false;
       this.sandersActive = false;
     }
+    setTargetSpeed(speed) {
+      this.targetSpeedKmh = speed;
+      if (speed === 0) {
+        this.emergencyBrake = false;
+        this.notch = 0;
+        this.throttlePercent = 0;
+        this.trainBrakePercent = 0.8;
+      } else {
+        this.emergencyBrake = false;
+        this.trainBrakePercent = 0;
+      }
+    }
+    reset() {
+      this.speedMs = 0;
+      this.speedKmh = 0;
+      this.targetSpeedKmh = 120;
+      this.distanceTraveled = 0;
+      this.trackProgress = 0;
+      this.acceleration = 0;
+      this.notch = 0;
+      this.throttlePercent = 0;
+      this.trainBrakePercent = 0;
+      this.emergencyBrake = false;
+      this.bpPressure = 5;
+      this.bcPressure = 0;
+      this.reverser = 1;
+      this.tractiveEffortKn = 0;
+      this.tractionAmps = 0;
+      this.rollTilt = 0;
+    }
     // ---------------------------------------------------------
     // Control Inputs (Intuitive Manual Speed Management)
     // ---------------------------------------------------------
@@ -32945,16 +33185,19 @@ void main() {
       }
     }
     notchUp() {
+      this.targetSpeedKmh = null;
       this.emergencyBrake = false;
       this.trainBrakePercent = 0;
       this.setNotch(this.notch + 1);
     }
     notchDown() {
+      this.targetSpeedKmh = null;
       this.setNotch(this.notch - 1);
     }
     setTrainBrake(percent) {
       this.trainBrakePercent = Math.max(0, Math.min(1, percent));
       if (this.trainBrakePercent > 0.05) {
+        this.targetSpeedKmh = null;
         this.notch = 0;
         this.throttlePercent = 0;
       }
@@ -32990,6 +33233,33 @@ void main() {
     update(dt, trackTotalLength = 2e3, currentCurveRadius = 0, currentGradient = 0) {
       this.curveRadius = currentCurveRadius;
       this.currentGradient = currentGradient;
+      if (this.targetSpeedKmh !== null && !this.emergencyBrake) {
+        if (this.targetSpeedKmh === 0) {
+          this.notch = 0;
+          this.throttlePercent = 0;
+          if (this.speedKmh > 0.5) {
+            this.trainBrakePercent = Math.min(0.85, 0.25 + this.speedKmh / 25);
+          } else {
+            this.speedMs = 0;
+            this.speedKmh = 0;
+            this.trainBrakePercent = 0.6;
+          }
+        } else {
+          const diff = this.targetSpeedKmh - this.speedKmh;
+          if (diff > 2) {
+            this.trainBrakePercent = 0;
+            const notch = diff > 35 ? 8 : diff > 18 ? 7 : diff > 8 ? 6 : 5;
+            this.setNotch(notch);
+          } else if (diff < -2) {
+            this.setNotch(0);
+            this.trainBrakePercent = Math.min(0.55, Math.abs(diff) / 18);
+          } else {
+            this.trainBrakePercent = 0;
+            const notch = this.targetSpeedKmh >= 150 ? 6 : this.targetSpeedKmh >= 110 ? 4 : this.targetSpeedKmh >= 70 ? 3 : 2;
+            this.setNotch(notch);
+          }
+        }
+      }
       if (this.emergencyBrake) {
         this.bpPressure = Math.max(0, this.bpPressure - 4 * dt);
         this.bcPressure = Math.min(3.8, this.bcPressure + 3 * dt);
@@ -33423,6 +33693,125 @@ void main() {
           osc.start(t);
           osc.stop(t + 0.45);
         });
+      } catch (e) {
+      }
+    }
+    // ---------------------------------------------------------
+    // Active Non-Lethal Deterrence Sound Effects (>150kg Animals)
+    // ---------------------------------------------------------
+    // 1. High-Voltage Track Electric Pulse / Arc Crackle
+    playElectricShockDischarge() {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        const bufferSize = this.ctx.sampleRate * 0.45;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.12));
+        }
+        const noiseNode = this.ctx.createBufferSource();
+        noiseNode.buffer = buffer;
+        const bpf = this.ctx.createBiquadFilter();
+        bpf.type = "bandpass";
+        bpf.frequency.setValueAtTime(3200, now);
+        bpf.frequency.exponentialRampToValueAtTime(1400, now + 0.4);
+        bpf.Q.value = 4;
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.75, now);
+        noiseGain.gain.exponentialRampToValueAtTime(1e-3, now + 0.45);
+        noiseNode.connect(bpf);
+        bpf.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
+        noiseNode.start(now);
+        [420, 840, 1680].forEach((freq, idx) => {
+          const zapOsc = this.ctx.createOscillator();
+          const zapGain = this.ctx.createGain();
+          zapOsc.type = "sawtooth";
+          zapOsc.frequency.setValueAtTime(freq + Math.random() * 120, now);
+          zapOsc.frequency.exponentialRampToValueAtTime(180, now + 0.35);
+          zapGain.gain.setValueAtTime(0.35 / (idx + 1), now);
+          zapGain.gain.exponentialRampToValueAtTime(1e-3, now + 0.38);
+          zapOsc.connect(zapGain);
+          zapGain.connect(this.masterGain);
+          zapOsc.start(now);
+          zapOsc.stop(now + 0.4);
+        });
+      } catch (e) {
+      }
+    }
+    // 2. Indian Railways Plan Bee - Bio-Acoustic Honeybee Swarm Frequency
+    playBeeSwarmSound() {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        [280, 310, 345, 390].forEach((f) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const lfo = this.ctx.createOscillator();
+          const lfoGain = this.ctx.createGain();
+          lfo.frequency.setValueAtTime(34 + Math.random() * 8, now);
+          lfoGain.gain.setValueAtTime(18, now);
+          lfo.connect(osc.frequency);
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(f, now);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.9);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          lfo.start(now);
+          osc.start(now);
+          lfo.stop(now + 0.95);
+          osc.stop(now + 0.95);
+        });
+      } catch (e) {
+      }
+    }
+    // 3. Acoustic LRAD - Focused Directional Long-Range Siren Pulse
+    playLRADSirenSound() {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(1800, now);
+        osc.frequency.linearRampToValueAtTime(2600, now + 0.25);
+        osc.frequency.linearRampToValueAtTime(1800, now + 0.55);
+        gain.gain.setValueAtTime(0.55, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.65);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.7);
+      } catch (e) {
+      }
+    }
+    // 4. Pulsed Millimeter Wave / Active Denial Carrier Hum
+    playActiveDenialHum() {
+      if (!this.ctx || this.isMuted) return;
+      try {
+        this.resume();
+        const now = this.ctx.currentTime;
+        const sub = this.ctx.createOscillator();
+        const carrier = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        sub.type = "sine";
+        sub.frequency.setValueAtTime(95, now);
+        carrier.type = "sawtooth";
+        carrier.frequency.setValueAtTime(1420, now);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(1e-3, now + 0.5);
+        sub.connect(gain);
+        carrier.connect(gain);
+        gain.connect(this.masterGain);
+        sub.start(now);
+        carrier.start(now);
+        sub.stop(now + 0.55);
+        carrier.stop(now + 0.55);
       } catch (e) {
       }
     }
@@ -36137,21 +36526,25 @@ void main() {
       this.beginCaptureSequence(obstacleMesh, obstacleInfo);
     }
     beginCaptureSequence(obstacleMesh, obstacleInfo) {
-      const zOffset = this.collectedList.length * 0.4 - 0.2;
+      const isHuman = obstacleInfo.type === "human";
+      const isAnimal = obstacleInfo.type === "animal";
+      const count = this.collectedList.length;
+      const xPattern = [0, -0.34, 0.34, -0.18, 0.18];
+      const targetX = isHuman ? xPattern[count % xPattern.length] : 0;
+      const zOffset = -0.22 + Math.floor(count / 2) * 0.42;
       this.cradleCargoGroup.add(obstacleMesh);
       this.collectedList.push(obstacleInfo);
       this.totalPayloadWeight += obstacleInfo.mass;
-      const isHuman = obstacleInfo.type === "human";
-      const isAnimal = obstacleInfo.type === "animal";
       obstacleMesh.position.set(0, isHuman ? -0.32 : isAnimal ? -0.16 : -0.15, 1.55);
       obstacleMesh.rotation.set(0, 0, 0);
       const targetPos = new Vector3(
-        0,
+        targetX,
         isHuman ? -0.38 : isAnimal ? -0.22 : -0.15,
         isHuman ? zOffset - 0.05 : isAnimal ? zOffset + 0.08 : zOffset
       );
       const targetRotX = isHuman ? -0.16 : isAnimal ? -0.25 : 0;
-      const targetRotZ = isAnimal ? 0.12 : 0;
+      const targetRotY = isHuman ? count % 2 === 1 ? -0.14 : 0.14 : 0;
+      const targetRotZ = isAnimal ? 0.12 : isHuman ? count % 2 === 1 ? 0.05 : -0.05 : 0;
       const animItem = {
         mesh: obstacleMesh,
         info: obstacleInfo,
@@ -36161,6 +36554,7 @@ void main() {
         startPos: new Vector3(0, isHuman ? -0.32 : isAnimal ? -0.16 : -0.15, 1.55),
         targetPos,
         targetRotX,
+        targetRotY,
         targetRotZ,
         settled: false,
         userData: obstacleMesh.userData || {}
@@ -36284,9 +36678,11 @@ void main() {
           const elasticDip = -0.16 * Math.sin(Math.max(0, Math.min(1, (p - 0.3) / 0.55)) * Math.PI);
           const baseCurY = MathUtils.lerp(cap.startPos.y, cap.targetPos.y, s);
           const curY = baseCurY + rampHump + elasticDip;
-          cap.mesh.position.set(0, curY, curZ);
+          const curX = MathUtils.lerp(cap.startPos.x, cap.targetPos.x, s);
+          cap.mesh.position.set(curX, curY, curZ);
           const rotS = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, p / 0.75));
           cap.mesh.rotation.x = MathUtils.lerp(0, cap.targetRotX, rotS);
+          cap.mesh.rotation.y = MathUtils.lerp(0, cap.targetRotY || 0, rotS);
           cap.mesh.rotation.z = MathUtils.lerp(0, cap.targetRotZ, rotS);
           const ud = cap.userData;
           if (ud.type === "human") {
@@ -36313,14 +36709,24 @@ void main() {
           } else if (ud.type === "animal") {
             if (ud.legs) {
               ud.legs.forEach((leg) => {
-                leg.group.rotation.x = MathUtils.lerp(0, leg.isFront ? 1.3 : -1.05, rotS);
+                const grp = leg.group || leg;
+                grp.rotation.x = MathUtils.lerp(0, 0.55, rotS);
                 if (leg.kneeGroup) {
                   leg.kneeGroup.rotation.x = MathUtils.lerp(0, leg.isFront ? -1.8 : 1.7, rotS);
                 }
               });
             }
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              ud.trunkSegments[0].rotation.x = MathUtils.lerp(-0.42, -0.3, rotS);
+              ud.trunkSegments[1].rotation.x = MathUtils.lerp(-0.36, -0.25, rotS);
+              ud.trunkSegments[2].rotation.x = MathUtils.lerp(-0.28, -0.15, rotS);
+              ud.trunkSegments[3].rotation.x = MathUtils.lerp(0.7, 0.55, rotS);
+              ud.trunkSegments[4].rotation.x = MathUtils.lerp(0.75, 0.65, rotS);
+            }
+            if (ud.earL) ud.earL.rotation.y = MathUtils.lerp(-0.45, -0.25, rotS);
+            if (ud.earR) ud.earR.rotation.y = MathUtils.lerp(0.45, 0.25, rotS);
             if (ud.headGroup) {
-              ud.headGroup.rotation.x = MathUtils.lerp(0, -0.2, rotS);
+              ud.headGroup.rotation.x = MathUtils.lerp(0, -0.15, rotS);
             }
           }
           if (p > 0.4 && p < 0.65) {
@@ -36330,12 +36736,25 @@ void main() {
             cap.settled = true;
             cap.mesh.position.copy(cap.targetPos);
             cap.mesh.rotation.x = cap.targetRotX;
+            cap.mesh.rotation.y = cap.targetRotY || 0;
             cap.mesh.rotation.z = cap.targetRotZ;
           }
         } else {
           const ud = cap.userData;
           const t = this.aeroTime;
           if (ud.type === "human") {
+            if (ud.faceData) {
+              const blinkCycle = t * 0.32 % 1;
+              let blinkFactor = 0;
+              if (blinkCycle < 0.04) {
+                blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
+              }
+              if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
+                ud.faceData.drawFace(blinkFactor);
+                ud.faceData.tex.needsUpdate = true;
+                ud.faceData.lastBlink = blinkFactor;
+              }
+            }
             const breath = Math.sin(t * 2.8);
             const deepReliefSigh = Math.pow(Math.max(0, Math.sin(t * 0.45)), 4) * 0.08;
             if (ud.torsoGroup) {
@@ -36365,28 +36784,44 @@ void main() {
             cap.mesh.rotation.z = 0.025 * Math.sin(t * 3.2) * vNorm;
             cap.mesh.rotation.x = cap.targetRotX + 0.018 * Math.cos(t * 3.8) * vNorm;
           } else if (ud.type === "animal") {
-            const breathAnim = Math.sin(t * 4.2);
+            if (ud.faceData) {
+              const blinkCycle = t * 0.25 % 1;
+              let blinkFactor = 0;
+              if (blinkCycle < 0.05) {
+                blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
+              }
+              if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
+                ud.faceData.drawFace(blinkFactor);
+                ud.faceData.tex.needsUpdate = true;
+                ud.faceData.lastBlink = blinkFactor;
+              }
+            }
+            const breathAnim = Math.sin(t * 2.8);
             if (ud.body) {
-              ud.body.scale.set(0.92 + 0.045 * breathAnim, 1.15 + 0.035 * breathAnim, 1);
+              ud.body.scale.set(1.05 + 0.03 * breathAnim, 1.18 + 0.025 * breathAnim, 1);
             }
             if (ud.headGroup) {
-              ud.headGroup.rotation.y = Math.sin(t * 1.4) * 0.35;
-              ud.headGroup.rotation.x = -0.18 + Math.sin(t * 2.4) * 0.08;
+              ud.headGroup.rotation.y = Math.sin(t * 1.2) * 0.22;
+              ud.headGroup.rotation.x = -0.12 + Math.sin(t * 2) * 0.05;
             }
-            if (ud.ears && ud.ears.length >= 2) {
-              ud.ears[0].rotation.z = -0.55 + Math.sin(t * 7.5) * 0.25;
-              ud.ears[1].rotation.z = 0.55 + Math.sin(t * 6 + 1.2) * 0.25;
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              const curlWave = Math.sin(t * 2);
+              ud.trunkSegments[0].rotation.x = -0.3 + 0.05 * curlWave;
+              ud.trunkSegments[1].rotation.x = -0.25 + 0.04 * curlWave;
+              ud.trunkSegments[2].rotation.x = -0.15 + 0.03 * curlWave;
+              ud.trunkSegments[3].rotation.x = 0.55 + 0.06 * curlWave;
+              ud.trunkSegments[4].rotation.x = 0.65 + 0.08 * curlWave;
             }
+            if (ud.earL) ud.earL.rotation.y = -0.3 + 0.08 * Math.sin(t * 1.8);
+            if (ud.earR) ud.earR.rotation.y = 0.3 - 0.08 * Math.sin(t * 1.8);
             if (ud.tail) {
-              ud.tail.rotation.z = Math.sin(t * 4.5) * 0.55;
-              ud.tail.rotation.x = 0.35 + Math.abs(Math.sin(t * 2.2)) * 0.25;
+              ud.tail.rotation.z = Math.sin(t * 3.5) * 0.45;
+              ud.tail.rotation.x = 0.35 + Math.abs(Math.sin(t * 1.8)) * 0.2;
             }
             if (ud.legs) {
               ud.legs.forEach((leg) => {
-                leg.group.rotation.x = leg.isFront ? 1.3 : -1.05;
-                if (leg.kneeGroup) {
-                  leg.kneeGroup.rotation.x = leg.isFront ? -1.8 : 1.7;
-                }
+                const grp = leg.group || leg;
+                grp.rotation.x = 0.55;
               });
             }
           }
@@ -37878,6 +38313,61 @@ void main() {
       this.track = track;
       this.obstacles = [];
       this.nextId = 1;
+      this.activeDeterrenceMode = "electric_shock";
+      this.deterrenceSpecs = {
+        electric_shock: {
+          id: "electric_shock",
+          name: "Track Electric Shock (High-Voltage Safety Analysis)",
+          shortTitle: "TRACK ELECTRIC SHOCK",
+          badge: "6.5kV PULSE",
+          color: "#38bdf8",
+          detail: "Discharges non-lethal pulsed electrical gradient (6.5 kV, < 3.8 mA, micro-joule duration) across track rails and forward contact sweepers (compliant with IEC 60335-2-76 / RDSO). Induces involuntary muscular jump reflex through hooves to compel immediate flight off track without tissue burns or physical injury."
+        },
+        bio_acoustic: {
+          id: "bio_acoustic",
+          name: "Bio-Acoustic Swarm (Zero-Harm Repellent)",
+          shortTitle: "PLAN BEE BIO-SWARM",
+          badge: "380Hz SWARM",
+          color: "#f59e0b",
+          detail: "Indian Railways 'Plan Bee' award-winning acoustic deterrent. Broadcasts directional 280\u2013420 Hz audio signature replicating swarming honeybees. Triggers innate evolutionary flight response in heavy cattle and elephants fearing bee stings to sensitive snouts and eyes."
+        },
+        lrad: {
+          id: "lrad",
+          name: "Acoustic LRAD (Directional Sound 1-1.5km)",
+          shortTitle: "ACOUSTIC LRAD",
+          badge: "138dB BEAM",
+          color: "#06b6d4",
+          detail: "Long Range Acoustic Device emitting focused 138 dB directional acoustic wave front (2.5 kHz siren pulses) penetrating wind noise up to 1.5 km ahead. Projects clear auditory alarm exclusively along rail corridor to disperse wildlife."
+        },
+        mmw_denial: {
+          id: "mmw_denial",
+          name: "Pulsed Millimeter Wave (Active Denial)",
+          shortTitle: "PULSED MMW DENIAL",
+          badge: "95GHz PULSE",
+          color: "#ec4899",
+          detail: "95 GHz directed electromagnetic micro-pulses penetrating only 0.4 mm of epidermal moisture. Rapidly excites surface water molecules, inducing an instantaneous, harmless surface heat sensation that triggers an instinctive retreat reflex without tissue damage."
+        },
+        holographic_mimo: {
+          id: "holographic_mimo",
+          name: "Holographic MIMO (Continuous Metasurface)",
+          shortTitle: "HOLOGRAPHIC MIMO",
+          badge: "METASURFACE",
+          color: "#10b981",
+          detail: "Reconfigurable Intelligent Surface (RIS) holographic metasurface antenna. Dynamically synthesizes targeted electromagnetic wavefronts focused on the animal's exact spatial coordinates to guide it away from the track."
+        },
+        retrodirective: {
+          id: "retrodirective",
+          name: "Retrodirective (Zero-Latency Conjugate)",
+          shortTitle: "RETRODIRECTIVE",
+          badge: "PHASE-CONJUGATE",
+          color: "#8b5cf6",
+          detail: "Phase-conjugate retrodirective array. Automatically steers non-lethal deterrence pulses along the exact received radar line-of-sight vector with zero digital processing latency, continuously tracking the obstacle as the train approaches."
+        }
+      };
+      this.fxGroup = new Group();
+      this.scene.add(this.fxGroup);
+      this.activeFX = null;
+      this.fxTimer = 0;
       this.telemetry = {
         targetDetected: false,
         type: null,
@@ -37890,39 +38380,95 @@ void main() {
         alertType: "info",
         // 'info' | 'deploy' | 'hazard' | 'success'
         collectedCount: 0,
-        collectedWeight: 0
+        collectedWeight: 0,
+        deterrenceActive: false,
+        deterrenceMode: "electric_shock"
       };
       this.animTime = 0;
       this.materials = {
-        humanSkin: new MeshStandardMaterial({ color: 14654327, roughness: 0.65 }),
-        humanShirt: new MeshStandardMaterial({ color: 13751771, roughness: 0.7 }),
-        humanVest: new MeshStandardMaterial({ color: 16347926, roughness: 0.45 }),
-        // Fluorescent Indian Railways Safety Orange
-        humanReflective: new MeshStandardMaterial({ color: 16317180, roughness: 0.18, metalness: 0.8 }),
-        // 3M Microprismatic Silver
-        humanPants: new MeshStandardMaterial({ color: 1981066, roughness: 0.65 }),
-        // Indian Railways Navy Blue Work Trousers
-        humanBoots: new MeshStandardMaterial({ color: 3811869, roughness: 0.55 }),
-        // Heavy Oiled Work Leather
-        bootSole: new MeshStandardMaterial({ color: 1579035, roughness: 0.9 }),
-        // Black Lugged Rubber Tread
-        humanBelt: new MeshStandardMaterial({ color: 2565930, roughness: 0.75 }),
-        humanEyes: new MeshBasicMaterial({ color: 592139 }),
-        helmetYellow: new MeshStandardMaterial({ color: 16436245, roughness: 0.25, metalness: 0.15 }),
-        // High-Gloss Fiber Hard Hat
-        radioPlastic: new MeshStandardMaterial({ color: 1579035, roughness: 0.4 }),
+        // Modern Stylized Human Character Materials (Exact match to media_1793819995371_c74a70f7.png)
+        humanSkinPeach: new MeshStandardMaterial({ color: 16566183, roughness: 0.62 }),
+        // Warm peach skin tone
+        humanSkinShadow: new MeshStandardMaterial({ color: 15445387, roughness: 0.68 }),
+        humanBlush: new MeshStandardMaterial({ color: 16020150, roughness: 0.55, transparent: true, opacity: 0.85 }),
+        // Rosy blush cheeks
+        humanHairGinger: new MeshStandardMaterial({ color: 14243627, roughness: 0.78 }),
+        // Auburn / ginger swept quiff hair
+        humanEyesWhite: new MeshBasicMaterial({ color: 16777215 }),
+        humanEyesIris: new MeshStandardMaterial({ color: 1976635, roughness: 0.2 }),
+        // Deep dark friendly cartoon pupil
+        humanEyeReflex: new MeshBasicMaterial({ color: 16777215 }),
+        // Specular catchlight dot
+        humanBrow: new MeshStandardMaterial({ color: 2565930, roughness: 0.7 }),
+        // Arched brows
+        humanSmile: new MeshStandardMaterial({ color: 10105874, roughness: 0.6 }),
+        // Sweet curved mouth
+        humanPoloCream: new MeshStandardMaterial({ color: 16051940, roughness: 0.72 }),
+        // Beige / cream polo shirt
+        humanPoloCollar: new MeshStandardMaterial({ color: 16777215, roughness: 0.55 }),
+        // Crisp white folded collar
+        humanPantsBrown: new MeshStandardMaterial({ color: 7883314, roughness: 0.75 }),
+        // Tailored warm brown chinos
+        humanShoesDark: new MeshStandardMaterial({ color: 2039587, roughness: 0.65 }),
+        // Dark casual loafers
+        // Indian Elephant Materials (Exact match to media_1793820037213_e448b2e7.jpg)
+        elephantSkin: new MeshStandardMaterial({ color: 5667725, roughness: 0.74 }),
+        // Slate blue-grey body skin
+        elephantSkinDark: new MeshStandardMaterial({ color: 4021355, roughness: 0.78 }),
+        // Dark contour accents & creases
+        elephantEarInner: new MeshStandardMaterial({ color: 4877178, roughness: 0.82 }),
+        // Ear contour / inner face
+        elephantTusk: new MeshStandardMaterial({ color: 16775909, roughness: 0.32, metalness: 0.05 }),
+        // Smooth ivory tusks
+        elephantTuskTip: new MeshStandardMaterial({ color: 16707722, roughness: 0.35 }),
+        // Warm golden tusk tip
+        elephantNails: new MeshStandardMaterial({ color: 16707722, roughness: 0.42 }),
+        // 3 cute yellow toenails per foot
+        elephantEyeWhite: new MeshBasicMaterial({ color: 16317180 }),
+        // Big cartoon white sclera
+        elephantEyePupil: new MeshStandardMaterial({ color: 1579035, roughness: 0.15 }),
+        // Deep dark cartoon pupil
+        elephantEyeCatchlight: new MeshBasicMaterial({ color: 16777215 }),
+        // Eye specular highlight
+        elephantSmile: new MeshStandardMaterial({ color: 1976635, roughness: 0.5 }),
+        // Curved smile line
+        elephantTailBrush: new MeshStandardMaterial({ color: 2241085, roughness: 0.85 }),
+        // Dark brush tuft
+        // Legacy Trackman / Industrial Materials
+        humanSkin: new MeshStandardMaterial({ color: 12417876, roughness: 0.72 }),
+        humanShirt: new MeshStandardMaterial({ color: 1976635, roughness: 0.75 }),
+        humanVest: new MeshStandardMaterial({ color: 16733440, roughness: 0.45 }),
+        humanVestTrim: new MeshStandardMaterial({ color: 988970, roughness: 0.6 }),
+        humanReflective: new MeshStandardMaterial({ color: 16777215, roughness: 0.15, metalness: 0.5 }),
+        humanPants: new MeshStandardMaterial({ color: 1981023, roughness: 0.75 }),
+        humanBoots: new MeshStandardMaterial({ color: 3022871, roughness: 0.52 }),
+        bootSole: new MeshStandardMaterial({ color: 1118741, roughness: 0.95 }),
+        humanBelt: new MeshStandardMaterial({ color: 1841431, roughness: 0.75 }),
+        leatherGlove: new MeshStandardMaterial({ color: 4731426, roughness: 0.65 }),
+        helmetYellow: new MeshStandardMaterial({ color: 16096779, roughness: 0.22, metalness: 0.1 }),
+        radioPlastic: new MeshStandardMaterial({ color: 1579035, roughness: 0.35 }),
         darkHousing: new MeshStandardMaterial({ color: 1976635, roughness: 0.35 }),
         glassLens: new MeshPhysicalMaterial({ color: 3718648, roughness: 0.05, transmission: 0.85, thickness: 0.1 }),
         brass: new MeshStandardMaterial({ color: 14251782, roughness: 0.25, metalness: 0.88 }),
+        // Wildlife / Spotted Deer / Calf Materials
+        animalFur: new MeshStandardMaterial({ color: 12082457, roughness: 0.74 }),
+        animalFurDark: new MeshStandardMaterial({ color: 8139786, roughness: 0.78 }),
+        animalUnderbelly: new MeshStandardMaterial({ color: 16643810, roughness: 0.82 }),
+        animalSpot: new MeshStandardMaterial({ color: 16777215, roughness: 0.88 }),
+        animalMuzzle: new MeshStandardMaterial({ color: 1841431, roughness: 0.35 }),
+        animalEyeWhite: new MeshBasicMaterial({ color: 14870768 }),
+        animalEye: new MeshStandardMaterial({ color: 592139, roughness: 0.08, metalness: 0.1 }),
+        animalEyeReflex: new MeshBasicMaterial({ color: 16777215 }),
+        animalEarInner: new MeshStandardMaterial({ color: 14656404, roughness: 0.85 }),
+        animalAntler: new MeshStandardMaterial({ color: 14074532, roughness: 0.45 }),
+        animalHoof: new MeshStandardMaterial({ color: 1579035, roughness: 0.75 }),
+        // Dark cloven hooves
+        // Heavy Cattle & Debris Materials
         cattleHide: new MeshStandardMaterial({ color: 9735038, roughness: 0.72 }),
         // Authentic Indian Desi Zebu Dun Hide
         cattleDark: new MeshStandardMaterial({ color: 2565930, roughness: 0.65 }),
         cattleHorn: new MeshStandardMaterial({ color: 15987958, roughness: 0.35, metalness: 0.08 }),
         cattleEye: new MeshBasicMaterial({ color: 592139 }),
-        animalFur: new MeshStandardMaterial({ color: 11817737, roughness: 0.75 }),
-        // Warm Golden Wildlife Fur
-        animalMuzzle: new MeshStandardMaterial({ color: 1841431, roughness: 0.5 }),
-        animalHoof: new MeshStandardMaterial({ color: 2696484, roughness: 0.8 }),
         woodCrate: new MeshStandardMaterial({ color: 7877903, roughness: 0.85 }),
         // Weathered Railway Teak Wood
         industrialSteel: new MeshStandardMaterial({ color: 9741240, roughness: 0.25, metalness: 0.88 }),
@@ -37933,137 +38479,384 @@ void main() {
     // ------------------------------------------------------------------
     // 3D Model Builders for Human, Animal, Heavy Cattle, Debris
     // ------------------------------------------------------------------
-    // 1. Human Track Worker / Railway Inspector (Mass: 72 kg <= 150 kg -> SCOOPABLE)
-    // Realistic Indian Railways trackman with fluorescent high-vis jacket, 3M reflective cross-harness,
-    // walkie-talkie, sculpted anatomical head, hard hat with brim, articulated joints, and steel-toe boots
+    // ------------------------------------------------------------------
+    // Canvas Texture Generators for Living Expressive Facial Features
+    // (Prevents disconnected geometric primitives, clipping, and z-fighting)
+    // ------------------------------------------------------------------
+    createHumanFaceTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext("2d");
+      const drawFace = (blinkFactor = 0) => {
+        ctx.clearRect(0, 0, 1024, 1024);
+        ctx.fillStyle = "#fcd5ba";
+        ctx.fillRect(0, 0, 1024, 1024);
+        const hairGrad = ctx.createLinearGradient(0, 180, 0, 320);
+        hairGrad.addColorStop(0, "#d9572b");
+        hairGrad.addColorStop(0.85, "#d9572b");
+        hairGrad.addColorStop(1, "rgba(217, 87, 43, 0)");
+        ctx.fillStyle = hairGrad;
+        ctx.fillRect(0, 0, 1024, 320);
+        ctx.fillStyle = "#d9572b";
+        ctx.fillRect(0, 0, 160, 1024);
+        ctx.fillRect(864, 0, 160, 1024);
+        [-1, 1].forEach((side) => {
+          const cx = 512 + side * 115;
+          const cy = 540;
+          const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 85);
+          grad.addColorStop(0, "rgba(244, 114, 182, 0.85)");
+          grad.addColorStop(0.5, "rgba(251, 113, 133, 0.40)");
+          grad.addColorStop(1, "rgba(252, 213, 186, 0)");
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 85, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        [-1, 1].forEach((side) => {
+          const ex = 512 + side * 75;
+          const ey = 460;
+          const ew = 28;
+          const eh = 38;
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#1c1917";
+          ctx.beginPath();
+          ctx.ellipse(ex + side * 3, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(ex + side * 3 + 8, ey - 10, 8.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(ex + side * 3 - 8, ey + 10, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          if (blinkFactor > 0.02) {
+            ctx.fillStyle = "#fcd5ba";
+            ctx.beginPath();
+            const lidHeight = eh * 2 * blinkFactor;
+            ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
+            ctx.fill();
+            ctx.strokeStyle = "#27272a";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(ex - ew, ey - eh + lidHeight);
+            ctx.lineTo(ex + ew, ey - eh + lidHeight);
+            ctx.stroke();
+          }
+          ctx.strokeStyle = "#27272a";
+          ctx.lineWidth = 8;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(ex - ew * 1.15, ey - eh - 16);
+          ctx.quadraticCurveTo(ex, ey - eh - 32, ex + ew * 1.15, ey - eh - 14);
+          ctx.stroke();
+        });
+        ctx.strokeStyle = "#e09f7a";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.arc(512, 515, 14, 0.2 * Math.PI, 0.8 * Math.PI);
+        ctx.stroke();
+        ctx.strokeStyle = "#9a3412";
+        ctx.lineWidth = 7;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.arc(512, 565, 36, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+      };
+      drawFace(0);
+      const tex = new CanvasTexture(canvas);
+      return { tex, canvas, ctx, drawFace };
+    }
+    createElephantFaceTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext("2d");
+      const drawFace = (blinkFactor = 0) => {
+        ctx.clearRect(0, 0, 1024, 1024);
+        ctx.fillStyle = "#567b8d";
+        ctx.fillRect(0, 0, 1024, 1024);
+        [-1, 1].forEach((side) => {
+          const ex = 512 + side * 125;
+          const ey = 425;
+          const ew = 48;
+          const eh = 64;
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#18181b";
+          ctx.beginPath();
+          ctx.ellipse(ex + side * 5, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(ex + side * 5 + 12, ey - 15, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(ex + side * 5 - 12, ey + 15, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+          if (blinkFactor > 0.02) {
+            ctx.fillStyle = "#567b8d";
+            ctx.beginPath();
+            const lidHeight = eh * 2 * blinkFactor;
+            ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
+            ctx.fill();
+            ctx.strokeStyle = "#2d4554";
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(ex - ew, ey - eh + lidHeight);
+            ctx.lineTo(ex + ew, ey - eh + lidHeight);
+            ctx.stroke();
+          }
+          ctx.strokeStyle = "#1e293b";
+          ctx.lineWidth = 9;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(ex - ew * 1.1, ey - eh - 18);
+          ctx.quadraticCurveTo(ex, ey - eh - 36, ex + ew * 1.1, ey - eh - 16);
+          ctx.stroke();
+        });
+        [-1, 1].forEach((side) => {
+          ctx.strokeStyle = "#2d4554";
+          ctx.lineWidth = 7;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.arc(512 + side * 95, 560, 34, (side > 0 ? 0.8 : 0) * Math.PI, (side > 0 ? 1.4 : 0.6) * Math.PI);
+          ctx.stroke();
+        });
+        ctx.strokeStyle = "#3d5c6b";
+        ctx.lineWidth = 6;
+        ctx.lineCap = "round";
+        [490, 525, 560].forEach((wy) => {
+          ctx.beginPath();
+          ctx.arc(512, wy, 48, 0.2 * Math.PI, 0.8 * Math.PI);
+          ctx.stroke();
+        });
+      };
+      drawFace(0);
+      const tex = new CanvasTexture(canvas);
+      return { tex, canvas, ctx, drawFace };
+    }
+    // 1. Modern Stylized Human Character (Mass: 72 kg <= 150 kg -> SCOOPABLE)
+    // Exact anatomical & aesthetic match to media_1793819995371_c74a70f7.png:
+    // Auburn/ginger swept-crest quiff hair, warm peach skin, blushing rosy cheeks, friendly eyes with catchlights,
+    // cream short-sleeve polo shirt with crisp white collar, warm brown chinos, and dark casual loafers
     buildHumanMesh() {
       const group = new Group();
-      group.name = "humanWorker";
-      const pelvis = new Mesh(new CylinderGeometry(0.16, 0.14, 0.18, 12), this.materials.humanPants);
+      group.name = "stylizedHuman";
+      const faceData = this.createHumanFaceTexture();
+      const pelvis = new Mesh(
+        new CylinderGeometry(0.15, 0.138, 0.16, 22),
+        this.materials.humanPantsBrown
+      );
       pelvis.position.y = 0.88;
+      pelvis.scale.set(1.02, 1, 0.76);
       pelvis.castShadow = true;
       group.add(pelvis);
-      const belt = new Mesh(new CylinderGeometry(0.17, 0.17, 0.05, 14), this.materials.humanBelt);
-      belt.position.y = 0.95;
-      group.add(belt);
-      const buckle = new Mesh(new BoxGeometry(0.06, 0.05, 0.03), this.materials.brass);
-      buckle.position.set(0, 0.95, 0.17);
-      group.add(buckle);
-      const pouch = new Mesh(new BoxGeometry(0.08, 0.1, 0.05), this.materials.humanBelt);
-      pouch.position.set(0.18, 0.92, 0.04);
-      group.add(pouch);
+      const saddle = new Mesh(
+        new SphereGeometry(0.142, 18, 14),
+        this.materials.humanPantsBrown
+      );
+      saddle.position.set(0, 0.84, 0);
+      saddle.scale.set(1.02, 0.85, 0.76);
+      group.add(saddle);
       const torsoGroup = new Group();
-      torsoGroup.position.set(0, 0.98, 0);
-      const shirt = new Mesh(new CylinderGeometry(0.19, 0.16, 0.38, 14), this.materials.humanShirt);
-      shirt.position.y = 0.19;
-      shirt.castShadow = true;
-      torsoGroup.add(shirt);
-      const vest = new Mesh(new CylinderGeometry(0.205, 0.175, 0.36, 14), this.materials.humanVest);
-      vest.position.y = 0.18;
-      vest.castShadow = true;
-      torsoGroup.add(vest);
-      [-0.09, 0.09].forEach((rx, idx) => {
-        const refFront = new Mesh(new BoxGeometry(0.045, 0.32, 0.012), this.materials.humanReflective);
-        refFront.position.set(rx, 0.18, 0.188);
-        refFront.rotation.y = idx === 0 ? 0.06 : -0.06;
-        torsoGroup.add(refFront);
-        const refBack = new Mesh(new BoxGeometry(0.045, 0.32, 0.012), this.materials.humanReflective);
-        refBack.position.set(rx, 0.18, -0.188);
-        refBack.rotation.y = idx === 0 ? -0.06 : 0.06;
-        torsoGroup.add(refBack);
+      torsoGroup.position.set(0, 0.94, 0);
+      const chest = new Mesh(
+        new CylinderGeometry(0.185, 0.165, 0.22, 24),
+        this.materials.humanPoloCream
+      );
+      chest.position.y = 0.29;
+      chest.scale.set(1.08, 1, 0.75);
+      chest.castShadow = true;
+      torsoGroup.add(chest);
+      const midriff = new Mesh(
+        new CylinderGeometry(0.165, 0.148, 0.2, 24),
+        this.materials.humanPoloCream
+      );
+      midriff.position.y = 0.11;
+      midriff.scale.set(1.04, 1, 0.75);
+      midriff.castShadow = true;
+      torsoGroup.add(midriff);
+      const hem = new Mesh(
+        new CylinderGeometry(0.152, 0.152, 0.04, 24),
+        this.materials.humanPoloCream
+      );
+      hem.position.y = 0.01;
+      hem.scale.set(1.04, 1, 0.76);
+      torsoGroup.add(hem);
+      [-0.17, 0.17].forEach((sx) => {
+        const deltoid = new Mesh(
+          new SphereGeometry(0.068, 18, 14),
+          this.materials.humanPoloCream
+        );
+        deltoid.position.set(sx, 0.33, 0);
+        deltoid.scale.set(1, 0.85, 0.95);
+        torsoGroup.add(deltoid);
       });
-      const refWaist = new Mesh(new CylinderGeometry(0.208, 0.178, 0.042, 14), this.materials.humanReflective);
-      refWaist.position.y = 0.05;
-      torsoGroup.add(refWaist);
-      const radio = new Mesh(new BoxGeometry(0.05, 0.1, 0.035), this.materials.radioPlastic);
-      radio.position.set(-0.14, 0.28, 0.16);
-      radio.rotation.z = -0.15;
-      torsoGroup.add(radio);
-      const antenna = new Mesh(new CylinderGeometry(4e-3, 4e-3, 0.08, 6), this.materials.radioPlastic);
-      antenna.position.set(-0.15, 0.35, 0.16);
-      torsoGroup.add(antenna);
-      const neck = new Mesh(new CylinderGeometry(0.075, 0.085, 0.12, 10), this.materials.humanSkin);
-      neck.position.set(0, 0.38, 0);
+      const placket = new Mesh(
+        new BoxGeometry(0.026, 0.16, 0.012),
+        this.materials.humanPoloCollar
+      );
+      placket.position.set(0, 0.26, 0.112);
+      torsoGroup.add(placket);
+      [0.3, 0.24].forEach((by) => {
+        const button = new Mesh(
+          new CylinderGeometry(5e-3, 5e-3, 6e-3, 8).rotateX(Math.PI / 2),
+          new MeshStandardMaterial({ color: 15857145, roughness: 0.3 })
+        );
+        button.position.set(0, by, 0.119);
+        torsoGroup.add(button);
+      });
+      const neck = new Mesh(
+        new CylinderGeometry(0.046, 0.052, 0.12, 18),
+        this.materials.humanSkinPeach
+      );
+      neck.position.y = 0.42;
       torsoGroup.add(neck);
-      const headGroup = new Group();
-      headGroup.position.set(0, 0.48, 0.02);
-      const cranium = new Mesh(new SphereGeometry(0.115, 16, 14), this.materials.humanSkin);
-      cranium.scale.set(1, 1.15, 1.05);
-      cranium.castShadow = true;
-      headGroup.add(cranium);
-      const nose = new Mesh(new ConeGeometry(0.022, 0.045, 8).rotateX(Math.PI / 2), this.materials.humanSkin);
-      nose.position.set(0, -0.01, 0.125);
-      headGroup.add(nose);
-      [-0.04, 0.04].forEach((ex) => {
-        const eye = new Mesh(new SphereGeometry(0.012, 8, 8), this.materials.humanEyes);
-        eye.position.set(ex, 0.025, 0.112);
-        headGroup.add(eye);
+      const collarBand = new Mesh(
+        new CylinderGeometry(0.06, 0.072, 0.045, 20),
+        this.materials.humanPoloCollar
+      );
+      collarBand.position.y = 0.39;
+      torsoGroup.add(collarBand);
+      [-1, 1].forEach((side) => {
+        const collarWing = new Mesh(
+          new BoxGeometry(0.07, 0.085, 0.014),
+          this.materials.humanPoloCollar
+        );
+        collarWing.position.set(side * 0.048, 0.36, 0.076);
+        collarWing.rotation.set(-0.35, side * 0.28, side * -0.36);
+        torsoGroup.add(collarWing);
       });
-      [-0.12, 0.12].forEach((ex) => {
-        const ear = new Mesh(new SphereGeometry(0.024, 8, 8), this.materials.humanSkin);
-        ear.scale.set(0.4, 1, 0.7);
-        ear.position.set(ex, 0, 0);
+      const headGroup = new Group();
+      headGroup.position.set(0, 0.5, 0.01);
+      const headGeo = new SphereGeometry(0.122, 32, 24);
+      headGeo.rotateY(-Math.PI / 2);
+      const headMesh = new Mesh(
+        headGeo,
+        new MeshStandardMaterial({
+          map: faceData.tex,
+          roughness: 0.65
+        })
+      );
+      headMesh.scale.set(0.94, 1.05, 0.96);
+      headMesh.castShadow = true;
+      headGroup.add(headMesh);
+      const hairShape = new Shape();
+      hairShape.moveTo(-0.09, 0);
+      hairShape.bezierCurveTo(-0.13, 0.08, -0.07, 0.2, 0.05, 0.22);
+      hairShape.bezierCurveTo(0.14, 0.23, 0.18, 0.14, 0.14, 0.05);
+      hairShape.bezierCurveTo(0.09, -0.01, 0.02, -0.02, -0.09, 0);
+      hairShape.closePath();
+      const hairQuiff = new Mesh(
+        new ExtrudeGeometry(hairShape, {
+          depth: 0.14,
+          bevelEnabled: true,
+          bevelThickness: 0.025,
+          bevelSize: 0.02,
+          bevelSegments: 4
+        }),
+        this.materials.humanHairGinger
+      );
+      hairQuiff.position.set(0, 0.05, 0.015);
+      hairQuiff.rotation.set(-0.3, 0.15, -0.1);
+      headGroup.add(hairQuiff);
+      const backHair = new Mesh(
+        new SphereGeometry(0.124, 24, 16, -Math.PI * 0.7, Math.PI * 1.4, 0, Math.PI * 0.65),
+        this.materials.humanHairGinger
+      );
+      backHair.position.set(0, 0.015, -0.015);
+      backHair.scale.set(0.96, 1.05, 1);
+      headGroup.add(backHair);
+      [-1, 1].forEach((side) => {
+        const sideburn = new Mesh(
+          new BoxGeometry(0.016, 0.055, 0.032),
+          this.materials.humanHairGinger
+        );
+        sideburn.position.set(side * 0.108, 0.012, 0.018);
+        headGroup.add(sideburn);
+        const ear = new Mesh(
+          new SphereGeometry(0.026, 14, 10),
+          this.materials.humanSkinPeach
+        );
+        ear.scale.set(0.35, 1.15, 0.75);
+        ear.position.set(side * 0.115, -8e-3, -5e-3);
+        ear.rotation.y = side * 0.18;
         headGroup.add(ear);
       });
-      const helmetCrown = new Mesh(new SphereGeometry(0.14, 16, 12), this.materials.helmetYellow);
-      helmetCrown.position.set(0, 0.05, -0.01);
-      helmetCrown.scale.set(1.02, 0.85, 1.12);
-      headGroup.add(helmetCrown);
-      const brimGeo = new CylinderGeometry(0.165, 0.165, 0.02, 16);
-      const helmetBrim = new Mesh(brimGeo, this.materials.helmetYellow);
-      helmetBrim.position.set(0, 0.03, 0.02);
-      helmetBrim.rotation.x = 0.08;
-      headGroup.add(helmetBrim);
-      const helmetRib = new Mesh(new BoxGeometry(0.03, 0.06, 0.22), this.materials.helmetYellow);
-      helmetRib.position.set(0, 0.14, -0.01);
-      headGroup.add(helmetRib);
-      const goggleFrame = new Mesh(new BoxGeometry(0.14, 0.03, 0.04), this.materials.darkHousing);
-      goggleFrame.position.set(0, 0.05, 0.12);
-      headGroup.add(goggleFrame);
-      [-0.038, 0.038].forEach((gx) => {
-        const gLens = new Mesh(new BoxGeometry(0.042, 0.024, 0.01), this.materials.glassLens);
-        gLens.position.set(gx, 0.05, 0.142);
-        headGroup.add(gLens);
-      });
       torsoGroup.add(headGroup);
-      group.userData = {
-        type: "human",
-        torsoGroup,
-        headGroup,
-        armL: null,
-        armR: null,
-        forearmL: null,
-        forearmR: null,
-        legL: null,
-        legR: null,
-        lowerLegL: null,
-        lowerLegR: null,
-        toolShaft: null
-      };
       [-1, 1].forEach((side) => {
         const armGroup = new Group();
-        armGroup.position.set(side * 0.23, 0.34, 0);
-        const shoulder = new Mesh(new SphereGeometry(0.065, 12, 10), this.materials.humanVest);
-        armGroup.add(shoulder);
-        const upperArm = new Mesh(new CylinderGeometry(0.052, 0.046, 0.26, 10), this.materials.humanVest);
-        upperArm.position.set(side * 0.02, -0.13, 0);
-        upperArm.rotation.z = side * -0.08;
-        armGroup.add(upperArm);
-        const armStripe = new Mesh(new CylinderGeometry(0.054, 0.054, 0.035, 10), this.materials.humanReflective);
-        armStripe.position.set(side * 0.02, -0.16, 0);
-        armGroup.add(armStripe);
+        armGroup.position.set(side * 0.17, 0.33, 0);
+        const sleeve = new Mesh(
+          new CylinderGeometry(0.066, 0.054, 0.15, 18),
+          this.materials.humanPoloCream
+        );
+        sleeve.position.set(side * 8e-3, -0.07, 0);
+        sleeve.rotation.z = side * -0.06;
+        armGroup.add(sleeve);
+        const sleeveCuff = new Mesh(
+          new CylinderGeometry(0.056, 0.056, 0.02, 18),
+          this.materials.humanPoloCream
+        );
+        sleeveCuff.position.set(side * 0.014, -0.14, 0);
+        armGroup.add(sleeveCuff);
+        const bareBicep = new Mesh(
+          new CylinderGeometry(0.048, 0.042, 0.14, 16),
+          this.materials.humanSkinPeach
+        );
+        bareBicep.position.set(side * 0.014, -0.15, 0);
+        armGroup.add(bareBicep);
         const forearmGroup = new Group();
-        forearmGroup.position.set(side * 0.04, -0.26, 0.02);
-        const forearm = new Mesh(new CylinderGeometry(0.044, 0.038, 0.24, 10), this.materials.humanShirt);
-        forearm.position.set(0, -0.08, 0.02);
-        forearm.rotation.x = -0.22;
+        forearmGroup.position.set(side * 0.014, -0.22, 5e-3);
+        const elbow = new Mesh(
+          new SphereGeometry(0.043, 14, 10),
+          this.materials.humanSkinPeach
+        );
+        forearmGroup.add(elbow);
+        const forearm = new Mesh(
+          new CylinderGeometry(0.042, 0.034, 0.22, 16),
+          this.materials.humanSkinPeach
+        );
+        forearm.position.set(0, -0.11, 8e-3);
+        forearm.rotation.x = -0.08;
         forearmGroup.add(forearm);
-        const palm = new Mesh(new BoxGeometry(0.048, 0.075, 0.036), this.materials.humanBoots);
-        palm.position.set(side * 0.01, -0.22, 0.06);
-        forearmGroup.add(palm);
-        const thumb = new Mesh(new SphereGeometry(0.016, 6, 6), this.materials.humanBoots);
-        thumb.position.set(side * -0.015, -0.2, 0.08);
-        forearmGroup.add(thumb);
+        const handGroup = new Group();
+        handGroup.position.set(0, -0.22, 0.015);
+        const wrist = new Mesh(
+          new SphereGeometry(0.033, 12, 10),
+          this.materials.humanSkinPeach
+        );
+        handGroup.add(wrist);
+        const palm = new Mesh(
+          new BoxGeometry(0.042, 0.065, 0.028),
+          this.materials.humanSkinPeach
+        );
+        palm.position.set(0, -0.032, 0);
+        handGroup.add(palm);
+        const thumb = new Mesh(
+          new CylinderGeometry(0.011, 9e-3, 0.036, 8),
+          this.materials.humanSkinPeach
+        );
+        thumb.position.set(-side * 0.022, -0.022, 0.012);
+        thumb.rotation.set(-0.35, 0, -side * 0.45);
+        handGroup.add(thumb);
+        [-0.014, -5e-3, 5e-3, 0.014].forEach((fx) => {
+          const finger = new Mesh(
+            new CylinderGeometry(9e-3, 7e-3, 0.042, 8),
+            this.materials.humanSkinPeach
+          );
+          finger.position.set(fx, -0.075, 3e-3);
+          finger.rotation.x = 0.2;
+          handGroup.add(finger);
+        });
+        forearmGroup.add(handGroup);
         armGroup.add(forearmGroup);
         torsoGroup.add(armGroup);
         if (side === -1) {
@@ -38077,39 +38870,61 @@ void main() {
       group.add(torsoGroup);
       [-1, 1].forEach((side) => {
         const legGroup = new Group();
-        legGroup.position.set(side * 0.11, 0.85, 0);
-        const thigh = new Mesh(new CylinderGeometry(0.078, 0.065, 0.38, 12), this.materials.humanPants);
-        thigh.position.set(0, -0.18, 0.01);
-        thigh.rotation.x = 0.04;
+        legGroup.position.set(side * 0.074, 0.86, 0);
+        const hip = new Mesh(
+          new SphereGeometry(0.068, 16, 12),
+          this.materials.humanPantsBrown
+        );
+        legGroup.add(hip);
+        const thigh = new Mesh(
+          new CylinderGeometry(0.068, 0.056, 0.4, 20),
+          this.materials.humanPantsBrown
+        );
+        thigh.position.set(0, -0.2, 5e-3);
+        thigh.rotation.x = 0.02;
         legGroup.add(thigh);
+        const knee = new Mesh(
+          new SphereGeometry(0.056, 16, 12),
+          this.materials.humanPantsBrown
+        );
+        knee.position.set(0, -0.4, 0.012);
+        legGroup.add(knee);
         const lowerLegGroup = new Group();
-        lowerLegGroup.position.set(0, -0.37, 0.02);
-        const knee = new Mesh(new SphereGeometry(0.062, 10, 8), this.materials.humanPants);
-        lowerLegGroup.add(knee);
-        const calf = new Mesh(new CylinderGeometry(0.062, 0.054, 0.36, 12), this.materials.humanPants);
-        calf.position.set(0, -0.18, -0.01);
+        lowerLegGroup.position.set(0, -0.4, 0.012);
+        const calf = new Mesh(
+          new CylinderGeometry(0.056, 0.048, 0.38, 20),
+          this.materials.humanPantsBrown
+        );
+        calf.position.set(0, -0.19, -6e-3);
         lowerLegGroup.add(calf);
-        const ankleReflector = new Mesh(new CylinderGeometry(0.064, 0.064, 0.035, 12), this.materials.humanReflective);
-        ankleReflector.position.set(0, -0.31, -0.01);
-        lowerLegGroup.add(ankleReflector);
-        const bootGroup = new Group();
-        bootGroup.position.set(0, -0.36, -0.02);
-        const bootAnkle = new Mesh(new CylinderGeometry(0.056, 0.058, 0.1, 10), this.materials.humanBoots);
-        bootAnkle.position.y = 0.04;
-        bootGroup.add(bootAnkle);
-        const bootUpper = new Mesh(new BoxGeometry(0.105, 0.075, 0.2), this.materials.humanBoots);
-        bootUpper.position.set(0, -0.01, 0.05);
-        bootGroup.add(bootUpper);
-        const toeCap = new Mesh(new CylinderGeometry(0.052, 0.052, 0.09, 10).rotateZ(Math.PI / 2), this.materials.bootSole);
-        toeCap.position.set(0, -0.015, 0.13);
-        bootGroup.add(toeCap);
-        const sole = new Mesh(new BoxGeometry(0.115, 0.026, 0.24), this.materials.bootSole);
-        sole.position.set(0, -0.06, 0.045);
-        bootGroup.add(sole);
-        const heel = new Mesh(new BoxGeometry(0.112, 0.022, 0.08), this.materials.bootSole);
-        heel.position.set(0, -0.045, -0.04);
-        bootGroup.add(heel);
-        lowerLegGroup.add(bootGroup);
+        const cuff = new Mesh(
+          new CylinderGeometry(0.052, 0.052, 0.025, 20),
+          this.materials.humanPantsBrown
+        );
+        cuff.position.set(0, -0.37, -6e-3);
+        lowerLegGroup.add(cuff);
+        const shoeGroup = new Group();
+        shoeGroup.position.set(0, -0.4, 0.025);
+        const shoeBody = new Mesh(
+          new BoxGeometry(0.076, 0.046, 0.17),
+          this.materials.humanShoesDark
+        );
+        shoeBody.position.set(0, 0, 0.01);
+        shoeGroup.add(shoeBody);
+        const toeCap = new Mesh(
+          new SphereGeometry(0.038, 14, 10),
+          this.materials.humanShoesDark
+        );
+        toeCap.scale.set(1, 0.65, 1);
+        toeCap.position.set(0, 0, 0.085);
+        shoeGroup.add(toeCap);
+        const sole = new Mesh(
+          new BoxGeometry(0.082, 0.016, 0.185),
+          this.materials.humanShoesDark
+        );
+        sole.position.set(0, -0.028, 0.015);
+        shoeGroup.add(sole);
+        lowerLegGroup.add(shoeGroup);
         legGroup.add(lowerLegGroup);
         group.add(legGroup);
         if (side === -1) {
@@ -38120,94 +38935,300 @@ void main() {
           group.userData.lowerLegR = lowerLegGroup;
         }
       });
-      const toolShaft = new Mesh(new CylinderGeometry(0.012, 0.012, 0.55, 8), this.materials.industrialSteel);
-      toolShaft.position.set(-0.02, -0.28, 0.08);
-      const toolHead = new Mesh(new BoxGeometry(0.12, 0.04, 0.04), this.materials.hazardYellow);
-      toolHead.position.set(0, 0.24, 0);
-      toolShaft.add(toolHead);
-      if (group.userData.forearmL) {
-        group.userData.forearmL.add(toolShaft);
-      }
-      group.userData.toolShaft = toolShaft;
+      group.userData.type = "human";
+      group.userData.torsoGroup = torsoGroup;
+      group.userData.headGroup = headGroup;
+      group.userData.faceData = faceData;
       return group;
     }
-    // 2. Wildlife / Stray Animal (Deer / Stray Calf - Mass: 55 kg <= 150 kg -> SCOOPABLE)
-    // Sculpted anatomical quadruped with contoured head, alert ears, articulated legs, and tail
+    // 2. Indian Elephant (Mass: 110 kg <= 150 kg -> SCOOPABLE IN RESCUE NET)
+    // Exact anatomical & artistic match to media_1793820037213_e448b2e7.jpg:
+    // Plump slate blue-grey rounded body, big floppy flapping fan ears with dark contours,
+    // multi-segment articulated flexible curling/raising trunk, upward curved ivory tusks with golden tips,
+    // friendly cartoon eyes with white sclera and specular catchlights, sweet smile,
+    // 4 sturdy pillar legs with 3 cute yellow semi-circular toenails per foot, and brush-tufted tail
     buildAnimalMesh() {
       const group = new Group();
-      group.name = "wildlifeCalf";
-      const body = new Mesh(new CylinderGeometry(0.24, 0.21, 0.88, 12).rotateX(Math.PI / 2), this.materials.animalFur);
-      body.position.set(0, 0.68, 0);
-      body.scale.set(0.92, 1.15, 1);
+      group.name = "indianElephant";
+      const elephantFaceData = this.createElephantFaceTexture();
+      const body = new Mesh(
+        new CylinderGeometry(0.44, 0.46, 0.92, 24).rotateX(Math.PI / 2),
+        this.materials.elephantSkin
+      );
+      body.position.set(0, 0.65, 0);
+      body.scale.set(1.05, 1.18, 1);
       body.castShadow = true;
       group.add(body);
-      const chest = new Mesh(new SphereGeometry(0.24, 12, 10), this.materials.animalFur);
-      chest.position.set(0, 0.7, 0.36);
+      const chest = new Mesh(
+        new SphereGeometry(0.45, 22, 18),
+        this.materials.elephantSkin
+      );
+      chest.position.set(0, 0.7, 0.32);
+      chest.scale.set(0.98, 1.15, 0.92);
+      chest.castShadow = true;
       group.add(chest);
-      const rump = new Mesh(new SphereGeometry(0.22, 12, 10), this.materials.animalFur);
-      rump.position.set(0, 0.7, -0.36);
+      const spineHump = new Mesh(
+        new CylinderGeometry(0.28, 0.35, 0.78, 18).rotateX(Math.PI / 2),
+        this.materials.elephantSkin
+      );
+      spineHump.position.set(0, 0.88, 0.02);
+      spineHump.scale.set(0.75, 0.85, 1);
+      spineHump.castShadow = true;
+      group.add(spineHump);
+      const rump = new Mesh(
+        new SphereGeometry(0.43, 22, 18),
+        this.materials.elephantSkin
+      );
+      rump.position.set(0, 0.7, -0.34);
+      rump.scale.set(0.95, 1.12, 0.92);
+      rump.castShadow = true;
       group.add(rump);
-      const neck = new Mesh(new CylinderGeometry(0.11, 0.16, 0.45, 10), this.materials.animalFur);
-      neck.position.set(0, 0.92, 0.48);
-      neck.rotation.x = -0.55;
-      group.add(neck);
+      const belly = new Mesh(
+        new CylinderGeometry(0.36, 0.4, 0.64, 18).rotateX(Math.PI / 2),
+        this.materials.elephantSkin
+      );
+      belly.position.set(0, 0.5, 0);
+      belly.scale.set(0.9, 0.72, 1);
+      group.add(belly);
       const headGroup = new Group();
-      headGroup.position.set(0, 1.14, 0.68);
-      headGroup.rotation.x = 0.15;
-      const cranium = new Mesh(new SphereGeometry(0.13, 12, 10), this.materials.animalFur);
-      cranium.scale.set(0.95, 1.05, 1.15);
+      headGroup.position.set(0, 0.88, 0.45);
+      const headGeo = new SphereGeometry(0.28, 32, 24);
+      headGeo.rotateY(-Math.PI / 2);
+      const cranium = new Mesh(
+        headGeo,
+        new MeshStandardMaterial({
+          map: elephantFaceData.tex,
+          roughness: 0.68
+        })
+      );
+      cranium.scale.set(0.94, 1.06, 1.04);
+      cranium.castShadow = true;
       headGroup.add(cranium);
-      const muzzle = new Mesh(new ConeGeometry(0.085, 0.22, 10).rotateX(Math.PI / 2), this.materials.animalFur);
-      muzzle.position.set(0, -0.04, 0.18);
-      headGroup.add(muzzle);
-      const nose = new Mesh(new SphereGeometry(0.03, 8, 8), this.materials.animalMuzzle);
-      nose.position.set(0, -0.02, 0.29);
-      headGroup.add(nose);
-      [-0.085, 0.085].forEach((ex) => {
-        const eye = new Mesh(new SphereGeometry(0.018, 8, 8), this.materials.cattleEye);
-        eye.position.set(ex, 0.05, 0.09);
-        headGroup.add(eye);
+      [-0.095, 0.095].forEach((bx) => {
+        const bump = new Mesh(
+          new SphereGeometry(0.095, 16, 12),
+          this.materials.elephantSkin
+        );
+        bump.position.set(bx, 0.22, 0.03);
+        bump.scale.set(0.95, 1, 1.1);
+        headGroup.add(bump);
       });
-      const ears = [];
-      [-1, 1].forEach((side) => {
-        const ear = new Mesh(new ConeGeometry(0.045, 0.18, 6), this.materials.animalFur);
-        ear.position.set(side * 0.11, 0.12, -0.04);
-        ear.rotation.z = side * -0.55;
-        ear.rotation.x = -0.2;
-        headGroup.add(ear);
-        ears.push(ear);
+      const earL = new Group();
+      earL.position.set(-0.24, 0.06, -0.04);
+      const earR = new Group();
+      earR.position.set(0.24, 0.06, -0.04);
+      const earShapeL = new Shape();
+      earShapeL.moveTo(0, 0.05);
+      earShapeL.bezierCurveTo(-0.08, 0.22, -0.26, 0.28, -0.36, 0.16);
+      earShapeL.bezierCurveTo(-0.44, 0.06, -0.42, -0.14, -0.32, -0.28);
+      earShapeL.bezierCurveTo(-0.2, -0.4, -0.08, -0.32, 0, -0.18);
+      earShapeL.closePath();
+      const earGeoL = new ExtrudeGeometry(earShapeL, {
+        depth: 0.025,
+        bevelEnabled: true,
+        bevelThickness: 0.018,
+        bevelSize: 0.015,
+        bevelSegments: 4
       });
+      const earMeshL = new Mesh(earGeoL, this.materials.elephantSkin);
+      earL.add(earMeshL);
+      const innerEarL = new Mesh(
+        new ExtrudeGeometry(earShapeL, { depth: 5e-3, bevelEnabled: false }),
+        this.materials.elephantEarInner
+      );
+      innerEarL.scale.set(0.82, 0.82, 1);
+      innerEarL.position.set(-0.02, 0, 0.026);
+      earL.add(innerEarL);
+      const earShapeR = new Shape();
+      earShapeR.moveTo(0, 0.05);
+      earShapeR.bezierCurveTo(0.08, 0.22, 0.26, 0.28, 0.36, 0.16);
+      earShapeR.bezierCurveTo(0.44, 0.06, 0.42, -0.14, 0.32, -0.28);
+      earShapeR.bezierCurveTo(0.2, -0.4, 0.08, -0.32, 0, -0.18);
+      earShapeR.closePath();
+      const earGeoR = new ExtrudeGeometry(earShapeR, {
+        depth: 0.025,
+        bevelEnabled: true,
+        bevelThickness: 0.018,
+        bevelSize: 0.015,
+        bevelSegments: 4
+      });
+      const earMeshR = new Mesh(earGeoR, this.materials.elephantSkin);
+      earR.add(earMeshR);
+      const innerEarR = new Mesh(
+        new ExtrudeGeometry(earShapeR, { depth: 5e-3, bevelEnabled: false }),
+        this.materials.elephantEarInner
+      );
+      innerEarR.scale.set(0.82, 0.82, 1);
+      innerEarR.position.set(0.02, 0, 0.026);
+      earR.add(innerEarR);
+      earL.rotation.set(-0.15, -0.45, -0.1);
+      earR.rotation.set(-0.15, 0.45, 0.1);
+      headGroup.add(earL);
+      headGroup.add(earR);
+      const tuskCurveL = new CatmullRomCurve3([
+        new Vector3(-0.13, -0.14, 0.22),
+        new Vector3(-0.19, -0.25, 0.38),
+        new Vector3(-0.24, -0.1, 0.54)
+      ]);
+      const tuskGeoL = new TubeGeometry(tuskCurveL, 20, 0.035, 12, false);
+      const tuskMeshL = new Mesh(tuskGeoL, this.materials.elephantTusk);
+      headGroup.add(tuskMeshL);
+      const tuskTipL = new Mesh(
+        new SphereGeometry(0.022, 10, 8),
+        this.materials.elephantTuskTip
+      );
+      tuskTipL.position.set(-0.24, -0.1, 0.54);
+      headGroup.add(tuskTipL);
+      const tuskCurveR = new CatmullRomCurve3([
+        new Vector3(0.13, -0.14, 0.22),
+        new Vector3(0.19, -0.25, 0.38),
+        new Vector3(0.24, -0.1, 0.54)
+      ]);
+      const tuskGeoR = new TubeGeometry(tuskCurveR, 20, 0.035, 12, false);
+      const tuskMeshR = new Mesh(tuskGeoR, this.materials.elephantTusk);
+      headGroup.add(tuskMeshR);
+      const tuskTipR = new Mesh(
+        new SphereGeometry(0.022, 10, 8),
+        this.materials.elephantTuskTip
+      );
+      tuskTipR.position.set(0.24, -0.1, 0.54);
+      headGroup.add(tuskTipR);
+      const trunkSegments = [];
+      const trunkRoot = new Group();
+      trunkRoot.position.set(0, -0.05, 0.25);
+      trunkRoot.rotation.x = -0.42;
+      const m0 = new Mesh(
+        new CylinderGeometry(0.102, 0.088, 0.16, 18),
+        this.materials.elephantSkin
+      );
+      m0.position.y = -0.08;
+      trunkRoot.add(m0);
+      const trunkSeg1 = new Group();
+      trunkSeg1.position.set(0, -0.15, 0);
+      trunkSeg1.rotation.x = -0.36;
+      const m1 = new Mesh(
+        new CylinderGeometry(0.088, 0.074, 0.16, 18),
+        this.materials.elephantSkin
+      );
+      m1.position.y = -0.08;
+      trunkSeg1.add(m1);
+      const trunkSeg2 = new Group();
+      trunkSeg2.position.set(0, -0.15, 0);
+      trunkSeg2.rotation.x = -0.28;
+      const m2 = new Mesh(
+        new CylinderGeometry(0.074, 0.062, 0.16, 18),
+        this.materials.elephantSkin
+      );
+      m2.position.y = -0.08;
+      trunkSeg2.add(m2);
+      const trunkSeg3 = new Group();
+      trunkSeg3.position.set(0, -0.14, 0);
+      trunkSeg3.rotation.x = 0.7;
+      const m3 = new Mesh(
+        new CylinderGeometry(0.062, 0.05, 0.14, 16),
+        this.materials.elephantSkin
+      );
+      m3.position.y = -0.07;
+      trunkSeg3.add(m3);
+      const trunkTip = new Group();
+      trunkTip.position.set(0, -0.13, 0);
+      trunkTip.rotation.x = 0.75;
+      const m4 = new Mesh(
+        new CylinderGeometry(0.05, 0.04, 0.12, 14),
+        this.materials.elephantSkin
+      );
+      m4.position.y = -0.06;
+      trunkTip.add(m4);
+      const tipBulb = new Mesh(
+        new SphereGeometry(0.044, 14, 10),
+        this.materials.elephantSkin
+      );
+      tipBulb.position.set(0, -0.11, 0.025);
+      tipBulb.scale.set(0.9, 0.8, 1.2);
+      trunkTip.add(tipBulb);
+      [-0.012, 0.012].forEach((nx) => {
+        const nostril = new Mesh(
+          new SphereGeometry(9e-3, 8, 8),
+          this.materials.elephantSkinDark
+        );
+        nostril.position.set(nx, -0.11, 0.062);
+        trunkTip.add(nostril);
+      });
+      trunkSeg3.add(trunkTip);
+      trunkSeg2.add(trunkSeg3);
+      trunkSeg1.add(trunkSeg2);
+      trunkRoot.add(trunkSeg1);
+      headGroup.add(trunkRoot);
+      trunkSegments.push(trunkRoot, trunkSeg1, trunkSeg2, trunkSeg3, trunkTip);
       group.add(headGroup);
       const legs = [];
       [
-        { x: -0.16, z: 0.3, isFront: true },
-        { x: 0.16, z: 0.3, isFront: true },
-        { x: -0.15, z: -0.32, isFront: false },
-        { x: 0.15, z: -0.32, isFront: false }
-      ].forEach((leg) => {
+        { x: -0.25, z: 0.3, isFront: true },
+        { x: 0.25, z: 0.3, isFront: true },
+        { x: -0.23, z: -0.3, isFront: false },
+        { x: 0.23, z: -0.3, isFront: false }
+      ].forEach((lp) => {
         const legGroup = new Group();
-        legGroup.position.set(leg.x, 0.62, leg.z);
-        const upperRadius = leg.isFront ? 0.065 : 0.075;
-        const upper = new Mesh(new CylinderGeometry(upperRadius, 0.045, 0.3, 8), this.materials.animalFur);
-        upper.position.y = -0.14;
-        legGroup.add(upper);
-        const kneeGroup = new Group();
-        kneeGroup.position.set(0, -0.28, leg.isFront ? 0.01 : -0.02);
-        const knee = new Mesh(new SphereGeometry(0.046, 8, 8), this.materials.animalFur);
-        kneeGroup.add(knee);
-        const lower = new Mesh(new CylinderGeometry(0.042, 0.032, 0.28, 8), this.materials.animalFur);
-        lower.position.y = -0.14;
-        kneeGroup.add(lower);
-        const paw = new Mesh(new BoxGeometry(0.055, 0.042, 0.08), this.materials.animalHoof);
-        paw.position.set(0, -0.28, 0.015);
-        kneeGroup.add(paw);
-        legGroup.add(kneeGroup);
-        legs.push({ group: legGroup, kneeGroup, isFront: leg.isFront });
+        legGroup.position.set(lp.x, 0.62, lp.z);
+        const hipSocket = new Mesh(
+          new SphereGeometry(0.145, 18, 14),
+          this.materials.elephantSkin
+        );
+        legGroup.add(hipSocket);
+        const pillarUpper = new Mesh(
+          new CylinderGeometry(0.138, 0.122, 0.34, 20),
+          this.materials.elephantSkin
+        );
+        pillarUpper.position.y = -0.16;
+        legGroup.add(pillarUpper);
+        const knee = new Mesh(
+          new SphereGeometry(0.124, 16, 12),
+          this.materials.elephantSkin
+        );
+        knee.position.y = -0.34;
+        legGroup.add(knee);
+        const lowerPillar = new Mesh(
+          new CylinderGeometry(0.122, 0.14, 0.26, 20),
+          this.materials.elephantSkin
+        );
+        lowerPillar.position.y = -0.48;
+        legGroup.add(lowerPillar);
+        const footPad = new Mesh(
+          new CylinderGeometry(0.14, 0.145, 0.06, 20),
+          this.materials.elephantSkin
+        );
+        footPad.position.y = -0.59;
+        legGroup.add(footPad);
+        const nailRadius = 0.144;
+        [-0.06, 0, 0.06].forEach((nx) => {
+          const nail = new Mesh(
+            new CylinderGeometry(0.028, 0.028, 0.044, 12).rotateX(Math.PI / 2),
+            this.materials.elephantNails
+          );
+          const nz = Math.sqrt(Math.max(0, nailRadius * nailRadius - nx * nx));
+          nail.position.set(nx, -0.61, nz);
+          nail.scale.set(1, 0.65, 0.85);
+          legGroup.add(nail);
+        });
         group.add(legGroup);
+        legs.push(legGroup);
       });
-      const tail = new Mesh(new CylinderGeometry(0.018, 0.01, 0.28, 6), this.materials.animalFur);
-      tail.position.set(0, 0.65, -0.52);
-      tail.rotation.x = 0.4;
+      const tail = new Group();
+      tail.position.set(0, 0.66, -0.44);
+      const tailCord = new Mesh(
+        new CylinderGeometry(0.022, 0.015, 0.34, 10),
+        this.materials.elephantSkin
+      );
+      tailCord.position.set(0, -0.16, -0.06);
+      tailCord.rotation.x = 0.35;
+      tail.add(tailCord);
+      const tailTuft = new Mesh(
+        new ConeGeometry(0.042, 0.12, 10),
+        this.materials.elephantTailBrush
+      );
+      tailTuft.position.set(0, -0.32, -0.12);
+      tailTuft.rotation.x = 0.35;
+      tail.add(tailTuft);
       group.add(tail);
       group.userData = {
         type: "animal",
@@ -38215,9 +39236,12 @@ void main() {
         chest,
         rump,
         headGroup,
+        faceData: elephantFaceData,
+        trunkSegments,
+        earL,
+        earR,
         legs,
-        tail,
-        ears
+        tail
       };
       return group;
     }
@@ -38406,13 +39430,13 @@ void main() {
       switch (type) {
         case "human":
           mesh = this.buildHumanMesh();
-          name = "Human (Track Worker)";
+          name = "Human (Trackside Pedestrian)";
           mass = 72;
           break;
         case "animal":
           mesh = this.buildAnimalMesh();
-          name = "Wildlife (Stray Deer/Calf)";
-          mass = 55;
+          name = "Wildlife (Indian Elephant)";
+          mass = 110;
           break;
         case "cattle":
           mesh = this.buildHeavyCattleMesh();
@@ -38459,6 +39483,232 @@ void main() {
       return this.spawnObstacle(type, targetProgress);
     }
     // ------------------------------------------------------------------
+    // Active Non-Lethal Animal Deterrence Protocol (>150kg Obstacles)
+    // ------------------------------------------------------------------
+    setDeterrenceMode(mode) {
+      if (this.deterrenceSpecs[mode]) {
+        this.activeDeterrenceMode = mode;
+        this.telemetry.deterrenceMode = mode;
+        return this.deterrenceSpecs[mode];
+      }
+      return this.deterrenceSpecs[this.activeDeterrenceMode];
+    }
+    getDeterrenceSpecs(mode) {
+      return this.deterrenceSpecs[mode] || this.deterrenceSpecs[this.activeDeterrenceMode];
+    }
+    getDeterrenceTickerData(mode) {
+      const m = mode || this.activeDeterrenceMode;
+      switch (m) {
+        case "holographic_mimo":
+          return {
+            arch: "HMIMO",
+            polarization: "CIRCULAR / METASURFACE",
+            carrier: "10.00 CM",
+            focusState: "COLLIMATED",
+            safety: "100% SAFE (99.9% CLEARANCE)"
+          };
+        case "retrodirective":
+          return {
+            arch: "RETRODIRECTIVE",
+            polarization: "DUAL-LINEAR / CONJUGATE",
+            carrier: "5.00 CM",
+            focusState: "PHASE-LOCKED",
+            safety: "100% SAFE (99.8% CLEARANCE)"
+          };
+        case "lrad":
+          return {
+            arch: "ACOUSTIC LRAD",
+            polarization: "DIRECTIONAL 138dB",
+            carrier: "13.6 CM (2.5 kHz)",
+            focusState: "BEAM FOCUS 1.5KM",
+            safety: "100% SAFE (99.9% CLEARANCE)"
+          };
+        case "bio_acoustic":
+          return {
+            arch: "BIO-SWARM",
+            polarization: "PLAN BEE AURA",
+            carrier: "380 Hz SWARM",
+            focusState: "DISPERSION AURA",
+            safety: "100% SAFE (100% CLEARANCE)"
+          };
+        case "mmw_denial":
+          return {
+            arch: "PULSED MMW",
+            polarization: "95 GHz ACTIVE",
+            carrier: "3.16 MM",
+            focusState: "COLLIMATED BEAM",
+            safety: "100% SAFE (99.7% CLEARANCE)"
+          };
+        case "electric_shock":
+        default:
+          return {
+            arch: "E-SHOCK (RDSO)",
+            polarization: "PULSED GRADIENT",
+            carrier: "6.5 kV / 3.8 mA",
+            focusState: "CONTACT SWEEP ARMED",
+            safety: "100% SAFE (99.9% CLEARANCE)"
+          };
+      }
+    }
+    triggerAnimalDeterrence(obs, audio) {
+      if (!obs || obs.isDeterred) return;
+      obs.isDeterred = true;
+      obs.deterMode = this.activeDeterrenceMode;
+      obs.fleeStartTime = this.animTime;
+      obs.fleeDirection = Math.random() > 0.5 ? 1 : -1;
+      obs.isCleared = false;
+      this.fxTimer = 1.2;
+      if (audio) {
+        if (this.activeDeterrenceMode === "electric_shock") {
+          audio.playElectricShockDischarge();
+        } else if (this.activeDeterrenceMode === "bio_acoustic") {
+          audio.playBeeSwarmSound();
+        } else if (this.activeDeterrenceMode === "lrad") {
+          audio.playLRADSirenSound();
+        } else if (this.activeDeterrenceMode === "mmw_denial") {
+          audio.playActiveDenialHum();
+        } else {
+          audio.playElectricShockDischarge();
+        }
+      }
+      this.spawnDeterrenceFX(obs);
+    }
+    spawnDeterrenceFX(obs) {
+      while (this.fxGroup.children.length > 0) {
+        const c = this.fxGroup.children[0];
+        if (c.geometry) c.geometry.dispose();
+        this.fxGroup.remove(c);
+      }
+      const obsPos = obs.mesh.position.clone();
+      const transform = this.track.getTrackTransform(obs.progress, 0);
+      const tangent = transform.tangent.clone().normalize();
+      const forwardMeters = Math.max(15, Math.min(obs.forwardMeters || 65, 80));
+      const trainFrontPos = obsPos.clone().sub(tangent.clone().multiplyScalar(forwardMeters));
+      if (this.activeDeterrenceMode === "electric_shock") {
+        const sparkColor = 6809849;
+        const arcOffsets = [
+          { pA: new Vector3(-0.84, 0.35, 0), pB: new Vector3(-0.35, 0.35, 0) },
+          { pA: new Vector3(0.84, 0.35, 0), pB: new Vector3(0.35, 0.35, 0) },
+          { pA: new Vector3(-0.6, 0.38, -2), pB: new Vector3(-0.25, 0.4, 1) },
+          { pA: new Vector3(0.6, 0.38, -2), pB: new Vector3(0.25, 0.4, 1) }
+        ];
+        arcOffsets.forEach((arc) => {
+          const p1 = trainFrontPos.clone().add(arc.pA);
+          const p2 = obsPos.clone().add(arc.pB);
+          const pts = [];
+          const segs = 10;
+          for (let i = 0; i <= segs; i++) {
+            const t = i / segs;
+            const p = p1.clone().lerp(p2, t);
+            if (i > 0 && i < segs) {
+              p.x += (Math.random() - 0.5) * 0.45;
+              p.y += (Math.random() - 0.5) * 0.35;
+            }
+            pts.push(p);
+          }
+          const geo = new BufferGeometry().setFromPoints(pts);
+          const mat = new LineBasicMaterial({ color: sparkColor, transparent: true, opacity: 0.95 });
+          const line = new Line(geo, mat);
+          line.userData = { isLightning: true, pA: p1, pB: p2 };
+          this.fxGroup.add(line);
+        });
+        const sparkLight = new PointLight(3718648, 6, 25);
+        sparkLight.position.copy(obsPos.clone().add(new Vector3(0, 0.75, 0)));
+        this.fxGroup.add(sparkLight);
+        const sparkCount = 28;
+        const sparkGeo = new BufferGeometry();
+        const sPos = [];
+        for (let s = 0; s < sparkCount; s++) {
+          sPos.push(
+            obsPos.x + (Math.random() - 0.5) * 1.2,
+            obsPos.y + Math.random() * 0.6,
+            obsPos.z + (Math.random() - 0.5) * 1.2
+          );
+        }
+        sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
+        const sparkMat = new PointsMaterial({ color: 14742270, size: 0.08, transparent: true, opacity: 0.9 });
+        this.fxGroup.add(new Points(sparkGeo, sparkMat));
+      } else if (this.activeDeterrenceMode === "bio_acoustic") {
+        const ringGeo = new TorusGeometry(0.85, 0.04, 8, 24);
+        const ringMat = new MeshBasicMaterial({ color: 16096779, transparent: true, opacity: 0.85 });
+        for (let r = 1; r <= 4; r++) {
+          const ring = new Mesh(ringGeo, ringMat);
+          ring.position.copy(trainFrontPos.clone().lerp(obsPos, r * 0.22));
+          ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+          ring.userData = { isAcousticRing: true };
+          this.fxGroup.add(ring);
+        }
+      } else if (this.activeDeterrenceMode === "lrad") {
+        const coneLength = Math.max(10, forwardMeters);
+        const coneGeo = new ConeGeometry(2.2, coneLength, 16, 4, true);
+        coneGeo.rotateX(Math.PI / 2);
+        const coneMat = new MeshBasicMaterial({ color: 440020, wireframe: true, transparent: true, opacity: 0.65 });
+        const cone = new Mesh(coneGeo, coneMat);
+        cone.position.copy(trainFrontPos.clone().lerp(obsPos, 0.5));
+        cone.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+        this.fxGroup.add(cone);
+      } else if (this.activeDeterrenceMode === "mmw_denial") {
+        const beamGeo = new CylinderGeometry(0.08, 0.18, forwardMeters, 12);
+        beamGeo.rotateX(Math.PI / 2);
+        const beamMat = new MeshBasicMaterial({ color: 15485081, transparent: true, opacity: 0.75 });
+        const beam = new Mesh(beamGeo, beamMat);
+        beam.position.copy(trainFrontPos.clone().lerp(obsPos, 0.5));
+        beam.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+        this.fxGroup.add(beam);
+      } else {
+        [-1, 1].forEach((side) => {
+          const p1 = trainFrontPos.clone().add(new Vector3(side * 0.9, 1.8, 0));
+          const p2 = obsPos.clone().add(new Vector3(0, 1.2, 0));
+          const pts = [p1, p2];
+          const lineGeo = new BufferGeometry().setFromPoints(pts);
+          const lineMat = new LineBasicMaterial({ color: 1096065, transparent: true, opacity: 0.9 });
+          this.fxGroup.add(new Line(lineGeo, lineMat));
+        });
+        const reticle = new Mesh(new TorusGeometry(0.9, 0.03, 8, 24), new MeshBasicMaterial({ color: 1096065 }));
+        reticle.position.copy(obsPos.clone().add(new Vector3(0, 1.1, 0)));
+        reticle.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+        this.fxGroup.add(reticle);
+      }
+    }
+    updateDeterrenceFX(dt) {
+      if (this.fxTimer > 0) {
+        this.fxTimer -= dt;
+        this.fxGroup.children.forEach((child) => {
+          if (child.isLine && child.userData.isLightning) {
+            const pA = child.userData.pA;
+            const pB = child.userData.pB;
+            const posAttr = child.geometry.attributes.position;
+            const arr = posAttr.array;
+            const segs = 10;
+            for (let i = 0; i <= segs; i++) {
+              const t = i / segs;
+              const p = pA.clone().lerp(pB, t);
+              if (i > 0 && i < segs) {
+                p.x += (Math.random() - 0.5) * 0.45;
+                p.y += (Math.random() - 0.5) * 0.35;
+              }
+              arr[i * 3] = p.x;
+              arr[i * 3 + 1] = p.y;
+              arr[i * 3 + 2] = p.z;
+            }
+            posAttr.needsUpdate = true;
+          } else if (child.isMesh && child.userData.isAcousticRing) {
+            child.scale.multiplyScalar(1 + dt * 1.8);
+            if (child.material) child.material.opacity = Math.max(0, this.fxTimer / 1.2);
+          } else if (child.isPointLight) {
+            child.intensity = (Math.random() > 0.2 ? 6 : 1) * (this.fxTimer / 1.2);
+          }
+        });
+        if (this.fxTimer <= 0) {
+          while (this.fxGroup.children.length > 0) {
+            const c = this.fxGroup.children[0];
+            if (c.geometry) c.geometry.dispose();
+            this.fxGroup.remove(c);
+          }
+        }
+      }
+    }
+    // ------------------------------------------------------------------
     // Living On-Track Obstacle Animation Loop
     // Simulates breathing, head scanning, contrapposto weight-shifts,
     // grazing, tail swishes, ear twitches, and startled train-avoidance panic
@@ -38473,127 +39723,193 @@ void main() {
         const isTrainClose = dist < 95;
         const isUrgent = dist < 50;
         if (ud.type === "human") {
-          const seed = obs.id * 2.1;
+          const seed = obs.id * 2.3;
           const localT = t + seed;
+          if (ud.faceData) {
+            const blinkCycle = localT * 0.32 % 1;
+            let blinkFactor = 0;
+            if (blinkCycle < 0.04) {
+              blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
+            }
+            if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
+              ud.faceData.drawFace(blinkFactor);
+              ud.faceData.tex.needsUpdate = true;
+              ud.faceData.lastBlink = blinkFactor;
+            }
+          } else if (ud.eyelids && ud.eyelids.length > 0) {
+            const blinkCycle = localT * 0.32 % 1;
+            let blinkScale = 0.05;
+            if (blinkCycle < 0.04) {
+              blinkScale = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
+            }
+            ud.eyelids.forEach((el) => {
+              el.scale.y = blinkScale;
+            });
+          }
           if (!isTrainClose) {
             const breath = Math.sin(localT * 2.2);
             if (ud.torsoGroup) {
-              ud.torsoGroup.scale.set(1 + 0.015 * breath, 1 + 8e-3 * breath, 1 + 0.015 * breath);
-              ud.torsoGroup.rotation.y = Math.sin(localT * 0.45) * 0.1;
-              ud.torsoGroup.rotation.x = 0.06 + Math.sin(localT * 0.6) * 0.04;
+              ud.torsoGroup.scale.set(1 + 0.018 * breath, 1 + 0.01 * breath, 1 + 0.018 * breath);
+              const weightShift = Math.sin(localT * 0.4);
+              ud.torsoGroup.rotation.z = weightShift * 0.035;
+              ud.torsoGroup.rotation.y = Math.sin(localT * 0.3) * 0.08;
+              ud.torsoGroup.rotation.x = 0.03 + Math.sin(localT * 0.5) * 0.02;
             }
             if (ud.headGroup) {
-              const headScanY = Math.sin(localT * 0.5) * 0.35 + Math.sin(localT * 1.3) * 0.15;
-              const headScanX = 0.22 + Math.cos(localT * 0.7) * 0.12;
-              ud.headGroup.rotation.set(headScanX, headScanY, 0);
+              const headPitch = 0.1 + Math.sin(localT * 0.6) * 0.16;
+              const headYaw = Math.sin(localT * 0.35) * 0.25 + Math.sin(localT * 0.9) * 0.1;
+              const headTilt = Math.sin(localT * 0.4) * 0.05;
+              ud.headGroup.rotation.set(headPitch, headYaw, headTilt);
             }
             if (ud.armL) {
-              ud.armL.rotation.x = -0.18 + Math.sin(localT * 0.8) * 0.08;
-              ud.armL.rotation.z = -0.15 + Math.cos(localT * 0.5) * 0.05;
+              ud.armL.rotation.x = 0.05 + Math.sin(localT * 0.8) * 0.06;
+              ud.armL.rotation.z = -0.12 - Math.cos(localT * 0.4) * 0.04;
             }
             if (ud.forearmL) {
-              ud.forearmL.rotation.x = -0.38 + Math.sin(localT * 0.8) * 0.1;
+              ud.forearmL.rotation.x = -0.22 + Math.sin(localT * 0.8) * 0.05;
             }
             if (ud.armR) {
-              ud.armR.rotation.x = -0.12 - Math.sin(localT * 0.7) * 0.06;
-              ud.armR.rotation.z = 0.14 - Math.cos(localT * 0.6) * 0.04;
+              ud.armR.rotation.x = 0.05 - Math.sin(localT * 0.7) * 0.06;
+              ud.armR.rotation.z = 0.12 + Math.cos(localT * 0.4) * 0.04;
             }
             if (ud.forearmR) {
-              ud.forearmR.rotation.x = -0.3 - Math.sin(localT * 0.7) * 0.08;
+              ud.forearmR.rotation.x = -0.2 - Math.sin(localT * 0.7) * 0.05;
             }
-            const weightShift = Math.sin(localT * 0.35);
+            const legShift = Math.sin(localT * 0.4);
             if (ud.legL) {
-              ud.legL.rotation.x = 0.03 + weightShift * 0.05;
-              ud.legL.rotation.z = weightShift * 0.02;
+              ud.legL.rotation.x = 0.02 + legShift * 0.03;
+              ud.legL.rotation.z = legShift * 0.02;
             }
             if (ud.lowerLegL) {
-              ud.lowerLegL.rotation.x = -Math.max(0, weightShift * 0.08);
+              ud.lowerLegL.rotation.x = -Math.max(0, legShift * 0.06);
             }
             if (ud.legR) {
-              ud.legR.rotation.x = 0.03 - weightShift * 0.05;
-              ud.legR.rotation.z = weightShift * 0.02;
+              ud.legR.rotation.x = 0.02 - legShift * 0.03;
+              ud.legR.rotation.z = legShift * 0.02;
             }
             if (ud.lowerLegR) {
-              ud.lowerLegR.rotation.x = -Math.max(0, -weightShift * 0.08);
+              ud.lowerLegR.rotation.x = -Math.max(0, -legShift * 0.06);
             }
           } else {
             const panicLerp = isUrgent ? 1 : Math.min(1, (95 - dist) / 45);
             if (ud.headGroup) {
-              ud.headGroup.rotation.x = MathUtils.lerp(0.22, -0.2, panicLerp);
-              ud.headGroup.rotation.y = MathUtils.lerp(0, Math.sin(localT * 14) * 0.08, panicLerp);
+              ud.headGroup.rotation.x = MathUtils.lerp(0.1, -0.25, panicLerp);
+              ud.headGroup.rotation.y = MathUtils.lerp(0, Math.sin(localT * 12) * 0.08, panicLerp);
+              ud.headGroup.rotation.z = 0;
             }
             if (ud.torsoGroup) {
-              ud.torsoGroup.rotation.x = MathUtils.lerp(0.06, -0.25, panicLerp);
-              const heavyBreath = Math.sin(localT * 7) * 0.06;
-              ud.torsoGroup.scale.set(1 + heavyBreath, 1 + heavyBreath * 0.5, 1 + heavyBreath);
+              ud.torsoGroup.rotation.x = MathUtils.lerp(0.03, -0.22, panicLerp);
+              ud.torsoGroup.rotation.z = 0;
+              const fastBreath = Math.sin(localT * 8) * 0.05;
+              ud.torsoGroup.scale.set(1 + fastBreath, 1 + fastBreath * 0.5, 1 + fastBreath);
             }
             if (ud.armL) {
-              const waveX = MathUtils.lerp(-0.18, -1.95 + Math.sin(localT * 14) * 0.35, panicLerp);
-              const waveZ = MathUtils.lerp(-0.15, -0.5 + Math.cos(localT * 14) * 0.2, panicLerp);
+              const waveX = MathUtils.lerp(0.05, -1.95 + Math.sin(localT * 14) * 0.35, panicLerp);
+              const waveZ = MathUtils.lerp(-0.12, -0.55 + Math.cos(localT * 14) * 0.25, panicLerp);
               ud.armL.rotation.set(waveX, 0, waveZ);
             }
             if (ud.forearmL) {
-              ud.forearmL.rotation.x = MathUtils.lerp(-0.38, -0.9, panicLerp);
+              ud.forearmL.rotation.x = MathUtils.lerp(-0.22, -0.85, panicLerp);
             }
             if (ud.armR) {
-              const shieldX = MathUtils.lerp(-0.12, -1.6 + Math.sin(localT * 8) * 0.15, panicLerp);
-              const shieldZ = MathUtils.lerp(0.14, 0.42, panicLerp);
-              ud.armR.rotation.set(shieldX, 0, shieldZ);
+              const defX = MathUtils.lerp(0.05, -1.55 + Math.sin(localT * 6) * 0.12, panicLerp);
+              const defZ = MathUtils.lerp(0.12, 0.4, panicLerp);
+              ud.armR.rotation.set(defX, 0, defZ);
             }
             if (ud.forearmR) {
-              ud.forearmR.rotation.x = MathUtils.lerp(-0.3, -1.15, panicLerp);
+              ud.forearmR.rotation.x = MathUtils.lerp(-0.2, -1.15, panicLerp);
             }
-            if (ud.legL) ud.legL.rotation.x = MathUtils.lerp(0.03, 0.42, panicLerp);
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = MathUtils.lerp(0, -0.7, panicLerp);
-            if (ud.legR) ud.legR.rotation.x = MathUtils.lerp(0.03, 0.3, panicLerp);
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = MathUtils.lerp(0, -0.6, panicLerp);
+            if (ud.legL) ud.legL.rotation.x = MathUtils.lerp(0.02, 0.38, panicLerp);
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = MathUtils.lerp(0, -0.65, panicLerp);
+            if (ud.legR) ud.legR.rotation.x = MathUtils.lerp(0.02, 0.28, panicLerp);
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = MathUtils.lerp(0, -0.55, panicLerp);
           }
         } else if (ud.type === "animal") {
-          const localT = t + obs.id * 2.5;
-          const breath = Math.sin(localT * 2.8);
+          const seed = obs.id * 3.1;
+          const localT = t + seed;
+          if (ud.faceData) {
+            const blinkCycle = localT * 0.25 % 1;
+            let blinkFactor = 0;
+            if (blinkCycle < 0.05) {
+              blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
+            }
+            if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
+              ud.faceData.drawFace(blinkFactor);
+              ud.faceData.tex.needsUpdate = true;
+              ud.faceData.lastBlink = blinkFactor;
+            }
+          } else if (ud.eyelids && ud.eyelids.length > 0) {
+            const blinkCycle = localT * 0.25 % 1;
+            let blinkScale = 0.05;
+            if (blinkCycle < 0.05) {
+              blinkScale = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
+            }
+            ud.eyelids.forEach((el) => {
+              el.scale.y = blinkScale;
+            });
+          }
+          const breath = Math.sin(localT * 1.8);
           if (ud.body) {
-            ud.body.scale.set(0.92 + 0.02 * breath, 1.15 + 0.015 * breath, 1);
+            ud.body.scale.set(1.05 + 0.025 * breath, 1.18 + 0.02 * breath, 1);
+          }
+          const earFlap = Math.sin(localT * 2.2);
+          if (!isTrainClose) {
+            if (ud.earL) {
+              ud.earL.rotation.y = -0.45 + earFlap * 0.16;
+            }
+            if (ud.earR) {
+              ud.earR.rotation.y = 0.45 - earFlap * 0.16;
+            }
           }
           if (ud.tail) {
-            ud.tail.rotation.z = Math.sin(localT * 4.5) * 0.45;
-            ud.tail.rotation.x = 0.4 + Math.sin(localT * 2) * 0.15;
+            ud.tail.rotation.z = Math.sin(localT * 3.5) * 0.45;
+            ud.tail.rotation.x = 0.3 + Math.abs(Math.sin(localT * 1.6)) * 0.2;
           }
           if (!isTrainClose) {
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              const trunkWaveTime = localT * 2;
+              ud.trunkSegments[0].rotation.x = -0.42 + Math.sin(trunkWaveTime) * 0.08;
+              ud.trunkSegments[0].rotation.y = Math.cos(trunkWaveTime * 0.7) * 0.1;
+              ud.trunkSegments[1].rotation.x = -0.36 + Math.sin(trunkWaveTime - 0.5) * 0.1;
+              ud.trunkSegments[1].rotation.y = Math.cos(trunkWaveTime * 0.7 - 0.3) * 0.08;
+              ud.trunkSegments[2].rotation.x = -0.28 + Math.sin(trunkWaveTime - 1) * 0.12;
+              ud.trunkSegments[2].rotation.z = Math.sin(trunkWaveTime * 0.8) * 0.1;
+              ud.trunkSegments[3].rotation.x = 0.7 + Math.sin(trunkWaveTime - 1.5) * 0.15;
+              ud.trunkSegments[4].rotation.x = 0.75 + Math.sin(trunkWaveTime - 2) * 0.18;
+            }
             if (ud.headGroup) {
-              const headPitch = 0.2 + Math.sin(localT * 0.7) * 0.35;
-              const headYaw = Math.sin(localT * 1.2) * 0.25;
+              const headPitch = 0.05 + Math.sin(localT * 1.2) * 0.06;
+              const headYaw = Math.sin(localT * 0.6) * 0.15;
               ud.headGroup.rotation.set(headPitch, headYaw, 0);
             }
-            if (ud.ears) {
-              ud.ears.forEach((ear, idx) => {
-                ear.rotation.z = (idx === 0 ? -0.55 : 0.55) + Math.sin(localT * 6 + idx * 2) * 0.22;
-              });
-            }
             if (ud.legs) {
-              const legShift = Math.sin(localT * 0.9) * 0.04;
+              const legShift = Math.sin(localT * 0.8) * 0.03;
               ud.legs.forEach((leg, idx) => {
-                leg.group.rotation.x = idx % 2 === 0 ? legShift : -legShift;
+                leg.rotation.x = idx % 2 === 0 ? legShift : -legShift;
               });
             }
           } else {
+            const alarmLerp = isUrgent ? 1 : Math.min(1, (95 - dist) / 45);
             if (ud.headGroup) {
-              ud.headGroup.rotation.x = -0.45;
-              ud.headGroup.rotation.y = Math.sin(localT * 12) * 0.15;
+              ud.headGroup.rotation.x = MathUtils.lerp(0.05, -0.35, alarmLerp);
+              ud.headGroup.rotation.y = MathUtils.lerp(0, Math.sin(localT * 10) * 0.08, alarmLerp);
             }
-            if (ud.ears) {
-              ud.ears.forEach((ear) => {
-                ear.rotation.x = 0.45;
-              });
+            if (ud.earL) {
+              ud.earL.rotation.y = MathUtils.lerp(-0.45, 0.4, alarmLerp);
             }
-            if (ud.tail) {
-              ud.tail.rotation.x = 0.9;
+            if (ud.earR) {
+              ud.earR.rotation.y = MathUtils.lerp(0.45, -0.4, alarmLerp);
+            }
+            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
+              ud.trunkSegments[0].rotation.x = MathUtils.lerp(-0.42, -0.85, alarmLerp);
+              ud.trunkSegments[1].rotation.x = MathUtils.lerp(-0.36, -0.7, alarmLerp);
+              ud.trunkSegments[2].rotation.x = MathUtils.lerp(-0.28, -0.55, alarmLerp);
+              ud.trunkSegments[3].rotation.x = MathUtils.lerp(0.7, -0.25, alarmLerp);
+              ud.trunkSegments[4].rotation.x = MathUtils.lerp(0.75, -0.35, alarmLerp);
             }
             if (ud.legs) {
-              ud.legs.forEach((leg) => {
-                leg.group.rotation.x = leg.isFront ? -0.18 : 0.14;
-                if (leg.kneeGroup) {
-                  leg.kneeGroup.rotation.x = leg.isFront ? 0.24 : -0.2;
-                }
+              ud.legs.forEach((leg, idx) => {
+                leg.rotation.x = (idx < 2 ? -0.1 : 0.08) * alarmLerp;
               });
             }
           }
@@ -38603,29 +39919,95 @@ void main() {
           if (ud.barrel) {
             ud.barrel.scale.set(0.95 + 0.02 * breath, 1.15 + 0.02 * breath, 1);
           }
-          if (ud.tail) {
-            ud.tail.rotation.z = Math.sin(localT * 3.2) * 0.6 + Math.sin(localT * 7.5) * 0.2;
-            ud.tail.rotation.x = 0.15 + Math.abs(Math.sin(localT * 1.6)) * 0.25;
-          }
-          if (ud.legs) {
-            const cowShift = Math.sin(localT * 0.6) * 0.03;
-            ud.legs.forEach((leg, idx) => {
-              leg.group.rotation.x = idx % 2 === 0 ? cowShift : -cowShift;
-            });
-          }
-          if (ud.headGroup) {
-            const chew = Math.sin(localT * 4.5) * 0.05;
-            const headYaw = Math.sin(localT * 0.4) * 0.22;
-            const headPitch = isTrainClose ? -0.38 : 0.12 + Math.sin(localT * 0.5) * 0.22;
-            ud.headGroup.rotation.set(headPitch + chew, headYaw, 0);
-          }
-          if (ud.dewlap) {
-            ud.dewlap.rotation.z = Math.sin(localT * 2) * 0.18;
-          }
-          if (ud.ears) {
-            ud.ears.forEach((ear, idx) => {
-              ear.rotation.z = (idx === 0 ? -1.15 : 1.15) + Math.sin(localT * 4 + idx * 3) * 0.18;
-            });
+          if (obs.isDeterred) {
+            const fleeT = this.animTime - obs.fleeStartTime;
+            const fleeDir = obs.fleeDirection || 1;
+            const fleeDist = Math.min(6.5, fleeT * 3.5);
+            const transform = this.track.getTrackTransform(obs.progress, 0);
+            const tangent = transform.tangent.clone().normalize();
+            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+            const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+            lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.3, fleeDist * 0.08));
+            obs.mesh.position.copy(lateralPos);
+            if (fleeDist >= 2.6) {
+              obs.isCleared = true;
+            }
+            if (fleeT < 0.35) {
+              obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
+              if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
+              if (ud.tail) ud.tail.rotation.x = 0.95;
+              if (ud.ears) ud.ears.forEach((ear) => {
+                ear.rotation.x = 0.6;
+              });
+            } else if (fleeT < 3.2) {
+              const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
+              const gallopFreq = 7.5 * Math.PI;
+              const gallopCycle = (fleeT - 0.35) * gallopFreq;
+              if (ud.legs && ud.legs.length === 4) {
+                ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.6;
+                ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.6;
+                ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
+                ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
+                ud.legs.forEach((leg) => {
+                  if (leg.kneeGroup) {
+                    leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
+                  }
+                });
+              }
+              if (ud.headGroup) {
+                ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2) * 0.22;
+                ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
+              }
+              if (ud.dewlap) {
+                ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
+              }
+              if (ud.tail) {
+                ud.tail.rotation.x = 0.85;
+                ud.tail.rotation.z = Math.sin(gallopCycle) * 0.4;
+              }
+            } else {
+              const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
+              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
+              if (ud.headGroup) {
+                ud.headGroup.rotation.y = -fleeDir * 0.75;
+                ud.headGroup.rotation.x = -0.1;
+              }
+              if (ud.legs) {
+                ud.legs.forEach((leg) => {
+                  leg.group.rotation.x = 0;
+                  if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
+                });
+              }
+              if (ud.tail) {
+                ud.tail.rotation.z = Math.sin(localT * 3) * 0.4;
+              }
+            }
+          } else {
+            if (ud.tail) {
+              ud.tail.rotation.z = Math.sin(localT * 3.2) * 0.6 + Math.sin(localT * 7.5) * 0.2;
+              ud.tail.rotation.x = 0.15 + Math.abs(Math.sin(localT * 1.6)) * 0.25;
+            }
+            if (ud.legs) {
+              const cowShift = Math.sin(localT * 0.6) * 0.03;
+              ud.legs.forEach((leg, idx) => {
+                leg.group.rotation.x = idx % 2 === 0 ? cowShift : -cowShift;
+              });
+            }
+            if (ud.headGroup) {
+              const chew = Math.sin(localT * 4.5) * 0.05;
+              const headYaw = Math.sin(localT * 0.4) * 0.22;
+              const headPitch = isTrainClose ? -0.38 : 0.12 + Math.sin(localT * 0.5) * 0.22;
+              ud.headGroup.rotation.set(headPitch + chew, headYaw, 0);
+            }
+            if (ud.dewlap) {
+              ud.dewlap.rotation.z = Math.sin(localT * 2) * 0.18;
+            }
+            if (ud.ears) {
+              ud.ears.forEach((ear, idx) => {
+                ear.rotation.z = (idx === 0 ? -1.15 : 1.15) + Math.sin(localT * 4 + idx * 3) * 0.18;
+              });
+            }
           }
         }
       });
@@ -38635,7 +40017,7 @@ void main() {
     // Enforces: Collect ONLY when Mass <= 150 kg AND Speed <= 150 km/h
     // Net defaults to CLOSED / STOWED; Opens with animation upon detection
     // ------------------------------------------------------------------
-    update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength) {
+    update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true) {
       let closestObstacle = null;
       let minForwardDist = Infinity;
       const speedKmh = trainSpeedMs * 3.6;
@@ -38651,6 +40033,7 @@ void main() {
         }
       });
       this.animateLivingObstacles(dt, trainSpeedMs);
+      this.updateDeterrenceFX(dt);
       if (closestObstacle && minForwardDist < 110) {
         this.telemetry.targetDetected = true;
         this.telemetry.type = closestObstacle.type;
@@ -38664,7 +40047,7 @@ void main() {
         if (canCollect) {
           this.telemetry.action = "AIRBAG NET RAPID DEPLOY & RESCUE SCOOP";
           this.telemetry.alertType = "deploy";
-          if (minForwardDist <= 80 && !captureNet.isDeployed) {
+          if (aiSensorAuto && minForwardDist <= 80 && !captureNet.isDeployed) {
             captureNet.triggerSolenoidDeploy(audio);
             if (audio) audio.playTargetAcquiredBeep(false);
             this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED (${closestObstacle.mass}KG \u2264 150KG, SPEED \u2264 160 KM/H). AIRBAG NET INFLATING!`;
@@ -38683,17 +40066,33 @@ void main() {
           if (captureNet.isDeployed) {
             captureNet.setDeployed(false);
           }
-          const reason = !isWeightSafe ? `OVERWEIGHT (>150KG): ${closestObstacle.mass}KG EXCEEDS NET LIMIT` : `OVERSPEED (>160 KM/H): SPEED ${Math.round(speedKmh)} KM/H TOO HIGH FOR NET`;
-          this.telemetry.action = `${reason} - EMERGENCY BRAKE ONLY`;
-          this.telemetry.alertType = "hazard";
-          this.telemetry.alertMessage = `\u26A0\uFE0F HAZARD: ${closestObstacle.name.toUpperCase()} ON TRACK! NET HELD CLOSED. EMERGENCY BRAKE APPLIED!`;
-          if (minForwardDist <= 95) {
-            if (physics && !physics.emergencyBrake) {
-              physics.setEmergencyBrake(true);
+          const specs = this.getDeterrenceSpecs(this.activeDeterrenceMode);
+          if (aiSensorAuto && minForwardDist <= 90 && !closestObstacle.isDeterred) {
+            this.triggerAnimalDeterrence(closestObstacle, audio);
+            if (audio) audio.playTargetAcquiredBeep(true);
+          }
+          if (closestObstacle.isCleared) {
+            this.telemetry.action = `TARGET CLEARED VIA ${specs.shortTitle} - TRACK CLEAR`;
+            this.telemetry.alertType = "success";
+            this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEARED! HEAVY BULL (480KG) ESCAPED SAFELY INTO FIELD VIA ${specs.shortTitle}. ZERO CASUALTIES!`;
+            if (physics && physics.emergencyBrake) {
+              physics.setEmergencyBrake(false);
             }
-            if (audio) {
-              audio.playTargetAcquiredBeep(true);
-              audio.startHorn();
+          } else if (closestObstacle.isDeterred) {
+            this.telemetry.action = `\u26A1 ${specs.shortTitle} ACTIVE - BULL FLEEING TO MEADOW`;
+            this.telemetry.alertType = "deploy";
+            this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${specs.shortTitle} DELIVERED (${specs.badge})! BULL SCRAMBLING OFF RAILS!`;
+          } else {
+            this.telemetry.action = `OVERWEIGHT (480KG) - ${specs.shortTitle} ARMED`;
+            this.telemetry.alertType = "hazard";
+            this.telemetry.alertMessage = `\u26A0\uFE0F HAZARD: ${closestObstacle.name.toUpperCase()} DETECTED! ARMED WITH ${specs.shortTitle}!`;
+            if (minForwardDist <= 35) {
+              if (physics && !physics.emergencyBrake) {
+                physics.setEmergencyBrake(true);
+              }
+              if (audio) {
+                audio.startHorn();
+              }
             }
           }
         }
@@ -38745,12 +40144,17 @@ void main() {
       this.autoSlowMo = true;
       this.isRescueSlowMo = false;
       this.rescueSlowMoTimer = 0;
+      this.isPaused = false;
+      this.aiSensorAuto = true;
+      this.autoSpin = false;
+      this.beamDischargingTimer = 0;
+      this.activeSpeedPreset = 120;
       this.controls = new OrbitControls(this.camera, this.renderer.domElement);
       this.controls.enableDamping = true;
       this.controls.dampingFactor = 0.05;
-      this.controls.maxDistance = 120;
+      this.controls.maxDistance = 140;
       this.controls.minDistance = 3;
-      this.cameraMode = "action";
+      this.cameraMode = "orbit";
       this.railfanPos = new Vector3();
       this.railfanLookTarget = new Vector3();
       this.isRailfanInitialized = false;
@@ -38760,35 +40164,14 @@ void main() {
       this.mouseX = 0;
       this.mouseY = 0;
       this.dom = {
-        speedDigital: document.getElementById("speed-digital"),
-        speedGaugeFill: document.getElementById("speedo-fill"),
-        teBar: document.getElementById("te-bar"),
-        teVal: document.getElementById("te-val"),
-        bpVal: document.getElementById("bp-val"),
-        bcVal: document.getElementById("bc-val"),
-        notchVal: document.getElementById("notch-val"),
-        brakeVal: document.getElementById("brake-val"),
-        throttleHandle: document.getElementById("throttle-handle"),
-        brakeHandle: document.getElementById("brake-handle"),
-        signalAspectText: document.getElementById("signal-aspect-text"),
-        signalDistText: document.getElementById("signal-dist-text"),
-        aspectGreen: document.getElementById("aspect-green"),
-        aspectYellow1: document.getElementById("aspect-yellow1"),
-        aspectYellow2: document.getElementById("aspect-yellow2"),
-        aspectRed: document.getElementById("aspect-red"),
-        oheVal: document.getElementById("ohe-val"),
-        pantoStatus: document.getElementById("panto-status"),
-        reverserBtn: document.getElementById("btn-reverser"),
         stationDistText: document.getElementById("station-dist"),
         alertBanner: document.getElementById("alert-banner"),
-        emergencyBtn: document.getElementById("btn-emergency"),
-        startOverlay: document.getElementById("start-overlay"),
-        startBtn: document.getElementById("start-btn"),
         helpModal: document.getElementById("help-modal"),
         btnHelp: document.getElementById("btn-help"),
         btnCloseHelp: document.getElementById("close-help"),
         // AI Kavach Sensor Fusion & Safety Controller elements
         kavachCard: document.getElementById("ai-kavach-card"),
+        btnKavachMinimize: document.getElementById("btn-kavach-minimize"),
         kavachTargetName: document.getElementById("kavach-target-name"),
         kavachTargetDist: document.getElementById("kavach-target-dist"),
         kavachTargetMass: document.getElementById("kavach-target-mass"),
@@ -38800,12 +40183,30 @@ void main() {
         btnSpawnBull: document.getElementById("btn-spawn-bull"),
         btnSpawnCrate: document.getElementById("btn-spawn-crate"),
         btnClearCradle: document.getElementById("btn-clear-cradle"),
-        btnCaptureNet: document.getElementById("btn-capture-net")
+        // Floating Console Elements (Ref: media_1793808764475_89ecfc40.jpg)
+        floatingConsole: document.getElementById("floating-console-container"),
+        consoleSpeedVal: document.getElementById("console-speed-val"),
+        btnRunPause: document.getElementById("btn-run-pause"),
+        btnAiSensorMode: document.getElementById("btn-ai-sensor-mode"),
+        btnConsoleBeam: document.getElementById("btn-console-beam"),
+        btnConsoleNet: document.getElementById("btn-console-net"),
+        btnConsoleHorn: document.getElementById("btn-console-horn"),
+        btnConsoleEmergency: document.getElementById("btn-console-emergency"),
+        btnConsoleReset: document.getElementById("btn-console-reset"),
+        btnAutoSpin: document.getElementById("btn-auto-spin"),
+        deterrencePopupMenu: document.getElementById("deterrence-popup-menu"),
+        tickerSysArch: document.getElementById("ticker-sys-arch"),
+        tickerTarget: document.getElementById("ticker-target"),
+        tickerRange: document.getElementById("ticker-range"),
+        tickerBeamState: document.getElementById("ticker-beam-state"),
+        tickerPolarization: document.getElementById("ticker-polarization"),
+        tickerCarrier: document.getElementById("ticker-carrier"),
+        tickerSafety: document.getElementById("ticker-safety")
       };
       this.initRenderer();
       this.initEventListeners();
       this.initUIControls();
-      this.setCameraMode("action");
+      this.setCameraMode("orbit");
       this.animate = this.animate.bind(this);
       requestAnimationFrame(this.animate);
     }
@@ -38870,9 +40271,6 @@ void main() {
           case "KeyZ":
             this.cycleSlowMotion();
             break;
-          case "KeyT":
-            this.switchTrainType();
-            break;
           case "KeyL":
             this.train.cycleHeadlight();
             break;
@@ -38900,7 +40298,7 @@ void main() {
         }
       });
       window.addEventListener("mousedown", (e) => {
-        if (e.target.closest(".hud-interactive") || e.target.closest("#start-overlay")) return;
+        if (e.target.closest(".hud-interactive")) return;
         this.isMouseDown = true;
         this.mouseX = e.clientX;
         this.mouseY = e.clientY;
@@ -38922,31 +40320,23 @@ void main() {
     // Interactive HUD Buttons and Sliders
     // ---------------------------------------------------------
     initUIControls() {
-      const startHandler = () => {
+      const unlockAudio = () => {
         try {
-          this.audio.init();
+          if (!this.audio.isInitialized) {
+            this.audio.init();
+          }
           this.audio.resume();
           this.audio.playStationChime();
         } catch (err) {
-          console.warn("Audio start warning:", err);
+          console.warn("Audio unlock warning:", err);
         }
-        if (this.dom.startOverlay) {
-          this.dom.startOverlay.style.display = "none";
-        }
+        window.removeEventListener("pointerdown", unlockAudio);
+        window.removeEventListener("keydown", unlockAudio);
+        window.removeEventListener("touchstart", unlockAudio);
       };
-      if (this.dom.startBtn) {
-        this.dom.startBtn.addEventListener("click", startHandler);
-        this.dom.startBtn.addEventListener("touchend", startHandler);
-      }
-      const previewCards = document.querySelectorAll(".preview-card");
-      previewCards.forEach((c) => {
-        c.addEventListener("click", () => {
-          previewCards.forEach((p) => p.classList.remove("selected"));
-          c.classList.add("selected");
-          const trainType = c.dataset.train;
-          this.setTrain(trainType);
-        });
-      });
+      window.addEventListener("pointerdown", unlockAudio, { once: true });
+      window.addEventListener("keydown", unlockAudio, { once: true });
+      window.addEventListener("touchstart", unlockAudio, { once: true });
       document.querySelectorAll("[data-cam]").forEach((btn) => {
         btn.addEventListener("click", () => {
           this.setCameraMode(btn.dataset.cam);
@@ -38958,72 +40348,10 @@ void main() {
           this.cycleSlowMotion();
         });
       }
-      const btnKavachSlowmo = document.getElementById("btn-kavach-slowmo");
-      if (btnKavachSlowmo) {
-        btnKavachSlowmo.addEventListener("click", () => {
-          this.cycleSlowMotion();
-        });
-      }
-      const btnKavachNetcam = document.getElementById("btn-kavach-netcam");
-      if (btnKavachNetcam) {
-        btnKavachNetcam.addEventListener("click", () => {
-          this.setCameraMode("net");
-        });
-      }
-      const btnTrainSwitch = document.getElementById("btn-train-switch");
-      if (btnTrainSwitch) {
-        btnTrainSwitch.addEventListener("click", () => {
-          this.switchTrainType();
-        });
-      }
       const btnWeather = document.getElementById("btn-weather");
       if (btnWeather) {
         btnWeather.addEventListener("click", () => {
           this.cycleWeather();
-        });
-      }
-      const btnHorn = document.getElementById("btn-horn");
-      if (btnHorn) {
-        btnHorn.addEventListener("mousedown", () => this.audio.startHorn());
-        btnHorn.addEventListener("mouseup", () => this.audio.stopHorn());
-        btnHorn.addEventListener("touchstart", (e) => {
-          e.preventDefault();
-          this.audio.startHorn();
-        });
-        btnHorn.addEventListener("touchend", (e) => {
-          e.preventDefault();
-          this.audio.stopHorn();
-        });
-      }
-      if (this.dom.emergencyBtn) {
-        this.dom.emergencyBtn.addEventListener("click", () => {
-          this.physics.triggerEmergencyBrake();
-          this.audio.triggerBrakeHiss(1);
-        });
-      }
-      if (this.dom.reverserBtn) {
-        this.dom.reverserBtn.addEventListener("click", () => {
-          this.physics.toggleReverser();
-        });
-      }
-      const btnLights = document.getElementById("btn-lights");
-      if (btnLights) {
-        btnLights.addEventListener("click", () => {
-          const state = this.train.cycleHeadlight();
-          btnLights.innerText = `\u{1F4A1} Lights: ${state.toUpperCase()}`;
-        });
-      }
-      const btnPanto = document.getElementById("btn-panto");
-      if (btnPanto) {
-        btnPanto.addEventListener("click", () => {
-          this.physics.togglePantograph();
-        });
-      }
-      if (this.dom.btnCaptureNet) {
-        this.dom.btnCaptureNet.addEventListener("click", () => {
-          const state = this.train.toggleCaptureNet(this.audio);
-          this.dom.btnCaptureNet.innerText = `\u{1F6E1}\uFE0F Net: ${state ? "DEPLOYED" : "RETRACTED"}`;
-          this.dom.btnCaptureNet.classList.toggle("active", state);
         });
       }
       if (this.dom.btnSpawnHuman) {
@@ -39061,42 +40389,250 @@ void main() {
           clearTimeout(this.alertBannerTimeout);
         });
       }
-      const throttleSlider = document.getElementById("throttle-slider");
-      if (throttleSlider) {
-        throttleSlider.addEventListener("click", (e) => {
-          const rect = throttleSlider.getBoundingClientRect();
-          const y = 1 - (e.clientY - rect.top) / rect.height;
-          const notch = Math.round(y * 8);
-          this.physics.setNotch(notch);
+      if (this.dom.btnRunPause) {
+        this.dom.btnRunPause.addEventListener("click", () => this.togglePause());
+      }
+      document.querySelectorAll(".speed-preset-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const spd = parseInt(btn.dataset.speed, 10);
+          this.physics.setTargetSpeed(spd);
+          this.activeSpeedPreset = spd;
+          this.updateSpeedPresetButtons(spd);
+          if (this.isPaused) {
+            this.togglePause();
+          }
+        });
+      });
+      if (this.dom.btnAiSensorMode) {
+        this.dom.btnAiSensorMode.addEventListener("click", () => this.toggleAiSensorMode());
+      }
+      if (this.dom.btnConsoleBeam) {
+        this.dom.btnConsoleBeam.addEventListener("click", () => this.fireDeterrenceBeam());
+      }
+      if (this.dom.btnConsoleNet) {
+        this.dom.btnConsoleNet.addEventListener("click", () => this.toggleCaptureNet());
+      }
+      if (this.dom.btnConsoleHorn) {
+        const startHornHandler = () => this.audio.startHorn("dual");
+        const stopHornHandler = () => this.audio.stopHorn();
+        this.dom.btnConsoleHorn.addEventListener("mousedown", startHornHandler);
+        this.dom.btnConsoleHorn.addEventListener("mouseup", stopHornHandler);
+        this.dom.btnConsoleHorn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          startHornHandler();
+        });
+        this.dom.btnConsoleHorn.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          stopHornHandler();
         });
       }
-      const brakeSlider = document.getElementById("brake-slider");
-      if (brakeSlider) {
-        brakeSlider.addEventListener("click", (e) => {
-          const rect = brakeSlider.getBoundingClientRect();
-          const y = 1 - (e.clientY - rect.top) / rect.height;
-          this.physics.setTrainBrake(y);
-          this.audio.triggerBrakeHiss(0.4);
+      if (this.dom.btnConsoleEmergency) {
+        this.dom.btnConsoleEmergency.addEventListener("click", () => {
+          this.physics.triggerEmergencyBrake();
+          this.audio.triggerBrakeHiss(1);
+          this.dom.btnConsoleEmergency.classList.toggle("active", this.physics.emergencyBrake);
         });
+      }
+      if (this.dom.btnConsoleReset) {
+        this.dom.btnConsoleReset.addEventListener("click", () => this.resetRun());
+      }
+      if (this.dom.btnAutoSpin) {
+        this.dom.btnAutoSpin.addEventListener("click", () => this.toggleAutoSpin());
+      }
+      if (this.dom.tickerSysArch) {
+        this.dom.tickerSysArch.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.toggleDeterrencePopup();
+        });
+      }
+      document.querySelectorAll(".deterrence-popup-item").forEach((item) => {
+        item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const mode = item.dataset.mode;
+          this.selectDeterrenceMode(mode);
+          this.hideDeterrencePopup();
+        });
+      });
+      window.addEventListener("click", (e) => {
+        if (!e.target.closest("#deterrence-popup-menu") && !e.target.closest("#ticker-sys-arch")) {
+          this.hideDeterrencePopup();
+        }
+      });
+      const btnToggleKavach = document.getElementById("btn-toggle-kavach");
+      if (btnToggleKavach && this.dom.kavachCard) {
+        btnToggleKavach.addEventListener("click", () => {
+          const isClosed = this.dom.kavachCard.classList.toggle("closed");
+          btnToggleKavach.classList.toggle("active", !isClosed);
+        });
+      }
+      if (this.dom.btnKavachMinimize && this.dom.kavachCard) {
+        this.dom.btnKavachMinimize.addEventListener("click", () => {
+          this.dom.kavachCard.classList.toggle("closed");
+          if (btnToggleKavach) {
+            btnToggleKavach.classList.remove("active");
+          }
+        });
+      }
+    }
+    // ---------------------------------------------------------
+    // Floating Console Helper Methods
+    // ---------------------------------------------------------
+    togglePause() {
+      this.isPaused = !this.isPaused;
+      if (this.dom.btnRunPause) {
+        this.dom.btnRunPause.innerText = this.isPaused ? "\u23F8 PAUSED" : "\u25B6 RUNNING";
+        this.dom.btnRunPause.classList.toggle("paused", this.isPaused);
+      }
+    }
+    updateSpeedPresetButtons(spd) {
+      document.querySelectorAll(".speed-preset-btn").forEach((btn) => {
+        const s = parseInt(btn.dataset.speed, 10);
+        btn.classList.toggle("active", s === spd);
+      });
+    }
+    toggleAiSensorMode() {
+      this.aiSensorAuto = !this.aiSensorAuto;
+      if (this.dom.btnAiSensorMode) {
+        this.dom.btnAiSensorMode.innerText = this.aiSensorAuto ? "\u{1F6E1}\uFE0F AI SENSOR: AUTO" : "\u{1F6E1}\uFE0F AI SENSOR: MANUAL";
+        this.dom.btnAiSensorMode.classList.toggle("active-cyan", this.aiSensorAuto);
+      }
+    }
+    fireDeterrenceBeam() {
+      let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isDeterred && o.mass > 150);
+      if (!target) {
+        target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 70);
+      }
+      if (target) {
+        this.obstacles.triggerAnimalDeterrence(target, this.audio);
+        this.beamDischargingTimer = 2.5;
+        if (this.dom.btnConsoleBeam) {
+          this.dom.btnConsoleBeam.innerText = "\u26A1 BEAM: FIRED";
+        }
+        if (this.dom.tickerBeamState) {
+          this.dom.tickerBeamState.innerText = "DISCHARGING PULSE (LINK 100%)";
+          this.dom.tickerBeamState.style.color = "#38bdf8";
+        }
+      }
+    }
+    toggleCaptureNet() {
+      const state = this.train.toggleCaptureNet(this.audio);
+      if (this.dom.btnConsoleNet) {
+        this.dom.btnConsoleNet.innerText = `\u{1FAA4} NET: ${state ? "DEPLOYED" : "RETRACTED"}`;
+        this.dom.btnConsoleNet.classList.toggle("active-amber", state);
+      }
+    }
+    resetRun() {
+      this.physics.reset();
+      this.physics.setTargetSpeed(120);
+      this.updateSpeedPresetButtons(120);
+      this.obstacles.resetCollected(this.train.captureNet);
+      this.obstacles.initDefaultObstacles();
+      this.train.setCaptureNetState(false);
+      if (this.dom.btnConsoleNet) {
+        this.dom.btnConsoleNet.innerText = "\u{1FAA4} NET: RETRACTED";
+        this.dom.btnConsoleNet.classList.remove("active-amber");
+      }
+      if (this.isPaused) {
+        this.togglePause();
+      }
+      if (this.dom.btnConsoleEmergency) {
+        this.dom.btnConsoleEmergency.classList.remove("active");
+      }
+    }
+    toggleAutoSpin() {
+      this.autoSpin = !this.autoSpin;
+      if (this.dom.btnAutoSpin) {
+        this.dom.btnAutoSpin.classList.toggle("active", this.autoSpin);
+      }
+    }
+    toggleDeterrencePopup() {
+      if (this.dom.deterrencePopupMenu) {
+        const isVisible = this.dom.deterrencePopupMenu.style.display !== "none";
+        this.dom.deterrencePopupMenu.style.display = isVisible ? "none" : "flex";
+      }
+    }
+    hideDeterrencePopup() {
+      if (this.dom.deterrencePopupMenu) {
+        this.dom.deterrencePopupMenu.style.display = "none";
+      }
+    }
+    selectDeterrenceMode(mode) {
+      this.obstacles.setDeterrenceMode(mode);
+      document.querySelectorAll(".deterrence-popup-item").forEach((item) => {
+        const isSelected = item.dataset.mode === mode;
+        item.classList.toggle("selected", isSelected);
+        const cleanName = item.innerText.replace("\u2713 ", "");
+        item.innerText = isSelected ? `\u2713 ${cleanName}` : cleanName;
+      });
+      this.updateTelemetryTicker();
+    }
+    updateTelemetryTicker() {
+      const tickerData = this.obstacles.getDeterrenceTickerData();
+      const t = this.lastTelemetry;
+      if (this.dom.tickerSysArch) {
+        this.dom.tickerSysArch.innerText = tickerData.arch;
+      }
+      if (this.dom.tickerPolarization) {
+        this.dom.tickerPolarization.innerText = tickerData.polarization;
+      }
+      if (this.dom.tickerCarrier) {
+        this.dom.tickerCarrier.innerText = tickerData.carrier;
+      }
+      if (this.beamDischargingTimer > 0) {
+        if (this.dom.tickerBeamState) {
+          this.dom.tickerBeamState.innerText = "DISCHARGING PULSE (LINK 100%)";
+          this.dom.tickerBeamState.style.color = "#38bdf8";
+        }
+      } else if (t && t.targetDetected) {
+        if (this.dom.tickerBeamState) {
+          this.dom.tickerBeamState.innerText = t.canCollect ? "SCOOP CRADLE ARMED" : "TARGET LOCKED (TRACK-1)";
+          this.dom.tickerBeamState.style.color = t.canCollect ? "#34d399" : "#f59e0b";
+        }
+      } else {
+        if (this.dom.tickerBeamState) {
+          this.dom.tickerBeamState.innerText = tickerData.focusState;
+          this.dom.tickerBeamState.style.color = "#34d399";
+        }
+      }
+      if (t && t.targetDetected) {
+        if (this.dom.tickerTarget) {
+          this.dom.tickerTarget.innerText = `${t.name.toUpperCase()} (TRACK-1)`;
+        }
+        if (this.dom.tickerRange) {
+          this.dom.tickerRange.innerText = t.distance !== null ? `${Math.round(t.distance)}M (LINK VERIFIED)` : "1548M (LINK VERIFIED)";
+        }
+      } else {
+        if (this.dom.tickerTarget) {
+          this.dom.tickerTarget.innerText = "NONE (TRACK CLEAR)";
+        }
+        if (this.dom.tickerRange) {
+          this.dom.tickerRange.innerText = "1548M (LINK VERIFIED)";
+        }
+      }
+      if (this.dom.tickerSafety) {
+        this.dom.tickerSafety.innerText = tickerData.safety;
       }
     }
     // ---------------------------------------------------------
     // Camera Switching
     // ---------------------------------------------------------
     setCameraMode(mode) {
+      if (mode === "chase") mode = "orbit";
       this.cameraMode = mode;
       this.isRailfanInitialized = false;
       document.querySelectorAll("[data-cam]").forEach((b) => {
-        b.classList.toggle("active", b.dataset.cam === mode);
+        const bCam = b.dataset.cam;
+        const isActive = bCam === mode || mode === "orbit" && bCam === "chase";
+        b.classList.toggle("active", isActive);
       });
-      if (mode === "chase" || mode === "drone") {
+      if (mode === "orbit" || mode === "drone") {
         this.controls.enabled = true;
       } else {
         this.controls.enabled = false;
       }
     }
     cycleCamera() {
-      const modes = ["action", "net", "chase", "cab", "railfan", "window", "drone"];
+      const modes = ["orbit", "beam", "cab", "target", "action", "drone", "net"];
       const idx = modes.indexOf(this.cameraMode);
       const nextMode = modes[(idx + 1) % modes.length];
       this.setCameraMode(nextMode);
@@ -39122,16 +40658,11 @@ void main() {
       const isSlow = activeScale < 1;
       const label = isSlow ? `\u23F1\uFE0F SLOW-MO: ${activeScale}x` : "\u23F1\uFE0F SLOW-MO: 1x";
       const btnTop = document.getElementById("btn-slow-mo");
-      const btnKavach = document.getElementById("btn-kavach-slowmo");
       const badge = document.getElementById("slowmo-badge");
       if (btnTop) {
         btnTop.innerText = label;
         btnTop.classList.toggle("active", isSlow);
         btnTop.style.background = isSlow ? "#0284c7" : "rgba(3, 105, 161, 0.4)";
-      }
-      if (btnKavach) {
-        btnKavach.innerText = label;
-        btnKavach.style.background = isSlow ? "#0284c7" : "#0369a1";
       }
       if (badge) {
         badge.style.display = isSlow ? "block" : "none";
@@ -39143,30 +40674,19 @@ void main() {
       }
     }
     // ---------------------------------------------------------
-    // Train Model Switcher (WAP-7 vs Diesel)
+    // Train Configuration (WAP-7 High-Speed Electric)
     // ---------------------------------------------------------
-    setTrain(type) {
-      this.train.setTrainType(type);
-      this.physics.isElectric = type === "electric";
+    setTrain(type = "electric") {
+      this.train.setTrainType("electric");
+      this.physics.isElectric = true;
       this.cab = new CabInterior(this.train.locoCar);
       const titleEl = document.getElementById("train-title");
       const shedEl = document.getElementById("loco-shed");
       const locoClassEl = document.getElementById("loco-class");
-      if (type === "electric") {
-        if (titleEl) titleEl.innerText = "12301 RAJDHANI EXPRESS";
-        if (shedEl) shedEl.innerText = "GZB WAP-7 #30201";
-        if (locoClassEl) locoClassEl.innerText = "Electric 25kV AC (6,350 HP)";
-        this.dom.oheVal.innerText = "25.0 kV";
-      } else {
-        if (titleEl) titleEl.innerText = "12952 SUPERFAST EXPRESS";
-        if (shedEl) shedEl.innerText = "BGKT WDP-4D #40112";
-        if (locoClassEl) locoClassEl.innerText = "Diesel-Electric 16-Cyl (4,500 HP)";
-        this.dom.oheVal.innerText = "DIESEL";
-      }
-    }
-    switchTrainType() {
-      const newType = this.train.trainType === "electric" ? "diesel" : "electric";
-      this.setTrain(newType);
+      if (titleEl) titleEl.innerText = "12301 RAJDHANI EXPRESS";
+      if (shedEl) shedEl.innerText = "GZB WAP-7 #30201";
+      if (locoClassEl) locoClassEl.innerText = "Electric 25kV AC (6,350 HP)";
+      if (this.dom.oheVal) this.dom.oheVal.innerText = "25.0 kV";
     }
     cycleWeather() {
       const weathers = ["day", "sunset", "night", "monsoon"];
@@ -39187,7 +40707,47 @@ void main() {
       const forward = new Vector3(0, 0, 1).applyEuler(locoRot);
       const right = new Vector3(1, 0, 0).applyEuler(locoRot);
       const up = new Vector3(0, 1, 0);
-      if (this.cameraMode === "action") {
+      if (this.cameraMode === "orbit" || this.cameraMode === "chase") {
+        this.controls.target.copy(locoPos).add(new Vector3(0, 2.5, 0));
+        if (this.camera.position.y < locoPos.y + 1.2) {
+          this.camera.position.y = locoPos.y + 1.2;
+        }
+        this.controls.autoRotate = this.autoSpin;
+        this.controls.autoRotateSpeed = 2;
+        this.controls.update();
+      } else if (this.cameraMode === "beam") {
+        const fwdDist = this.train.locoLength / 2 + 0.6;
+        const camPos = locoPos.clone().add(forward.clone().multiplyScalar(fwdDist)).add(up.clone().multiplyScalar(2.1));
+        this.camera.position.copy(camPos);
+        let targetObs = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isDeterred && o.mesh);
+        if (targetObs) {
+          this.camera.lookAt(targetObs.mesh.position.clone().add(up.clone().multiplyScalar(1)));
+        } else {
+          const lookTarget = camPos.clone().add(forward.clone().multiplyScalar(80)).add(up.clone().multiplyScalar(-0.4));
+          this.camera.lookAt(lookTarget);
+        }
+      } else if (this.cameraMode === "target") {
+        let targetObs = this.obstacles.obstacles.find((o) => !o.isCollected && o.mesh);
+        if (targetObs) {
+          const targetPos = targetObs.mesh.position;
+          const camPos = targetPos.clone().add(forward.clone().multiplyScalar(5.5)).add(right.clone().multiplyScalar(-2.5)).add(up.clone().multiplyScalar(1.6));
+          this.camera.position.copy(camPos);
+          this.camera.lookAt(locoPos.clone().add(up.clone().multiplyScalar(2)));
+        } else {
+          const aheadProg = (this.physics.trackProgress + 85 / this.track.totalLength) % 1;
+          const spot = this.track.getTrackTransform(aheadProg, 0);
+          const camPos = spot.position.clone().add(spot.normal.clone().multiplyScalar(2.8)).setY(spot.position.y + 1.8);
+          this.camera.position.copy(camPos);
+          this.camera.lookAt(locoPos.clone().add(up.clone().multiplyScalar(2)));
+        }
+      } else if (this.cameraMode === "cab") {
+        const eyeOffset = new Vector3(0.55, 2.4, this.train.locoLength / 2 - 1.2).applyEuler(locoRot);
+        this.camera.position.copy(locoPos).add(eyeOffset);
+        const lookDir = forward.clone();
+        lookDir.applyAxisAngle(up, this.cabYaw);
+        lookDir.applyAxisAngle(right, this.cabPitch);
+        this.camera.lookAt(this.camera.position.clone().add(lookDir));
+      } else if (this.cameraMode === "action") {
         const fwdDist = this.train.locoLength / 2 + 10.5;
         const camOffset = forward.clone().multiplyScalar(fwdDist).add(right.clone().multiplyScalar(-5.4)).add(up.clone().multiplyScalar(1.8));
         const lookTarget = locoPos.clone().add(forward.clone().multiplyScalar(this.train.locoLength / 2 + 0.8)).add(right.clone().multiplyScalar(0.4)).add(up.clone().multiplyScalar(1.7));
@@ -39199,19 +40759,11 @@ void main() {
         const lookTarget = locoPos.clone().add(forward.clone().multiplyScalar(this.train.locoLength / 2 + 1.6)).add(right.clone().multiplyScalar(0.1)).add(up.clone().multiplyScalar(0.7));
         this.camera.position.copy(locoPos).add(camOffset);
         this.camera.lookAt(lookTarget);
-      } else if (this.cameraMode === "chase") {
-        this.controls.target.copy(locoPos).add(new Vector3(0, 2.5, 0));
-        if (this.camera.position.y < locoPos.y + 1.4) {
-          this.camera.position.y = locoPos.y + 1.4;
-        }
+      } else if (this.cameraMode === "drone") {
+        this.controls.target.copy(locoPos);
+        this.controls.autoRotate = this.autoSpin;
+        this.controls.autoRotateSpeed = 1.5;
         this.controls.update();
-      } else if (this.cameraMode === "cab") {
-        const eyeOffset = new Vector3(0.55, 2.4, this.train.locoLength / 2 - 1.2).applyEuler(locoRot);
-        this.camera.position.copy(locoPos).add(eyeOffset);
-        const lookDir = forward.clone();
-        lookDir.applyAxisAngle(up, this.cabYaw);
-        lookDir.applyAxisAngle(right, this.cabPitch);
-        this.camera.lookAt(this.camera.position.clone().add(lookDir));
       } else if (this.cameraMode === "railfan") {
         if (!this.isRailfanInitialized) {
           const aheadProg = (this.physics.trackProgress + 80 / this.track.totalLength) % 1;
@@ -39235,9 +40787,6 @@ void main() {
           const cFwd = new Vector3(0, 0, 1).applyEuler(c1.rotation);
           this.camera.lookAt(this.camera.position.clone().add(cRight.clone().multiplyScalar(8)).add(cFwd.clone().multiplyScalar(4)));
         }
-      } else if (this.cameraMode === "drone") {
-        this.controls.target.copy(locoPos);
-        this.controls.update();
       }
     }
     // ---------------------------------------------------------
@@ -39245,48 +40794,27 @@ void main() {
     // ---------------------------------------------------------
     updateHUD() {
       const p = this.physics;
-      this.dom.speedDigital.innerText = Math.round(p.speedKmh);
-      const speedDashoffset = 440 - Math.min(1, p.speedKmh / 160) * 440;
-      this.dom.speedGaugeFill.style.strokeDashoffset = speedDashoffset;
-      this.dom.teVal.innerText = `${p.tractiveEffortKn} kN`;
-      const teWidth = Math.min(100, Math.abs(p.tractiveEffortKn) / 460 * 100);
-      this.dom.teBar.style.width = `${teWidth}%`;
-      this.dom.bpVal.innerText = `${p.bpPressure.toFixed(1)} bar`;
-      this.dom.bcVal.innerText = `${p.bcPressure.toFixed(1)} bar`;
-      this.dom.notchVal.innerText = `N${p.notch}`;
-      this.dom.brakeVal.innerText = `${Math.round(p.trainBrakePercent * 100)}%`;
-      const notchPx = 12 + p.notch / 8 * 76;
-      this.dom.throttleHandle.style.bottom = `${notchPx}px`;
-      const brakePx = 12 + p.trainBrakePercent * 76;
-      this.dom.brakeHandle.style.bottom = `${brakePx}px`;
-      const revText = p.reverser === 1 ? "FORWARD (F)" : p.reverser === 0 ? "NEUTRAL (N)" : "REVERSE (R)";
-      this.dom.reverserBtn.innerText = `\u2699\uFE0F ${revText}`;
-      this.dom.emergencyBtn.classList.toggle("engaged", p.emergencyBrake);
-      if (this.dom.pantoStatus) {
-        this.dom.pantoStatus.innerText = p.pantographRaised ? "UP (25kV)" : "LOWERED";
-        this.dom.pantoStatus.style.color = p.pantographRaised ? "#00e676" : "#ff1744";
+      if (this.dom.consoleSpeedVal) {
+        this.dom.consoleSpeedVal.innerText = Math.round(p.speedKmh);
       }
-      const distToStationMeters = (this.track.stationProgress - p.trackProgress + 1) % 1 * this.track.totalLength;
-      if (distToStationMeters < 1e3) {
-        this.dom.stationDistText.innerText = `${Math.round(distToStationMeters)} m`;
-      } else {
-        this.dom.stationDistText.innerText = `${(distToStationMeters / 1e3).toFixed(1)} km`;
+      if (this.dom.btnConsoleEmergency) {
+        this.dom.btnConsoleEmergency.classList.toggle("active", p.emergencyBrake);
       }
-      this.track.updateSignals(p.trackProgress);
-      const activeSig = this.track.signals[0];
-      if (activeSig) {
-        const sigAspect = activeSig.currentAspect;
-        this.dom.signalAspectText.innerText = sigAspect.toUpperCase().replace("_", " ");
-        this.dom.aspectGreen.classList.toggle("lit", sigAspect === "green");
-        this.dom.aspectYellow1.classList.toggle("lit", sigAspect === "yellow" || sigAspect === "double_yellow");
-        this.dom.aspectYellow2.classList.toggle("lit", sigAspect === "double_yellow");
-        this.dom.aspectRed.classList.toggle("lit", sigAspect === "red");
-        if (!this.lastTelemetry || !this.lastTelemetry.alertMessage) {
-          if (!this.lastDisplayedAlert) {
-            this.dom.alertBanner.style.display = "none";
-          }
+      if (this.dom.btnConsoleNet && this.train && this.train.captureNetDeployed !== void 0) {
+        const isNetOut = this.train.captureNetDeployed;
+        this.dom.btnConsoleNet.innerText = `\u{1FAA4} NET: ${isNetOut ? "DEPLOYED" : "RETRACTED"}`;
+        this.dom.btnConsoleNet.classList.toggle("active-amber", isNetOut);
+      }
+      this.updateTelemetryTicker();
+      if (this.dom.stationDistText) {
+        const distToStationMeters = (this.track.stationProgress - p.trackProgress + 1) % 1 * this.track.totalLength;
+        if (distToStationMeters < 1e3) {
+          this.dom.stationDistText.innerText = `${Math.round(distToStationMeters)} m`;
+        } else {
+          this.dom.stationDistText.innerText = `${(distToStationMeters / 1e3).toFixed(1)} km`;
         }
       }
+      this.track.updateSignals(p.trackProgress);
       if (this.lastTelemetry && this.dom.kavachTargetName) {
         const t = this.lastTelemetry;
         this.dom.kavachTargetName.innerText = t.name ? t.name.toUpperCase() : "NONE (TRACK CLEAR)";
@@ -39346,6 +40874,10 @@ void main() {
             }, 3800);
           }
         }
+      } else {
+        if (!this.lastDisplayedAlert && this.dom.alertBanner) {
+          this.dom.alertBanner.style.display = "none";
+        }
       }
     }
     // ---------------------------------------------------------
@@ -39354,6 +40886,20 @@ void main() {
     animate() {
       requestAnimationFrame(this.animate);
       const rawDt = Math.min(this.clock.getDelta(), 0.1);
+      if (this.beamDischargingTimer > 0) {
+        this.beamDischargingTimer -= rawDt;
+        if (this.beamDischargingTimer <= 0) {
+          if (this.dom.btnConsoleBeam) {
+            this.dom.btnConsoleBeam.innerText = "\u26A1 BEAM: ARMED";
+          }
+        }
+      }
+      if (this.isPaused) {
+        this.updateCamera();
+        this.updateHUD();
+        this.renderer.render(this.scene, this.camera);
+        return;
+      }
       if (this.autoSlowMo && this.lastTelemetry && this.lastTelemetry.targetDetected && this.lastTelemetry.canCollect) {
         if (this.lastTelemetry.distance <= 48 && !this.isRescueSlowMo) {
           this.isRescueSlowMo = true;
@@ -39390,7 +40936,8 @@ void main() {
         this.train.captureNet,
         this.audio,
         this.physics,
-        this.track.totalLength
+        this.track.totalLength,
+        this.aiSensorAuto
       );
       this.lastTelemetry = telemetry;
       this.train.update(dt, this.physics.speedMs, telemetry.targetDetected);

@@ -21,6 +21,7 @@ export class TrainPhysics {
     // Dynamic State
     this.speedMs = 0;             // Speed in meters / second
     this.speedKmh = 0;            // Speed in km / h
+    this.targetSpeedKmh = 120;    // Target cruise speed preset (0, 40, 80, 120, 160)
     this.distanceTraveled = 0;    // Meters
     this.trackProgress = 0;       // 0.0 to 1.0 along the track spline
     this.acceleration = 0;        // m/s^2
@@ -54,6 +55,38 @@ export class TrainPhysics {
     this.sandersActive = false;
   }
 
+  setTargetSpeed(speed) {
+    this.targetSpeedKmh = speed;
+    if (speed === 0) {
+      this.emergencyBrake = false;
+      this.notch = 0;
+      this.throttlePercent = 0;
+      this.trainBrakePercent = 0.8;
+    } else {
+      this.emergencyBrake = false;
+      this.trainBrakePercent = 0;
+    }
+  }
+
+  reset() {
+    this.speedMs = 0;
+    this.speedKmh = 0;
+    this.targetSpeedKmh = 120;
+    this.distanceTraveled = 0;
+    this.trackProgress = 0;
+    this.acceleration = 0;
+    this.notch = 0;
+    this.throttlePercent = 0;
+    this.trainBrakePercent = 0;
+    this.emergencyBrake = false;
+    this.bpPressure = 5.0;
+    this.bcPressure = 0.0;
+    this.reverser = 1;
+    this.tractiveEffortKn = 0;
+    this.tractionAmps = 0;
+    this.rollTilt = 0;
+  }
+
   // ---------------------------------------------------------
   // Control Inputs (Intuitive Manual Speed Management)
   // ---------------------------------------------------------
@@ -69,18 +102,21 @@ export class TrainPhysics {
   }
 
   notchUp() {
+    this.targetSpeedKmh = null;
     this.emergencyBrake = false;
     this.trainBrakePercent = 0;
     this.setNotch(this.notch + 1);
   }
 
   notchDown() {
+    this.targetSpeedKmh = null;
     this.setNotch(this.notch - 1);
   }
 
   setTrainBrake(percent) {
     this.trainBrakePercent = Math.max(0, Math.min(1.0, percent));
     if (this.trainBrakePercent > 0.05) {
+      this.targetSpeedKmh = null;
       this.notch = 0;
       this.throttlePercent = 0;
     }
@@ -122,6 +158,35 @@ export class TrainPhysics {
   update(dt, trackTotalLength = 2000, currentCurveRadius = 0, currentGradient = 0) {
     this.curveRadius = currentCurveRadius;
     this.currentGradient = currentGradient;
+
+    // Automatic Target Speed / Cruise Autopilot (STOP, 40, 80, 120 CRUISE, 160 MAX)
+    if (this.targetSpeedKmh !== null && !this.emergencyBrake) {
+      if (this.targetSpeedKmh === 0) {
+        this.notch = 0;
+        this.throttlePercent = 0;
+        if (this.speedKmh > 0.5) {
+          this.trainBrakePercent = Math.min(0.85, 0.25 + (this.speedKmh / 25));
+        } else {
+          this.speedMs = 0;
+          this.speedKmh = 0;
+          this.trainBrakePercent = 0.6;
+        }
+      } else {
+        const diff = this.targetSpeedKmh - this.speedKmh;
+        if (diff > 2.0) {
+          this.trainBrakePercent = 0;
+          const notch = diff > 35 ? 8 : (diff > 18 ? 7 : (diff > 8 ? 6 : 5));
+          this.setNotch(notch);
+        } else if (diff < -2.0) {
+          this.setNotch(0);
+          this.trainBrakePercent = Math.min(0.55, Math.abs(diff) / 18);
+        } else {
+          this.trainBrakePercent = 0;
+          const notch = this.targetSpeedKmh >= 150 ? 6 : (this.targetSpeedKmh >= 110 ? 4 : (this.targetSpeedKmh >= 70 ? 3 : 2));
+          this.setNotch(notch);
+        }
+      }
+    }
 
     // 1. Update Pneumatic Pressures
     if (this.emergencyBrake) {
