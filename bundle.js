@@ -37568,6 +37568,7 @@ void main() {
       this.scene.add(this.rootGroup);
       this.trainType = "electric";
       this.locoCar = null;
+      this.shockEmitters = [];
       this.coachCars = [];
       this.rotatingWheels = [];
       this.wipers = [];
@@ -37952,6 +37953,7 @@ void main() {
       this.wipers = [];
       this.radiatorFans = [];
       this.flasherLamps = [];
+      this.shockEmitters = [];
       this.locoCar = new Group();
       if (this.trainType === "electric") {
         this.buildWAP7Locomotive(this.locoCar);
@@ -38186,6 +38188,17 @@ void main() {
           slat.position.set(0, 0.48 + sy, cabLen + 0.52 - Math.abs(sy) * 0.2);
           cabGroup.add(slat);
         });
+        if (isFront) {
+          const devTL = this.createShockSenderDevice("top_left", new Vector3(-1.25, 3.32, cabLen + 0.12), new Euler(-0.03, 0.04, 0), "Top-Left Emitter");
+          const devTR = this.createShockSenderDevice("top_right", new Vector3(1.25, 3.32, cabLen + 0.12), new Euler(-0.03, -0.04, 0), "Top-Right Emitter");
+          const devDL = this.createShockSenderDevice("down_left", new Vector3(-1.35, 0.95, cabLen + 0.28), new Euler(0.02, 0.03, 0), "Down-Left Emitter");
+          const devDR = this.createShockSenderDevice("down_right", new Vector3(1.35, 0.95, cabLen + 0.28), new Euler(0.02, -0.03, 0), "Down-Right Emitter");
+          cabGroup.add(devTL.group);
+          cabGroup.add(devTR.group);
+          cabGroup.add(devDL.group);
+          cabGroup.add(devDR.group);
+          this.shockEmitters = [devTL, devTR, devDL, devDR];
+        }
         group.add(cabGroup);
       });
       this.headlightBeam = new SpotLight(16775917, 8.5, 175, Math.PI / 6.5, 0.35, 1.2);
@@ -38388,6 +38401,15 @@ void main() {
       group.add(plow);
       this.buildCoCoBogie(group, length * 0.28);
       this.buildCoCoBogie(group, -length * 0.28);
+      const devTL = this.createShockSenderDevice("top_left", new Vector3(-1.25, 3.25, length / 2 + 0.1), new Euler(-0.03, 0.04, 0), "Top-Left Emitter");
+      const devTR = this.createShockSenderDevice("top_right", new Vector3(1.25, 3.25, length / 2 + 0.1), new Euler(-0.03, -0.04, 0), "Top-Right Emitter");
+      const devDL = this.createShockSenderDevice("down_left", new Vector3(-1.35, 0.95, length / 2 + 0.28), new Euler(0.02, 0.03, 0), "Down-Left Emitter");
+      const devDR = this.createShockSenderDevice("down_right", new Vector3(1.35, 0.95, length / 2 + 0.28), new Euler(0.02, -0.03, 0), "Down-Right Emitter");
+      group.add(devTL.group);
+      group.add(devTR.group);
+      group.add(devDL.group);
+      group.add(devDR.group);
+      this.shockEmitters = [devTL, devTR, devDL, devDR];
       this.captureNet = new ObstacleCaptureNet(group, length, this.captureNetDeployed);
     }
     // ---------------------------------------------------------
@@ -38537,6 +38559,141 @@ void main() {
         if (this.headlightBeam) this.headlightBeam.intensity = 8;
       }
       return this.headlightState;
+    }
+    // ---------------------------------------------------------
+    // 3D Directional High-Voltage Electric Shock Sender Devices
+    // 4 Quad Units mounted on Locomotive Front:
+    // - Top-Left (cab brow left)
+    // - Top-Right (cab brow right)
+    // - Down-Left (buffer beam left)
+    // - Down-Right (buffer beam right)
+    // ---------------------------------------------------------
+    createShockSenderDevice(id, position, rotation, label = "") {
+      const devGroup = new Group();
+      devGroup.name = `shockSender_${id}`;
+      devGroup.position.copy(position);
+      if (rotation) devGroup.rotation.copy(rotation);
+      const baseMat = new MeshStandardMaterial({
+        color: 1976635,
+        metalness: 0.85,
+        roughness: 0.35
+      });
+      const baseFlange = new Mesh(
+        new CylinderGeometry(0.16, 0.18, 0.05, 16).rotateX(Math.PI / 2),
+        baseMat
+      );
+      devGroup.add(baseFlange);
+      for (let b = 0; b < 6; b++) {
+        const angle = b / 6 * Math.PI * 2;
+        const bolt = new Mesh(
+          new CylinderGeometry(0.014, 0.014, 0.025, 6).rotateX(Math.PI / 2),
+          new MeshStandardMaterial({ color: 9741240, metalness: 0.9, roughness: 0.2 })
+        );
+        bolt.position.set(Math.cos(angle) * 0.12, Math.sin(angle) * 0.12, 0.025);
+        devGroup.add(bolt);
+      }
+      const insulatorMat = new MeshStandardMaterial({
+        color: 7877903,
+        // Glazed porcelain terracotta
+        roughness: 0.25,
+        metalness: 0.15
+      });
+      const insulatorColumn = new Mesh(
+        new CylinderGeometry(0.1, 0.11, 0.14, 16).rotateX(Math.PI / 2),
+        insulatorMat
+      );
+      insulatorColumn.position.set(0, 0, 0.09);
+      devGroup.add(insulatorColumn);
+      [-0.035, 0, 0.035].forEach((sz) => {
+        const shed = new Mesh(
+          new CylinderGeometry(0.14, 0.14, 0.018, 16).rotateX(Math.PI / 2),
+          insulatorMat
+        );
+        shed.position.set(0, 0, 0.09 + sz);
+        devGroup.add(shed);
+      });
+      const barrelMat = new MeshStandardMaterial({
+        color: 988970,
+        metalness: 0.88,
+        roughness: 0.25
+      });
+      const barrel = new Mesh(
+        new CylinderGeometry(0.095, 0.1, 0.15, 16).rotateX(Math.PI / 2),
+        barrelMat
+      );
+      barrel.position.set(0, 0, 0.22);
+      devGroup.add(barrel);
+      const hazardBand = new Mesh(
+        new CylinderGeometry(0.098, 0.098, 0.03, 16).rotateX(Math.PI / 2),
+        new MeshStandardMaterial({ color: 16436245, roughness: 0.4, metalness: 0.2 })
+      );
+      hazardBand.position.set(0, 0, 0.2);
+      devGroup.add(hazardBand);
+      const nozzleMat = new MeshStandardMaterial({
+        color: 3359061,
+        metalness: 0.8,
+        roughness: 0.2
+      });
+      const nozzle = new Mesh(
+        new CylinderGeometry(0.15, 0.085, 0.14, 20, 1, true).rotateX(Math.PI / 2),
+        nozzleMat
+      );
+      nozzle.position.set(0, 0, 0.35);
+      devGroup.add(nozzle);
+      const rim = new Mesh(
+        new TorusGeometry(0.15, 0.014, 8, 20),
+        new MeshStandardMaterial({ color: 165063, metalness: 0.7, roughness: 0.3 })
+      );
+      rim.position.set(0, 0, 0.42);
+      devGroup.add(rim);
+      const plasmaMat = new MeshBasicMaterial({ color: 3718648 });
+      const core = new Mesh(
+        new SphereGeometry(0.045, 12, 12),
+        plasmaMat
+      );
+      core.position.set(0, 0, 0.32);
+      devGroup.add(core);
+      const tip = new Object3D();
+      tip.name = `emitterTip_${id}`;
+      tip.position.set(0, 0, 0.43);
+      devGroup.add(tip);
+      return {
+        id,
+        label: label || id,
+        group: devGroup,
+        tip,
+        core,
+        mat: plasmaMat
+      };
+    }
+    getShockEmitterWorldPositions() {
+      if (!this.shockEmitters || this.shockEmitters.length === 0) return null;
+      return this.shockEmitters.map((e) => {
+        const pos = new Vector3();
+        e.tip.getWorldPosition(pos);
+        return {
+          id: e.id,
+          label: e.label,
+          tip: e.tip,
+          core: e.core,
+          mat: e.mat,
+          pos
+        };
+      });
+    }
+    pulseShockEmitters(intensity = 1) {
+      if (!this.shockEmitters) return;
+      this.shockEmitters.forEach((e) => {
+        if (e.core && e.mat) {
+          if (intensity > 0.05) {
+            e.mat.color.setHex(intensity > 0.6 ? 16777215 : 3718648);
+            e.core.scale.setScalar(1 + intensity * 0.8);
+          } else {
+            e.mat.color.setHex(3718648);
+            e.core.scale.setScalar(1);
+          }
+        }
+      });
     }
   };
 
@@ -39478,6 +39635,7 @@ void main() {
     constructor(scene, track) {
       this.scene = scene;
       this.track = track;
+      this.train = null;
       this.obstacles = [];
       this.nextId = 1;
       this.activeDeterrenceMode = "electric_shock";
@@ -39604,6 +39762,9 @@ void main() {
         hazardYellow: new MeshStandardMaterial({ color: 15381256, roughness: 0.35 })
       };
       this.initDefaultObstacles();
+    }
+    setTrain(train) {
+      this.train = train;
     }
     // ------------------------------------------------------------------
     // 3D Model Builders for Human, Animal, Heavy Cattle, Debris
@@ -40892,8 +41053,9 @@ void main() {
         };
       }
     }
-    triggerDeterrence(obs, audio) {
+    triggerDeterrence(obs, audio, train = null) {
       if (!obs || obs.isDeterred) return;
+      if (train) this.train = train;
       obs.isDeterred = true;
       obs.hasBeenShocked = true;
       obs.shockTime = this.animTime;
@@ -40905,102 +41067,177 @@ void main() {
       if (audio) {
         audio.playElectricShockDischarge(obs.type, obs.mass);
       }
-      this.spawnDeterrenceFX(obs);
+      this.spawnDeterrenceFX(obs, this.train);
     }
     // Alias for backward compatibility
-    triggerAnimalDeterrence(obs, audio) {
-      return this.triggerDeterrence(obs, audio);
+    triggerAnimalDeterrence(obs, audio, train = null) {
+      return this.triggerDeterrence(obs, audio, train);
     }
-    spawnDeterrenceFX(obs) {
+    spawnDeterrenceFX(obs, train = null) {
+      const activeTrain = train || this.train;
       while (this.fxGroup.children.length > 0) {
         const c = this.fxGroup.children[0];
         if (c.geometry) c.geometry.dispose();
         this.fxGroup.remove(c);
       }
       const obsPos = obs.mesh.position.clone();
-      const transform = this.track.getTrackTransform(obs.progress, 0);
-      const tangent = transform.tangent.clone().normalize();
-      const forwardMeters = Math.max(15, Math.min(obs.forwardMeters || 65, 80));
-      const trainFrontPos = obsPos.clone().sub(tangent.clone().multiplyScalar(forwardMeters));
       const isHuman = obs.type === "human";
+      const emitters = activeTrain && activeTrain.getShockEmitterWorldPositions ? activeTrain.getShockEmitterWorldPositions() : null;
       const sparkColor = isHuman ? 10875900 : 3718648;
-      const arcOffsets = isHuman ? [
-        { pA: new Vector3(-0.45, 0.3, 0), pB: new Vector3(-0.15, 0.15, 0) },
-        { pA: new Vector3(0.45, 0.3, 0), pB: new Vector3(0.15, 0.15, 0) },
-        { pA: new Vector3(-0.35, 0.25, -1), pB: new Vector3(-0.1, 0.18, 0.5) },
-        { pA: new Vector3(0.35, 0.25, -1), pB: new Vector3(0.1, 0.18, 0.5) }
+      const targetOffsets = isHuman ? [
+        new Vector3(-0.1, 1.25, 0.04),
+        // Top-Left -> Left shoulder
+        new Vector3(0.1, 1.25, 0.04),
+        // Top-Right -> Right shoulder
+        new Vector3(-0.14, 0.12, 0.02),
+        // Down-Left -> Left foot / ankle
+        new Vector3(0.14, 0.12, 0.02)
+        // Down-Right -> Right foot / ankle
       ] : [
-        { pA: new Vector3(-0.84, 0.35, 0), pB: new Vector3(-0.35, 0.35, 0) },
-        { pA: new Vector3(0.84, 0.35, 0), pB: new Vector3(0.35, 0.35, 0) },
-        { pA: new Vector3(-0.6, 0.38, -2), pB: new Vector3(-0.25, 0.4, 1) },
-        { pA: new Vector3(0.6, 0.38, -2), pB: new Vector3(0.25, 0.4, 1) }
+        new Vector3(-0.45, 1.35, -0.2),
+        // Top-Left -> Upper left flank / spine
+        new Vector3(0.45, 1.35, -0.2),
+        // Top-Right -> Upper right flank / spine
+        new Vector3(-0.42, 0.22, 0.4),
+        // Down-Left -> Left forehoof
+        new Vector3(0.42, 0.22, 0.4)
+        // Down-Right -> Right forehoof
       ];
-      arcOffsets.forEach((arc) => {
-        const p1 = trainFrontPos.clone().add(arc.pA);
-        const p2 = obsPos.clone().add(arc.pB);
+      const fallbackFront = obsPos.clone().sub(
+        this.track.getTrackTransform(obs.progress, 0).tangent.clone().normalize().multiplyScalar(obs.forwardMeters || 60)
+      );
+      const fallbackOffsets = [
+        new Vector3(-1.25, 3.32, 0),
+        new Vector3(1.25, 3.32, 0),
+        new Vector3(-1.35, 0.95, 0),
+        new Vector3(1.35, 0.95, 0)
+      ];
+      const segs = 16;
+      for (let i = 0; i < 4; i++) {
+        const emitter = emitters && emitters[i] ? emitters[i] : null;
+        const p1 = emitter ? emitter.pos.clone() : fallbackFront.clone().add(fallbackOffsets[i]);
+        const targetOffset = targetOffsets[i];
+        const p2 = obsPos.clone().add(targetOffset);
         const pts = [];
-        const segs = 10;
-        const jitter = isHuman ? 0.25 : 0.45;
-        for (let i = 0; i <= segs; i++) {
-          const t = i / segs;
+        const dist = p1.distanceTo(p2);
+        const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * (isHuman ? 0.75 : 1);
+        for (let s = 0; s <= segs; s++) {
+          const t = s / segs;
           const p = p1.clone().lerp(p2, t);
-          if (i > 0 && i < segs) {
-            p.x += (Math.random() - 0.5) * jitter;
-            p.y += (Math.random() - 0.5) * (jitter * 0.8);
+          if (s > 0 && s < segs) {
+            const envelope = Math.sin(t * Math.PI);
+            p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+            p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
+            p.z += (Math.random() - 0.5) * jitterAmp * envelope;
           }
           pts.push(p);
         }
         const geo = new BufferGeometry().setFromPoints(pts);
-        const mat = new LineBasicMaterial({ color: sparkColor, transparent: true, opacity: isHuman ? 0.85 : 0.98 });
+        const mat = new LineBasicMaterial({
+          color: sparkColor,
+          transparent: true,
+          opacity: isHuman ? 0.9 : 1,
+          linewidth: 2
+        });
         const line = new Line(geo, mat);
-        line.userData = { isLightning: true, pA: p1, pB: p2, isHuman };
+        line.userData = {
+          isLightning: true,
+          arcIndex: i,
+          emitterTip: emitter ? emitter.tip : null,
+          fallbackOrigin: fallbackFront.clone().add(fallbackOffsets[i]),
+          obs,
+          targetOffset,
+          isHuman,
+          segs
+        };
         this.fxGroup.add(line);
-      });
-      const sparkLight = new PointLight(sparkColor, isHuman ? 3.5 : 7, isHuman ? 18 : 28);
-      sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.45 : 0.75, 0)));
+        if (emitter && emitter.tip) {
+          const nozzleFlare = new PointLight(sparkColor, isHuman ? 2.5 : 4.5, 8);
+          emitter.tip.getWorldPosition(nozzleFlare.position);
+          nozzleFlare.userData = { isNozzleFlare: true, emitterTip: emitter.tip };
+          this.fxGroup.add(nozzleFlare);
+        }
+      }
+      const sparkLight = new PointLight(sparkColor, isHuman ? 4.5 : 9, isHuman ? 20 : 32);
+      sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.8 : 1, 0)));
       this.fxGroup.add(sparkLight);
-      const sparkCount = isHuman ? 14 : 32;
+      const sparkCount = isHuman ? 18 : 36;
       const sparkGeo = new BufferGeometry();
       const sPos = [];
-      const spread = isHuman ? 0.6 : 1.2;
+      const spread = isHuman ? 0.5 : 1.2;
       for (let s = 0; s < sparkCount; s++) {
         sPos.push(
           obsPos.x + (Math.random() - 0.5) * spread,
-          obsPos.y + Math.random() * (isHuman ? 0.35 : 0.6),
+          obsPos.y + Math.random() * (isHuman ? 0.6 : 1.2),
           obsPos.z + (Math.random() - 0.5) * spread
         );
       }
       sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
-      const sparkMat = new PointsMaterial({ color: 14742270, size: isHuman ? 0.05 : 0.08, transparent: true, opacity: 0.9 });
+      const sparkMat = new PointsMaterial({
+        color: 14742270,
+        size: isHuman ? 0.06 : 0.1,
+        transparent: true,
+        opacity: 0.95
+      });
       this.fxGroup.add(new Points(sparkGeo, sparkMat));
+      if (activeTrain && activeTrain.pulseShockEmitters) {
+        activeTrain.pulseShockEmitters(1);
+      }
     }
     updateDeterrenceFX(dt) {
       if (this.fxTimer > 0) {
         this.fxTimer -= dt;
+        const progress = Math.max(0, this.fxTimer / 1.2);
+        if (this.train && this.train.pulseShockEmitters) {
+          this.train.pulseShockEmitters(progress);
+        }
+        const tempStart = new Vector3();
+        const tempEnd = new Vector3();
         this.fxGroup.children.forEach((child) => {
           if (child.isLine && child.userData.isLightning) {
-            const pA = child.userData.pA;
-            const pB = child.userData.pB;
+            const ud = child.userData;
+            if (ud.emitterTip) {
+              ud.emitterTip.getWorldPosition(tempStart);
+            } else {
+              tempStart.copy(ud.fallbackOrigin);
+            }
+            if (ud.obs && ud.obs.mesh) {
+              ud.obs.mesh.getWorldPosition(tempEnd);
+              tempEnd.add(ud.targetOffset);
+            }
             const posAttr = child.geometry.attributes.position;
             const arr = posAttr.array;
-            const segs = 10;
+            const segs = ud.segs || 16;
+            const dist = tempStart.distanceTo(tempEnd);
+            const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * (ud.isHuman ? 0.75 : 1) * progress;
             for (let i = 0; i <= segs; i++) {
               const t = i / segs;
-              const p = pA.clone().lerp(pB, t);
+              const p = tempStart.clone().lerp(tempEnd, t);
               if (i > 0 && i < segs) {
-                p.x += (Math.random() - 0.5) * 0.45;
-                p.y += (Math.random() - 0.5) * 0.35;
+                const envelope = Math.sin(t * Math.PI);
+                p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+                p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
+                p.z += (Math.random() - 0.5) * jitterAmp * envelope;
               }
               arr[i * 3] = p.x;
               arr[i * 3 + 1] = p.y;
               arr[i * 3 + 2] = p.z;
             }
             posAttr.needsUpdate = true;
+            child.material.opacity = (ud.isHuman ? 0.85 : 0.98) * progress;
           } else if (child.isPointLight) {
-            child.intensity = (Math.random() > 0.2 ? 6 : 1) * (this.fxTimer / 1.2);
+            if (child.userData.isNozzleFlare && child.userData.emitterTip) {
+              child.userData.emitterTip.getWorldPosition(child.position);
+              child.intensity = (Math.random() > 0.3 ? 4 : 1.5) * progress;
+            } else {
+              child.intensity = (Math.random() > 0.2 ? 7.5 : 2) * progress;
+            }
           }
         });
         if (this.fxTimer <= 0) {
+          if (this.train && this.train.pulseShockEmitters) {
+            this.train.pulseShockEmitters(0);
+          }
           while (this.fxGroup.children.length > 0) {
             const c = this.fxGroup.children[0];
             if (c.geometry) c.geometry.dispose();
@@ -41473,7 +41710,8 @@ void main() {
     // Enforces: Collect ONLY when Mass <= 150 kg AND Speed <= 150 km/h
     // Net defaults to CLOSED / STOWED; Opens with animation upon detection
     // ------------------------------------------------------------------
-    update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true) {
+    update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true, train = null) {
+      if (train) this.train = train;
       let closestObstacle = null;
       let minForwardDist = Infinity;
       const speedKmh = trainSpeedMs * 3.6;
@@ -41500,13 +41738,13 @@ void main() {
         this.telemetry.tailoredSpec = `\u26A1 ACTIVE [${tailored.badge}]`;
         this.telemetry.tailoredLabel = tailored.typeLabel;
         if (aiSensorAuto && !closestObstacle.hasBeenShocked) {
-          this.triggerDeterrence(closestObstacle, audio);
+          this.triggerDeterrence(closestObstacle, audio, this.train);
           if (audio) audio.playTargetAcquiredBeep(false);
           this.telemetry.alertType = "deploy";
-          this.telemetry.alertMessage = `\u26A1 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! DELIVERING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
+          this.telemetry.alertMessage = `\u26A1 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! QUAD SENDER FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
         }
         if (aiSensorAuto && !closestObstacle.isCleared && this.fxTimer <= 0) {
-          this.spawnDeterrenceFX(closestObstacle);
+          this.spawnDeterrenceFX(closestObstacle, this.train);
           if (audio) audio.playElectricShockDischarge(closestObstacle.type, closestObstacle.mass);
           this.fxTimer = 1;
         }
@@ -41620,6 +41858,7 @@ void main() {
       this.cab = new CabInterior(this.train.locoCar);
       this.env = new Environment(this.scene, this.track);
       this.obstacles = new ObstacleManager(this.scene, this.track);
+      this.obstacles.setTrain(this.train);
       this.lastTelemetry = null;
       this.timeScale = 1;
       this.timeScales = [1, 0.5, 0.25, 0.1];
@@ -41976,7 +42215,7 @@ void main() {
         target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 70, false);
       }
       if (target) {
-        this.obstacles.triggerDeterrence(target, this.audio);
+        this.obstacles.triggerDeterrence(target, this.audio, this.train);
         if (this.dom.btnConsoleShock) {
           this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: FIRED";
           setTimeout(() => {
@@ -41998,6 +42237,7 @@ void main() {
       this.updateSpeedPresetButtons(120);
       this.obstacles.resetCollected(this.train.captureNet);
       this.obstacles.initDefaultObstacles();
+      this.obstacles.setTrain(this.train);
       this.train.setCaptureNetState(false);
       if (this.dom.btnConsoleNet) {
         this.dom.btnConsoleNet.innerText = "\u{1FAA4} NET: RETRACTED";
@@ -42361,7 +42601,8 @@ void main() {
         this.audio,
         this.physics,
         this.track.totalLength,
-        this.aiSensorAuto
+        this.aiSensorAuto,
+        this.train
       );
       this.lastTelemetry = telemetry;
       this.train.update(dt, this.physics.speedMs, telemetry.targetDetected);

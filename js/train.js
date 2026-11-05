@@ -17,6 +17,7 @@ export class TrainModel {
 
     // Articulated train components
     this.locoCar = null;
+    this.shockEmitters = [];
     this.coachCars = []; // Array of independent coach group objects
     this.rotatingWheels = [];
     this.wipers = [];
@@ -521,6 +522,7 @@ export class TrainModel {
     this.wipers = [];
     this.radiatorFans = [];
     this.flasherLamps = [];
+    this.shockEmitters = [];
 
     // 1. Build Locomotive Car Group (Independent Top-Level Group)
     this.locoCar = new THREE.Group();
@@ -813,6 +815,23 @@ export class TrainModel {
         cabGroup.add(slat);
       });
 
+      // 4 Physical High-Voltage Electric Shock Sender Devices
+      // Mounted on Locomotive Front: Top-Left, Top-Right, Down-Left, Down-Right
+      // User requirement: "electric shoc sender device will be place on train engine top left - right and down left-right . this will be help in proper align to target and train"
+      if (isFront) {
+        const devTL = this.createShockSenderDevice('top_left', new THREE.Vector3(-1.25, 3.32, cabLen + 0.12), new THREE.Euler(-0.03, 0.04, 0), 'Top-Left Emitter');
+        const devTR = this.createShockSenderDevice('top_right', new THREE.Vector3(1.25, 3.32, cabLen + 0.12), new THREE.Euler(-0.03, -0.04, 0), 'Top-Right Emitter');
+        const devDL = this.createShockSenderDevice('down_left', new THREE.Vector3(-1.35, 0.95, cabLen + 0.28), new THREE.Euler(0.02, 0.03, 0), 'Down-Left Emitter');
+        const devDR = this.createShockSenderDevice('down_right', new THREE.Vector3(1.35, 0.95, cabLen + 0.28), new THREE.Euler(0.02, -0.03, 0), 'Down-Right Emitter');
+
+        cabGroup.add(devTL.group);
+        cabGroup.add(devTR.group);
+        cabGroup.add(devDL.group);
+        cabGroup.add(devDR.group);
+
+        this.shockEmitters = [devTL, devTR, devDL, devDR];
+      }
+
       group.add(cabGroup);
     });
 
@@ -1090,6 +1109,19 @@ export class TrainModel {
     this.buildCoCoBogie(group, length * 0.28);
     this.buildCoCoBogie(group, -length * 0.28);
 
+    // 4 Physical High-Voltage Electric Shock Sender Devices on Diesel Locomotive Front
+    const devTL = this.createShockSenderDevice('top_left', new THREE.Vector3(-1.25, 3.25, length / 2 + 0.10), new THREE.Euler(-0.03, 0.04, 0), 'Top-Left Emitter');
+    const devTR = this.createShockSenderDevice('top_right', new THREE.Vector3(1.25, 3.25, length / 2 + 0.10), new THREE.Euler(-0.03, -0.04, 0), 'Top-Right Emitter');
+    const devDL = this.createShockSenderDevice('down_left', new THREE.Vector3(-1.35, 0.95, length / 2 + 0.28), new THREE.Euler(0.02, 0.03, 0), 'Down-Left Emitter');
+    const devDR = this.createShockSenderDevice('down_right', new THREE.Vector3(1.35, 0.95, length / 2 + 0.28), new THREE.Euler(0.02, -0.03, 0), 'Down-Right Emitter');
+
+    group.add(devTL.group);
+    group.add(devTR.group);
+    group.add(devDL.group);
+    group.add(devDR.group);
+
+    this.shockEmitters = [devTL, devTR, devDL, devDR];
+
     // Front Obstacle Capture Net & Safety Airbag Scoop (Dedicated Module: js/captureNet.js)
     this.captureNet = new ObstacleCaptureNet(group, length, this.captureNetDeployed);
   }
@@ -1263,5 +1295,163 @@ export class TrainModel {
       if (this.headlightBeam) this.headlightBeam.intensity = 8.0;
     }
     return this.headlightState;
+  }
+
+  // ---------------------------------------------------------
+  // 3D Directional High-Voltage Electric Shock Sender Devices
+  // 4 Quad Units mounted on Locomotive Front:
+  // - Top-Left (cab brow left)
+  // - Top-Right (cab brow right)
+  // - Down-Left (buffer beam left)
+  // - Down-Right (buffer beam right)
+  // ---------------------------------------------------------
+  createShockSenderDevice(id, position, rotation, label = '') {
+    const devGroup = new THREE.Group();
+    devGroup.name = `shockSender_${id}`;
+    devGroup.position.copy(position);
+    if (rotation) devGroup.rotation.copy(rotation);
+
+    // 1. Heavy Base Mounting Bracket / Flange (Gunmetal alloy)
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.85,
+      roughness: 0.35
+    });
+    const baseFlange = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.18, 0.05, 16).rotateX(Math.PI / 2),
+      baseMat
+    );
+    devGroup.add(baseFlange);
+
+    // Chrome mounting hex bolts
+    for (let b = 0; b < 6; b++) {
+      const angle = (b / 6) * Math.PI * 2;
+      const bolt = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.014, 0.014, 0.025, 6).rotateX(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 })
+      );
+      bolt.position.set(Math.cos(angle) * 0.12, Math.sin(angle) * 0.12, 0.025);
+      devGroup.add(bolt);
+    }
+
+    // 2. High-Voltage Ceramic/Porcelain Insulator Bushing (Glazed terracotta with ribbed sheds)
+    const insulatorMat = new THREE.MeshStandardMaterial({
+      color: 0x78350f, // Glazed porcelain terracotta
+      roughness: 0.25,
+      metalness: 0.15
+    });
+    const insulatorColumn = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10, 0.11, 0.14, 16).rotateX(Math.PI / 2),
+      insulatorMat
+    );
+    insulatorColumn.position.set(0, 0, 0.09);
+    devGroup.add(insulatorColumn);
+
+    // 3 Annular Shed Discs
+    [-0.035, 0.0, 0.035].forEach(sz => {
+      const shed = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.14, 0.018, 16).rotateX(Math.PI / 2),
+        insulatorMat
+      );
+      shed.position.set(0, 0, 0.09 + sz);
+      devGroup.add(shed);
+    });
+
+    // 3. CNC Alloy Projector Barrel with cooling fins
+    const barrelMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      metalness: 0.88,
+      roughness: 0.25
+    });
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.095, 0.10, 0.15, 16).rotateX(Math.PI / 2),
+      barrelMat
+    );
+    barrel.position.set(0, 0, 0.22);
+    devGroup.add(barrel);
+
+    // Yellow High-Voltage Hazard Identification Band
+    const hazardBand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.098, 0.098, 0.03, 16).rotateX(Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4, metalness: 0.2 })
+    );
+    hazardBand.position.set(0, 0, 0.20);
+    devGroup.add(hazardBand);
+
+    // 4. Parabolic Directional Emitter Nozzle / Collimator Horn
+    const nozzleMat = new THREE.MeshStandardMaterial({
+      color: 0x334155,
+      metalness: 0.8,
+      roughness: 0.2
+    });
+    const nozzle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.085, 0.14, 20, 1, true).rotateX(Math.PI / 2),
+      nozzleMat
+    );
+    nozzle.position.set(0, 0, 0.35);
+    devGroup.add(nozzle);
+
+    // Polished Conductive Cyan Bezel Rim
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.15, 0.014, 8, 20),
+      new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 })
+    );
+    rim.position.set(0, 0, 0.42);
+    devGroup.add(rim);
+
+    // 5. Plasma Core Electrode (Glowing cyan cathode)
+    const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.045, 12, 12),
+      plasmaMat
+    );
+    core.position.set(0, 0, 0.32);
+    devGroup.add(core);
+
+    // 6. Emitter Tip Anchor Node (Crucial: getWorldPosition will read this exact point)
+    const tip = new THREE.Object3D();
+    tip.name = `emitterTip_${id}`;
+    tip.position.set(0, 0, 0.43);
+    devGroup.add(tip);
+
+    return {
+      id,
+      label: label || id,
+      group: devGroup,
+      tip,
+      core,
+      mat: plasmaMat
+    };
+  }
+
+  getShockEmitterWorldPositions() {
+    if (!this.shockEmitters || this.shockEmitters.length === 0) return null;
+    return this.shockEmitters.map(e => {
+      const pos = new THREE.Vector3();
+      e.tip.getWorldPosition(pos);
+      return {
+        id: e.id,
+        label: e.label,
+        tip: e.tip,
+        core: e.core,
+        mat: e.mat,
+        pos: pos
+      };
+    });
+  }
+
+  pulseShockEmitters(intensity = 1.0) {
+    if (!this.shockEmitters) return;
+    this.shockEmitters.forEach(e => {
+      if (e.core && e.mat) {
+        if (intensity > 0.05) {
+          e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
+          e.core.scale.setScalar(1.0 + intensity * 0.8);
+        } else {
+          e.mat.color.setHex(0x38bdf8);
+          e.core.scale.setScalar(1.0);
+        }
+      }
+    });
   }
 }

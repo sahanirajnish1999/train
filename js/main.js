@@ -29,6 +29,7 @@ class SimulatorApp {
     this.cab = new CabInterior(this.train.locoCar);
     this.env = new Environment(this.scene, this.track);
     this.obstacles = new ObstacleManager(this.scene, this.track);
+    this.obstacles.setTrain(this.train);
     this.lastTelemetry = null;
 
     // Cinematic Slow-Motion Time-Warp State (Does not alter true train speed)
@@ -452,7 +453,7 @@ class SimulatorApp {
       target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 70, false);
     }
     if (target) {
-      this.obstacles.triggerDeterrence(target, this.audio);
+      this.obstacles.triggerDeterrence(target, this.audio, this.train);
       if (this.dom.btnConsoleShock) {
         this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: FIRED';
         setTimeout(() => {
@@ -476,6 +477,7 @@ class SimulatorApp {
     this.updateSpeedPresetButtons(120);
     this.obstacles.resetCollected(this.train.captureNet);
     this.obstacles.initDefaultObstacles();
+    this.obstacles.setTrain(this.train);
     this.train.setCaptureNetState(false);
     if (this.dom.btnConsoleNet) {
       this.dom.btnConsoleNet.innerText = '🪤 NET: RETRACTED';
@@ -940,7 +942,8 @@ class SimulatorApp {
       this.audio,
       this.physics,
       this.track.totalLength,
-      this.aiSensorAuto
+      this.aiSensorAuto,
+      this.train
     );
     this.lastTelemetry = telemetry;
 

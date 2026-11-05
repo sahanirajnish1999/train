@@ -13,6 +13,7 @@ export class ObstacleManager {
   constructor(scene, track) {
     this.scene = scene;
     this.track = track;
+    this.train = null;
     this.obstacles = [];
     this.nextId = 1;
 
@@ -128,6 +129,10 @@ export class ObstacleManager {
 
     // Spawn scenic track obstacles along the route
     this.initDefaultObstacles();
+  }
+
+  setTrain(train) {
+    this.train = train;
   }
 
   // ------------------------------------------------------------------
@@ -1733,8 +1738,9 @@ export class ObstacleManager {
     }
   }
 
-  triggerDeterrence(obs, audio) {
+  triggerDeterrence(obs, audio, train = null) {
     if (!obs || obs.isDeterred) return;
+    if (train) this.train = train;
 
     obs.isDeterred = true;
     obs.hasBeenShocked = true;
@@ -1750,16 +1756,18 @@ export class ObstacleManager {
       audio.playElectricShockDischarge(obs.type, obs.mass);
     }
 
-    // Spawn 3D Visual FX in world scene
-    this.spawnDeterrenceFX(obs);
+    // Spawn 3D Visual FX in world scene from the 4 sender devices
+    this.spawnDeterrenceFX(obs, this.train);
   }
 
   // Alias for backward compatibility
-  triggerAnimalDeterrence(obs, audio) {
-    return this.triggerDeterrence(obs, audio);
+  triggerAnimalDeterrence(obs, audio, train = null) {
+    return this.triggerDeterrence(obs, audio, train);
   }
 
-  spawnDeterrenceFX(obs) {
+  spawnDeterrenceFX(obs, train = null) {
+    const activeTrain = train || this.train;
+
     // Clear previous FX
     while (this.fxGroup.children.length > 0) {
       const c = this.fxGroup.children[0];
@@ -1768,101 +1776,192 @@ export class ObstacleManager {
     }
 
     const obsPos = obs.mesh.position.clone();
-    const transform = this.track.getTrackTransform(obs.progress, 0);
-    const tangent = transform.tangent.clone().normalize();
-    const forwardMeters = Math.max(15, Math.min(obs.forwardMeters || 65, 80));
-    const trainFrontPos = obsPos.clone().sub(tangent.clone().multiplyScalar(forwardMeters));
-
     const isHuman = obs.type === 'human';
+
+    // 4 Emitter World Data from Locomotive Front: Top-Left, Top-Right, Down-Left, Down-Right
+    const emitters = (activeTrain && activeTrain.getShockEmitterWorldPositions)
+      ? activeTrain.getShockEmitterWorldPositions()
+      : null;
 
     // Tailored spark color: softer cyan for human, intense azure electric for animals
     const sparkColor = isHuman ? 0xa5f3fc : 0x38bdf8;
-    const arcOffsets = isHuman
+
+    // Target contact points on obstacle:
+    // Top emitters target upper torso / shoulder / spine
+    // Down emitters target lower feet / hooves / ground contact
+    const targetOffsets = isHuman
       ? [
-          { pA: new THREE.Vector3(-0.45, 0.30, 0), pB: new THREE.Vector3(-0.15, 0.15, 0) },
-          { pA: new THREE.Vector3( 0.45, 0.30, 0), pB: new THREE.Vector3( 0.15, 0.15, 0) },
-          { pA: new THREE.Vector3(-0.35, 0.25, -1), pB: new THREE.Vector3(-0.10, 0.18, 0.5) },
-          { pA: new THREE.Vector3( 0.35, 0.25, -1), pB: new THREE.Vector3( 0.10, 0.18, 0.5) }
+          new THREE.Vector3(-0.10, 1.25, 0.04), // Top-Left -> Left shoulder
+          new THREE.Vector3( 0.10, 1.25, 0.04), // Top-Right -> Right shoulder
+          new THREE.Vector3(-0.14, 0.12, 0.02), // Down-Left -> Left foot / ankle
+          new THREE.Vector3( 0.14, 0.12, 0.02)  // Down-Right -> Right foot / ankle
         ]
       : [
-          { pA: new THREE.Vector3(-0.84, 0.35, 0), pB: new THREE.Vector3(-0.35, 0.35, 0) },
-          { pA: new THREE.Vector3( 0.84, 0.35, 0), pB: new THREE.Vector3( 0.35, 0.35, 0) },
-          { pA: new THREE.Vector3(-0.60, 0.38, -2), pB: new THREE.Vector3(-0.25, 0.40, 1) },
-          { pA: new THREE.Vector3( 0.60, 0.38, -2), pB: new THREE.Vector3( 0.25, 0.40, 1) }
+          new THREE.Vector3(-0.45, 1.35, -0.20), // Top-Left -> Upper left flank / spine
+          new THREE.Vector3( 0.45, 1.35, -0.20), // Top-Right -> Upper right flank / spine
+          new THREE.Vector3(-0.42, 0.22,  0.40), // Down-Left -> Left forehoof
+          new THREE.Vector3( 0.42, 0.22,  0.40)  // Down-Right -> Right forehoof
         ];
 
-    arcOffsets.forEach(arc => {
-      const p1 = trainFrontPos.clone().add(arc.pA);
-      const p2 = obsPos.clone().add(arc.pB);
+    // Fallback if train emitter positions are temporarily unavailable
+    const fallbackFront = obsPos.clone().sub(
+      this.track.getTrackTransform(obs.progress, 0).tangent.clone().normalize().multiplyScalar(obs.forwardMeters || 60)
+    );
+    const fallbackOffsets = [
+      new THREE.Vector3(-1.25, 3.32, 0),
+      new THREE.Vector3( 1.25, 3.32, 0),
+      new THREE.Vector3(-1.35, 0.95, 0),
+      new THREE.Vector3( 1.35, 0.95, 0)
+    ];
+
+    const segs = 16;
+    for (let i = 0; i < 4; i++) {
+      const emitter = (emitters && emitters[i]) ? emitters[i] : null;
+      const p1 = emitter ? emitter.pos.clone() : fallbackFront.clone().add(fallbackOffsets[i]);
+      const targetOffset = targetOffsets[i];
+      const p2 = obsPos.clone().add(targetOffset);
+
+      // Generate initial lightning polyline vertices with displacement
       const pts = [];
-      const segs = 10;
-      const jitter = isHuman ? 0.25 : 0.45;
-      for (let i = 0; i <= segs; i++) {
-        const t = i / segs;
+      const dist = p1.distanceTo(p2);
+      const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * (isHuman ? 0.75 : 1.0);
+
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
         const p = p1.clone().lerp(p2, t);
-        if (i > 0 && i < segs) {
-          p.x += (Math.random() - 0.5) * jitter;
-          p.y += (Math.random() - 0.5) * (jitter * 0.8);
+        if (s > 0 && s < segs) {
+          const envelope = Math.sin(t * Math.PI);
+          p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+          p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
+          p.z += (Math.random() - 0.5) * jitterAmp * envelope;
         }
         pts.push(p);
       }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color: sparkColor, transparent: true, opacity: isHuman ? 0.85 : 0.98 });
-      const line = new THREE.Line(geo, mat);
-      line.userData = { isLightning: true, pA: p1, pB: p2, isHuman };
-      this.fxGroup.add(line);
-    });
 
-    // Flashing discharge point light (Tailored intensity)
-    const sparkLight = new THREE.PointLight(sparkColor, isHuman ? 3.5 : 7.0, isHuman ? 18 : 28);
-    sparkLight.position.copy(obsPos.clone().add(new THREE.Vector3(0, isHuman ? 0.45 : 0.75, 0)));
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({
+        color: sparkColor,
+        transparent: true,
+        opacity: isHuman ? 0.90 : 1.0,
+        linewidth: 2
+      });
+      const line = new THREE.Line(geo, mat);
+      line.userData = {
+        isLightning: true,
+        arcIndex: i,
+        emitterTip: emitter ? emitter.tip : null,
+        fallbackOrigin: fallbackFront.clone().add(fallbackOffsets[i]),
+        obs: obs,
+        targetOffset: targetOffset,
+        isHuman: isHuman,
+        segs: segs
+      };
+      this.fxGroup.add(line);
+
+      // Plasma flare at the mouth of each sender nozzle on the train engine
+      if (emitter && emitter.tip) {
+        const nozzleFlare = new THREE.PointLight(sparkColor, isHuman ? 2.5 : 4.5, 8);
+        emitter.tip.getWorldPosition(nozzleFlare.position);
+        nozzleFlare.userData = { isNozzleFlare: true, emitterTip: emitter.tip };
+        this.fxGroup.add(nozzleFlare);
+      }
+    }
+
+    // High-intensity illumination at the target
+    const sparkLight = new THREE.PointLight(sparkColor, isHuman ? 4.5 : 9.0, isHuman ? 20 : 32);
+    sparkLight.position.copy(obsPos.clone().add(new THREE.Vector3(0, isHuman ? 0.8 : 1.0, 0)));
     this.fxGroup.add(sparkLight);
 
-    // Spark particles at ground hooves / boots (Tailored density and spread)
-    const sparkCount = isHuman ? 14 : 32;
+    // Spark particles at ground hooves / boots
+    const sparkCount = isHuman ? 18 : 36;
     const sparkGeo = new THREE.BufferGeometry();
     const sPos = [];
-    const spread = isHuman ? 0.6 : 1.2;
+    const spread = isHuman ? 0.5 : 1.2;
     for (let s = 0; s < sparkCount; s++) {
       sPos.push(
         obsPos.x + (Math.random() - 0.5) * spread,
-        obsPos.y + Math.random() * (isHuman ? 0.35 : 0.6),
+        obsPos.y + Math.random() * (isHuman ? 0.6 : 1.2),
         obsPos.z + (Math.random() - 0.5) * spread
       );
     }
     sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sPos, 3));
-    const sparkMat = new THREE.PointsMaterial({ color: 0xe0f2fe, size: isHuman ? 0.05 : 0.08, transparent: true, opacity: 0.9 });
+    const sparkMat = new THREE.PointsMaterial({
+      color: 0xe0f2fe,
+      size: isHuman ? 0.06 : 0.10,
+      transparent: true,
+      opacity: 0.95
+    });
     this.fxGroup.add(new THREE.Points(sparkGeo, sparkMat));
+
+    // Flash train plasma emitters
+    if (activeTrain && activeTrain.pulseShockEmitters) {
+      activeTrain.pulseShockEmitters(1.0);
+    }
   }
 
   updateDeterrenceFX(dt) {
     if (this.fxTimer > 0) {
       this.fxTimer -= dt;
+      const progress = Math.max(0, this.fxTimer / 1.2);
+
+      if (this.train && this.train.pulseShockEmitters) {
+        this.train.pulseShockEmitters(progress);
+      }
+
+      const tempStart = new THREE.Vector3();
+      const tempEnd = new THREE.Vector3();
+
       this.fxGroup.children.forEach(child => {
         if (child.isLine && child.userData.isLightning) {
-          const pA = child.userData.pA;
-          const pB = child.userData.pB;
+          const ud = child.userData;
+          // Exact real-time tracking of train emitter nozzle
+          if (ud.emitterTip) {
+            ud.emitterTip.getWorldPosition(tempStart);
+          } else {
+            tempStart.copy(ud.fallbackOrigin);
+          }
+
+          // Exact real-time tracking of obstacle target point
+          if (ud.obs && ud.obs.mesh) {
+            ud.obs.mesh.getWorldPosition(tempEnd);
+            tempEnd.add(ud.targetOffset);
+          }
+
           const posAttr = child.geometry.attributes.position;
           const arr = posAttr.array;
-          const segs = 10;
+          const segs = ud.segs || 16;
+          const dist = tempStart.distanceTo(tempEnd);
+          const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * (ud.isHuman ? 0.75 : 1.0) * progress;
+
           for (let i = 0; i <= segs; i++) {
             const t = i / segs;
-            const p = pA.clone().lerp(pB, t);
+            const p = tempStart.clone().lerp(tempEnd, t);
             if (i > 0 && i < segs) {
-              p.x += (Math.random() - 0.5) * 0.45;
-              p.y += (Math.random() - 0.5) * 0.35;
+              const envelope = Math.sin(t * Math.PI);
+              p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+              p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
+              p.z += (Math.random() - 0.5) * jitterAmp * envelope;
             }
             arr[i * 3]     = p.x;
             arr[i * 3 + 1] = p.y;
             arr[i * 3 + 2] = p.z;
           }
           posAttr.needsUpdate = true;
+          child.material.opacity = (ud.isHuman ? 0.85 : 0.98) * progress;
         } else if (child.isPointLight) {
-          child.intensity = (Math.random() > 0.2 ? 6 : 1) * (this.fxTimer / 1.2);
+          if (child.userData.isNozzleFlare && child.userData.emitterTip) {
+            child.userData.emitterTip.getWorldPosition(child.position);
+            child.intensity = (Math.random() > 0.3 ? 4.0 : 1.5) * progress;
+          } else {
+            child.intensity = (Math.random() > 0.2 ? 7.5 : 2.0) * progress;
+          }
         }
       });
 
       if (this.fxTimer <= 0) {
+        if (this.train && this.train.pulseShockEmitters) {
+          this.train.pulseShockEmitters(0);
+        }
         while (this.fxGroup.children.length > 0) {
           const c = this.fxGroup.children[0];
           if (c.geometry) c.geometry.dispose();
@@ -2467,7 +2566,8 @@ export class ObstacleManager {
   // Enforces: Collect ONLY when Mass <= 150 kg AND Speed <= 150 km/h
   // Net defaults to CLOSED / STOWED; Opens with animation upon detection
   // ------------------------------------------------------------------
-  update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true) {
+  update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true, train = null) {
+    if (train) this.train = train;
     let closestObstacle = null;
     let minForwardDist = Infinity;
     const speedKmh = trainSpeedMs * 3.6;
@@ -2513,15 +2613,15 @@ export class ObstacleManager {
       // "We will deliver an electric shock to everyone so that they move off the track"
       // ================================================================
       if (aiSensorAuto && !closestObstacle.hasBeenShocked) {
-        this.triggerDeterrence(closestObstacle, audio);
+        this.triggerDeterrence(closestObstacle, audio, this.train);
         if (audio) audio.playTargetAcquiredBeep(false);
         this.telemetry.alertType = 'deploy';
-        this.telemetry.alertMessage = `⚡ 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! DELIVERING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
+        this.telemetry.alertMessage = `⚡ 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! QUAD SENDER FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
       }
 
       // Continuous repeat electric shock pulse every 1.4s while target remains on track
       if (aiSensorAuto && !closestObstacle.isCleared && this.fxTimer <= 0) {
-        this.spawnDeterrenceFX(closestObstacle);
+        this.spawnDeterrenceFX(closestObstacle, this.train);
         if (audio) audio.playElectricShockDischarge(closestObstacle.type, closestObstacle.mass);
         this.fxTimer = 1.0;
       }
