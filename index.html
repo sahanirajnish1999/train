@@ -62,7 +62,7 @@
     <!-- CINEMATIC SLOW-MOTION STATUS BADGE -->
     <div id="slowmo-badge" style="display: none; position: fixed; top: 78px; left: 50%; transform: translateX(-50%); background: rgba(3, 105, 161, 0.95); color: #ffffff; padding: 6px 20px; border-radius: 20px; font-weight: 800; font-size: 13px; letter-spacing: 1.5px; border: 1.5px solid #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.7); z-index: 1000; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">⏱️ SLOW MOTION (0.25x) ACTIVE • TRAIN SPEED PRESERVED</div>
 
-    <!-- AI VISION, LIDAR/RADAR & SAFETY CONTROLLER HUD CARD -->
+    <!-- AI SENSOR FUSION & SAFETY CONTROLLER HUD CARD -->
     <div class="ai-kavach-card hud-interactive" id="ai-kavach-card">
       <div class="kavach-header">
         <div class="kavach-title">
@@ -71,14 +71,14 @@
         </div>
         <button id="btn-kavach-minimize" class="kavach-min-btn" title="Minimize / Expand AI Sensor Card">−</button>
       </div>
-      <div class="kavach-sub">1 km LiDAR • 4K Stereo Vision • 77GHz Radar • Kavach AI Core</div>
+      <div class="kavach-sub">1 km LiDAR & Camera • Electric Shock • Capture Net (< 150 kg)</div>
 
       <!-- Active Sensors Status Row -->
       <div class="kavach-sensors-row">
-        <span class="sensor-badge active" id="badge-cam">📷 4K CAM 1km</span>
-        <span class="sensor-badge active" id="badge-lidar">📡 LiDAR 1km</span>
-        <span class="sensor-badge active" id="badge-radar">🛰️ 77GHz RADAR</span>
-        <span class="sensor-badge active" id="badge-ai">🧠 AI 120FPS</span>
+        <span class="sensor-badge active" id="badge-cam">📷 Camera (1km)</span>
+        <span class="sensor-badge active" id="badge-lidar">📡 LiDAR (1km)</span>
+        <span class="sensor-badge active" id="badge-shock">⚡ Electric Shock</span>
+        <span class="sensor-badge active" id="badge-net">🪤 Net (<150kg)</span>
       </div>
 
       <!-- Real-Time Target Scanner Box -->
@@ -92,16 +92,16 @@
           <span class="scanner-value" id="kavach-target-dist">---</span>
         </div>
         <div class="scanner-row">
-          <span class="scanner-label">EST. MASS:</span>
+          <span class="scanner-label">EST. WEIGHT:</span>
           <span class="scanner-value" id="kavach-target-mass">---</span>
         </div>
         <div class="scanner-row">
-          <span class="scanner-label">TAILORED PULSE:</span>
+          <span class="scanner-label">STAGE 1 (SHOCK):</span>
           <span class="scanner-value" id="kavach-target-spec">STANDBY (1 km)</span>
         </div>
         <div class="scanner-row">
-          <span class="scanner-label">DECISION:</span>
-          <span class="scanner-status" id="kavach-action">STANDBY SCANNING (1 km)</span>
+          <span class="scanner-label">STAGE 2 (DECISION):</span>
+          <span class="scanner-status" id="kavach-action">TRACK CLEAR — STANDBY (1 km)</span>
         </div>
       </div>
 
@@ -116,44 +116,32 @@
         </div>
       </div>
 
-      <!-- Interactive Test Spawner Buttons -->
-      <div class="kavach-spawner-header">TEST 1KM LIDAR E-SHOCK & 30-40M NET RESCUE:</div>
+      <!-- Interactive Test Spawner Buttons (Directly executing user requirement) -->
+      <div class="kavach-spawner-header">TEST SAFETY PROTOCOL:</div>
       <div class="kavach-spawner-grid">
-        <button class="spawn-btn" id="btn-spawn-human" title="Spawn Person: 1km LiDAR detects -> Tailored 2.0kV Human E-Shock -> Stays on track -> Net deploys at 30-40m -> Scooped!">👤 Person (72kg - Net at 30-40m)</button>
-        <button class="spawn-btn" id="btn-spawn-human-flee" title="Spawn Person: 1km LiDAR detects -> Tailored 2.0kV Human E-Shock -> Flees track -> Track Clear!">🏃 Person (72kg - Flees Track)</button>
-        <button class="spawn-btn" id="btn-spawn-animal" title="Spawn Wildlife Calf: 1km LiDAR detects -> Tailored 5.5kV E-Shock -> Stays -> Net deploys at 30-40m -> Scooped!">🐘 Animal (110kg - Net at 30-40m)</button>
-        <button class="spawn-btn" id="btn-spawn-animal-flee" title="Spawn Wildlife: 1km LiDAR detects -> Tailored 5.5kV E-Shock -> Flees into meadow -> Track Clear!">🐘 Animal (110kg - Flees)</button>
-        <button class="spawn-btn hazard" id="btn-spawn-bull" title="Spawn Heavy Bull: 1km LiDAR detects -> Tailored 7.8kV E-Shock -> Mass 480kg > 150kg -> Net Stowed, Horn & Brake!">🐂 Bull (480kg - Overweight)</button>
-        <button class="spawn-btn" id="btn-spawn-human-long" title="Spawn Person at 500m (Testing 1km Long-Range Detection & Early E-Shock)">📡 Person (500m Long Range)</button>
-        <button class="spawn-btn" id="btn-spawn-crate" title="Spawn Cargo Crate: Inanimate -> Mass 40kg ≤ 150kg -> Net deploys at 30-40m -> Scooped!">📦 Crate (40kg - Net Scoop)</button>
+        <button class="spawn-btn" id="btn-spawn-human-flee" title="Person: Electric shock fires -> Person moves off track safely -> Track Clear">🏃 Person (Shock -> Flees)</button>
+        <button class="spawn-btn" id="btn-spawn-human" title="Person: Electric shock fires -> Person does NOT move -> Weight 72kg < 150kg -> Capture net deploys at 30-40m & Scoops!">👤 Person (72kg - Net at 30-40m)</button>
+        <button class="spawn-btn" id="btn-spawn-animal-flee" title="Wildlife: Electric shock fires -> Animal moves off track safely into meadow -> Track Clear">🐘 Animal (Shock -> Flees)</button>
+        <button class="spawn-btn" id="btn-spawn-animal" title="Wildlife: Electric shock fires -> Animal does NOT move -> Weight 110kg < 150kg -> Capture net deploys at 30-40m & Scoops!">🐘 Animal (110kg - Net at 30-40m)</button>
+        <button class="spawn-btn hazard" id="btn-spawn-bull-flee" title="Heavy Bull: Electric shock fires -> Bull moves off track safely -> Track Clear">🐂 Bull (Shock -> Flees)</button>
+        <button class="spawn-btn hazard" id="btn-spawn-bull" title="Heavy Bull: Electric shock fires -> Bull does NOT move -> Weight 480kg > 150kg -> Net Stowed (Under 150kg only), Emergency Brake!">🐂 Bull (480kg - Overweight)</button>
         <button class="spawn-btn clear" id="btn-clear-cradle" title="Clear and Release Captured Obstacles">🔄 Clear Net</button>
       </div>
     </div>
 
-    <!-- FLOATING DUAL-TIER CONSOLE DOCK & TELEMETRY TICKER (Exact match to media_1793808764475_89ecfc40.jpg) -->
+    <!-- FLOATING DUAL-TIER CONSOLE DOCK & TELEMETRY TICKER -->
     <div class="floating-console-container hud-interactive" id="floating-console-container">
       
       <!-- Tier 1: Viewport Toolbar -->
       <div class="viewport-pill-bar">
         <span class="viewport-label">VIEWPORT:</span>
         <button class="viewport-btn active" data-cam="orbit" id="btn-cam-orbit" title="Orbit 360° Camera [Drag to Orbit, Scroll to Zoom]">ORBIT 360°</button>
-        <button class="viewport-btn" data-cam="beam" id="btn-cam-beam" title="Deterrence Beam Projector Forward POV">BEAM POV</button>
         <button class="viewport-btn" data-cam="cab" id="btn-cam-cab" title="Loco Pilot Cockpit View">TX CAB</button>
         <button class="viewport-btn" data-cam="target" id="btn-cam-target" title="Target View Looking Back at Approaching Train">RX TARGET</button>
         <button class="viewport-btn" data-cam="action" id="btn-cam-action" title="Coach Side Shield & Net Flank View">COACH SHIELD</button>
         <button class="viewport-btn" data-cam="drone" id="btn-cam-drone" title="Top-Down Overhead Radar Overview">TOP RADAR</button>
         <button class="viewport-btn" data-cam="net" id="btn-cam-net-dock" title="Close-Up Front Capture Net View">🪤 CAPTURE NET</button>
         <button class="viewport-btn" id="btn-auto-spin" title="Toggle 360° Cinematic Auto Spin">AUTO SPIN</button>
-      </div>
-
-      <!-- Deterrence Protocol Dropdown Popup (Exact match to media_1793805384414_9a225d7d.jpg) -->
-      <div class="deterrence-popup-menu" id="deterrence-popup-menu" style="display: none;">
-        <div class="deterrence-popup-item" data-mode="holographic_mimo">Holographic MIMO (Continuous Metasurface)</div>
-        <div class="deterrence-popup-item" data-mode="retrodirective">Retrodirective (Zero-Latency Conjugate)</div>
-        <div class="deterrence-popup-item" data-mode="lrad">Acoustic LRAD (Directional Sound 1-1.5km)</div>
-        <div class="deterrence-popup-item" data-mode="bio_acoustic">Bio-Acoustic Swarm (Zero-Harm Repellent)</div>
-        <div class="deterrence-popup-item" data-mode="mmw_denial">Pulsed Millimeter Wave (Active Denial)</div>
-        <div class="deterrence-popup-item selected" data-mode="electric_shock">✓ Track Electric Shock (High-Voltage Safety Analysis)</div>
       </div>
 
       <!-- Tier 2: Main Floating Control Console Bar -->
@@ -179,29 +167,21 @@
 
         <!-- Action / System Toggles -->
         <button class="console-pill-btn active-cyan" id="btn-ai-sensor-mode" title="Toggle AI Sensor Mode: AUTO / MANUAL">🛡️ AI SENSOR: AUTO</button>
-        <button class="console-pill-btn active-cyan" id="btn-console-beam" title="Discharge Deterrence Pulse or Change Protocol">⚡ BEAM: ARMED</button>
+        <button class="console-pill-btn active-cyan" id="btn-console-shock" title="Manual Electric Shock Pulse [Key B]">⚡ E-SHOCK: ACTIVE</button>
         <button class="console-pill-btn" id="btn-console-net" title="Deploy or Retract Front Net [Key O]">🪤 NET: RETRACTED</button>
         <button class="console-pill-btn" id="btn-console-horn" title="Sound Dual-Tone Pneumatic Horn [Space / Key H]">🎺 HORN</button>
         <button class="console-pill-btn emergency" id="btn-console-emergency" title="Emergency Brake Dump [Key E]">🚨 EMERGENCY BRAKE</button>
         <button class="console-pill-btn" id="btn-console-reset" title="Reset Run to Starting Line">🔄 RESET RUN</button>
       </div>
 
-      <!-- Tier 3: Technical Telemetry Ticker -->
+      <!-- Tier 3: Safety Protocol Status Ticker -->
       <div class="telemetry-ticker-bar" id="telemetry-ticker-bar">
-        <span>&gt; SYS.ARCH: <strong id="ticker-sys-arch" style="color: #38bdf8; cursor: pointer; text-decoration: underline;" title="Click to Change Deterrence Protocol">HMIMO</strong></span>
+        <span>SAFETY PROTOCOL: <strong>1. DELIVER E-SHOCK TO MOVE OFF TRACK</strong></span>
         <span>|</span>
-        <span>TARGET: <strong id="ticker-target" style="color: #7dd3fc;">ELEPHANT (TRACK-1)</strong></span>
+        <span><strong>2. IF STILL ON TRACK: DEPLOY NET IF WEIGHT &lt; 150 KG</strong></span>
         <span>|</span>
-        <span>RANGE: <strong id="ticker-range" style="color: #38bdf8;">1548M (LINK VERIFIED)</strong></span>
-        <span>|</span>
-        <span>BEAM FOCUS STATE: <strong id="ticker-beam-state" style="color: #34d399;">COLLIMATED</strong></span>
-        <span>|</span>
-        <span>POLARIZATION: <strong id="ticker-polarization" style="color: #38bdf8;">CIRCULAR / METASURFACE</strong></span>
-        <span>|</span>
-        <span>CARRIER WAVELENGTH: <strong id="ticker-carrier" style="color: #38bdf8;">10.00 CM</strong></span>
-        <span>|</span>
-        <span>SAFETY INDEX: <strong id="ticker-safety" style="color: #34d399;">100% SAFE (99.9% CLEARANCE)</strong></span>
-        <span class="ticker-controls-hint">DRAG TO ORBIT 360° | SCROLL TO ZOOM | RIGHT-CLICK TO PAN</span>
+        <span>STATUS: <strong id="ticker-status" style="color: #34d399;">ACTIVE MONITORING (1 km)</strong></span>
+        <span class="ticker-controls-hint">DRAG TO ORBIT 360° | SCROLL TO ZOOM</span>
       </div>
 
     </div>
@@ -283,7 +263,7 @@
   </div>
 
   <!-- Main Self-Contained Bundle with Cache-Buster -->
-  <script src="bundle.js?v=20261105_v6"></script>
+  <script src="bundle.js?v=20261105_v7"></script>
 </body>
 </html>
 

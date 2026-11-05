@@ -39484,51 +39484,11 @@ void main() {
       this.deterrenceSpecs = {
         electric_shock: {
           id: "electric_shock",
-          name: "Track Electric Shock (High-Voltage Safety Analysis)",
+          name: "Track Electric Shock (Non-Lethal Track Clearance)",
           shortTitle: "TRACK ELECTRIC SHOCK",
-          badge: "6.5kV PULSE",
+          badge: "E-SHOCK PULSE",
           color: "#38bdf8",
-          detail: "Discharges non-lethal pulsed electrical gradient (6.5 kV, < 3.8 mA, micro-joule duration) across track rails and forward contact sweepers (compliant with IEC 60335-2-76 / RDSO). Induces involuntary muscular jump reflex through hooves to compel immediate flight off track without tissue burns or physical injury."
-        },
-        bio_acoustic: {
-          id: "bio_acoustic",
-          name: "Bio-Acoustic Swarm (Zero-Harm Repellent)",
-          shortTitle: "PLAN BEE BIO-SWARM",
-          badge: "380Hz SWARM",
-          color: "#f59e0b",
-          detail: "Indian Railways 'Plan Bee' award-winning acoustic deterrent. Broadcasts directional 280\u2013420 Hz audio signature replicating swarming honeybees. Triggers innate evolutionary flight response in heavy cattle and elephants fearing bee stings to sensitive snouts and eyes."
-        },
-        lrad: {
-          id: "lrad",
-          name: "Acoustic LRAD (Directional Sound 1-1.5km)",
-          shortTitle: "ACOUSTIC LRAD",
-          badge: "138dB BEAM",
-          color: "#06b6d4",
-          detail: "Long Range Acoustic Device emitting focused 138 dB directional acoustic wave front (2.5 kHz siren pulses) penetrating wind noise up to 1.5 km ahead. Projects clear auditory alarm exclusively along rail corridor to disperse wildlife."
-        },
-        mmw_denial: {
-          id: "mmw_denial",
-          name: "Pulsed Millimeter Wave (Active Denial)",
-          shortTitle: "PULSED MMW DENIAL",
-          badge: "95GHz PULSE",
-          color: "#ec4899",
-          detail: "95 GHz directed electromagnetic micro-pulses penetrating only 0.4 mm of epidermal moisture. Rapidly excites surface water molecules, inducing an instantaneous, harmless surface heat sensation that triggers an instinctive retreat reflex without tissue damage."
-        },
-        holographic_mimo: {
-          id: "holographic_mimo",
-          name: "Holographic MIMO (Continuous Metasurface)",
-          shortTitle: "HOLOGRAPHIC MIMO",
-          badge: "METASURFACE",
-          color: "#10b981",
-          detail: "Reconfigurable Intelligent Surface (RIS) holographic metasurface antenna. Dynamically synthesizes targeted electromagnetic wavefronts focused on the animal's exact spatial coordinates to guide it away from the track."
-        },
-        retrodirective: {
-          id: "retrodirective",
-          name: "Retrodirective (Zero-Latency Conjugate)",
-          shortTitle: "RETRODIRECTIVE",
-          badge: "PHASE-CONJUGATE",
-          color: "#8b5cf6",
-          detail: "Phase-conjugate retrodirective array. Automatically steers non-lethal deterrence pulses along the exact received radar line-of-sight vector with zero digital processing latency, continuously tracking the obstacle as the train approaches."
+          detail: "Discharges non-lethal pulsed electrical gradient across track rails and forward contact sweepers (compliant with IEC 60335-2-76 / RDSO). Prompts immediate flight off track without burns or physical injury."
         }
       };
       this.fxGroup = new Group();
@@ -40849,11 +40809,10 @@ void main() {
     initDefaultObstacles() {
       this.spawnObstacle("human", 0.045, false);
       this.spawnObstacle("animal", 0.12, true);
-      this.spawnObstacle("human", 0.28, false);
+      this.spawnObstacle("human", 0.28, true);
       this.spawnObstacle("cattle", 0.45, true);
       this.spawnObstacle("animal", 0.6, false);
-      this.spawnObstacle("debris", 0.74, false);
-      this.spawnObstacle("cattle", 0.88, false);
+      this.spawnObstacle("cattle", 0.85, false);
     }
     // Spawn immediately ahead of the train on demand (via HUD test buttons)
     spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null) {
@@ -40862,72 +40821,24 @@ void main() {
       return this.spawnObstacle(type, targetProgress, moveOffTrack);
     }
     // ------------------------------------------------------------------
-    // Active Non-Lethal Animal Deterrence Protocol (>150kg Obstacles)
+    // Active Non-Lethal Electric Shock Protocol (Track Clearance)
     // ------------------------------------------------------------------
     setDeterrenceMode(mode) {
-      if (this.deterrenceSpecs[mode]) {
-        this.activeDeterrenceMode = mode;
-        this.telemetry.deterrenceMode = mode;
-        return this.deterrenceSpecs[mode];
-      }
-      return this.deterrenceSpecs[this.activeDeterrenceMode];
+      this.activeDeterrenceMode = "electric_shock";
+      this.telemetry.deterrenceMode = "electric_shock";
+      return this.deterrenceSpecs.electric_shock;
     }
     getDeterrenceSpecs(mode) {
-      return this.deterrenceSpecs[mode] || this.deterrenceSpecs[this.activeDeterrenceMode];
+      return this.deterrenceSpecs.electric_shock;
     }
     getDeterrenceTickerData(mode) {
-      const m = mode || this.activeDeterrenceMode;
-      switch (m) {
-        case "holographic_mimo":
-          return {
-            arch: "HMIMO",
-            polarization: "CIRCULAR / METASURFACE",
-            carrier: "10.00 CM",
-            focusState: "COLLIMATED",
-            safety: "100% SAFE (99.9% CLEARANCE)"
-          };
-        case "retrodirective":
-          return {
-            arch: "RETRODIRECTIVE",
-            polarization: "DUAL-LINEAR / CONJUGATE",
-            carrier: "5.00 CM",
-            focusState: "PHASE-LOCKED",
-            safety: "100% SAFE (99.8% CLEARANCE)"
-          };
-        case "lrad":
-          return {
-            arch: "ACOUSTIC LRAD",
-            polarization: "DIRECTIONAL 138dB",
-            carrier: "13.6 CM (2.5 kHz)",
-            focusState: "BEAM FOCUS 1.5KM",
-            safety: "100% SAFE (99.9% CLEARANCE)"
-          };
-        case "bio_acoustic":
-          return {
-            arch: "BIO-SWARM",
-            polarization: "PLAN BEE AURA",
-            carrier: "380 Hz SWARM",
-            focusState: "DISPERSION AURA",
-            safety: "100% SAFE (100% CLEARANCE)"
-          };
-        case "mmw_denial":
-          return {
-            arch: "PULSED MMW",
-            polarization: "95 GHz ACTIVE",
-            carrier: "3.16 MM",
-            focusState: "COLLIMATED BEAM",
-            safety: "100% SAFE (99.7% CLEARANCE)"
-          };
-        case "electric_shock":
-        default:
-          return {
-            arch: "E-SHOCK (RDSO)",
-            polarization: "PULSED GRADIENT",
-            carrier: "6.5 kV / 3.8 mA",
-            focusState: "CONTACT SWEEP ARMED",
-            safety: "100% SAFE (99.9% CLEARANCE)"
-          };
-      }
+      return {
+        arch: "E-SHOCK (RDSO)",
+        polarization: "PULSED GRADIENT",
+        carrier: "IEC 60335 COMPLIANT",
+        focusState: "CONTACT SWEEP ARMED",
+        safety: "100% NON-LETHAL (ZERO HARM)"
+      };
     }
     // ------------------------------------------------------------------
     // Subject-Tailored Electric Shock Specifications (Human vs Animal)
@@ -40986,23 +40897,13 @@ void main() {
       obs.isDeterred = true;
       obs.hasBeenShocked = true;
       obs.shockTime = this.animTime;
-      obs.deterMode = this.activeDeterrenceMode;
+      obs.deterMode = "electric_shock";
       obs.fleeStartTime = this.animTime;
       obs.fleeDirection = Math.random() > 0.5 ? 1 : -1;
       obs.isCleared = false;
       this.fxTimer = 1.2;
       if (audio) {
-        if (this.activeDeterrenceMode === "electric_shock") {
-          audio.playElectricShockDischarge(obs.type, obs.mass);
-        } else if (this.activeDeterrenceMode === "bio_acoustic") {
-          audio.playBeeSwarmSound();
-        } else if (this.activeDeterrenceMode === "lrad") {
-          audio.playLRADSirenSound();
-        } else if (this.activeDeterrenceMode === "mmw_denial") {
-          audio.playActiveDenialHum();
-        } else {
-          audio.playElectricShockDischarge(obs.type, obs.mass);
-        }
+        audio.playElectricShockDischarge(obs.type, obs.mass);
       }
       this.spawnDeterrenceFX(obs);
     }
@@ -41022,98 +40923,56 @@ void main() {
       const forwardMeters = Math.max(15, Math.min(obs.forwardMeters || 65, 80));
       const trainFrontPos = obsPos.clone().sub(tangent.clone().multiplyScalar(forwardMeters));
       const isHuman = obs.type === "human";
-      if (this.activeDeterrenceMode === "electric_shock") {
-        const sparkColor = isHuman ? 10875900 : 3718648;
-        const arcOffsets = isHuman ? [
-          { pA: new Vector3(-0.45, 0.3, 0), pB: new Vector3(-0.15, 0.15, 0) },
-          { pA: new Vector3(0.45, 0.3, 0), pB: new Vector3(0.15, 0.15, 0) },
-          { pA: new Vector3(-0.35, 0.25, -1), pB: new Vector3(-0.1, 0.18, 0.5) },
-          { pA: new Vector3(0.35, 0.25, -1), pB: new Vector3(0.1, 0.18, 0.5) }
-        ] : [
-          { pA: new Vector3(-0.84, 0.35, 0), pB: new Vector3(-0.35, 0.35, 0) },
-          { pA: new Vector3(0.84, 0.35, 0), pB: new Vector3(0.35, 0.35, 0) },
-          { pA: new Vector3(-0.6, 0.38, -2), pB: new Vector3(-0.25, 0.4, 1) },
-          { pA: new Vector3(0.6, 0.38, -2), pB: new Vector3(0.25, 0.4, 1) }
-        ];
-        arcOffsets.forEach((arc) => {
-          const p1 = trainFrontPos.clone().add(arc.pA);
-          const p2 = obsPos.clone().add(arc.pB);
-          const pts = [];
-          const segs = 10;
-          const jitter = isHuman ? 0.25 : 0.45;
-          for (let i = 0; i <= segs; i++) {
-            const t = i / segs;
-            const p = p1.clone().lerp(p2, t);
-            if (i > 0 && i < segs) {
-              p.x += (Math.random() - 0.5) * jitter;
-              p.y += (Math.random() - 0.5) * (jitter * 0.8);
-            }
-            pts.push(p);
+      const sparkColor = isHuman ? 10875900 : 3718648;
+      const arcOffsets = isHuman ? [
+        { pA: new Vector3(-0.45, 0.3, 0), pB: new Vector3(-0.15, 0.15, 0) },
+        { pA: new Vector3(0.45, 0.3, 0), pB: new Vector3(0.15, 0.15, 0) },
+        { pA: new Vector3(-0.35, 0.25, -1), pB: new Vector3(-0.1, 0.18, 0.5) },
+        { pA: new Vector3(0.35, 0.25, -1), pB: new Vector3(0.1, 0.18, 0.5) }
+      ] : [
+        { pA: new Vector3(-0.84, 0.35, 0), pB: new Vector3(-0.35, 0.35, 0) },
+        { pA: new Vector3(0.84, 0.35, 0), pB: new Vector3(0.35, 0.35, 0) },
+        { pA: new Vector3(-0.6, 0.38, -2), pB: new Vector3(-0.25, 0.4, 1) },
+        { pA: new Vector3(0.6, 0.38, -2), pB: new Vector3(0.25, 0.4, 1) }
+      ];
+      arcOffsets.forEach((arc) => {
+        const p1 = trainFrontPos.clone().add(arc.pA);
+        const p2 = obsPos.clone().add(arc.pB);
+        const pts = [];
+        const segs = 10;
+        const jitter = isHuman ? 0.25 : 0.45;
+        for (let i = 0; i <= segs; i++) {
+          const t = i / segs;
+          const p = p1.clone().lerp(p2, t);
+          if (i > 0 && i < segs) {
+            p.x += (Math.random() - 0.5) * jitter;
+            p.y += (Math.random() - 0.5) * (jitter * 0.8);
           }
-          const geo = new BufferGeometry().setFromPoints(pts);
-          const mat = new LineBasicMaterial({ color: sparkColor, transparent: true, opacity: isHuman ? 0.85 : 0.98 });
-          const line = new Line(geo, mat);
-          line.userData = { isLightning: true, pA: p1, pB: p2, isHuman };
-          this.fxGroup.add(line);
-        });
-        const sparkLight = new PointLight(sparkColor, isHuman ? 3.5 : 7, isHuman ? 18 : 28);
-        sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.45 : 0.75, 0)));
-        this.fxGroup.add(sparkLight);
-        const sparkCount = isHuman ? 14 : 32;
-        const sparkGeo = new BufferGeometry();
-        const sPos = [];
-        const spread = isHuman ? 0.6 : 1.2;
-        for (let s = 0; s < sparkCount; s++) {
-          sPos.push(
-            obsPos.x + (Math.random() - 0.5) * spread,
-            obsPos.y + Math.random() * (isHuman ? 0.35 : 0.6),
-            obsPos.z + (Math.random() - 0.5) * spread
-          );
+          pts.push(p);
         }
-        sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
-        const sparkMat = new PointsMaterial({ color: 14742270, size: isHuman ? 0.05 : 0.08, transparent: true, opacity: 0.9 });
-        this.fxGroup.add(new Points(sparkGeo, sparkMat));
-      } else if (this.activeDeterrenceMode === "bio_acoustic") {
-        const ringGeo = new TorusGeometry(0.85, 0.04, 8, 24);
-        const ringMat = new MeshBasicMaterial({ color: 16096779, transparent: true, opacity: 0.85 });
-        for (let r = 1; r <= 4; r++) {
-          const ring = new Mesh(ringGeo, ringMat);
-          ring.position.copy(trainFrontPos.clone().lerp(obsPos, r * 0.22));
-          ring.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-          ring.userData = { isAcousticRing: true };
-          this.fxGroup.add(ring);
-        }
-      } else if (this.activeDeterrenceMode === "lrad") {
-        const coneLength = Math.max(10, forwardMeters);
-        const coneGeo = new ConeGeometry(2.2, coneLength, 16, 4, true);
-        coneGeo.rotateX(Math.PI / 2);
-        const coneMat = new MeshBasicMaterial({ color: 440020, wireframe: true, transparent: true, opacity: 0.65 });
-        const cone = new Mesh(coneGeo, coneMat);
-        cone.position.copy(trainFrontPos.clone().lerp(obsPos, 0.5));
-        cone.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-        this.fxGroup.add(cone);
-      } else if (this.activeDeterrenceMode === "mmw_denial") {
-        const beamGeo = new CylinderGeometry(0.08, 0.18, forwardMeters, 12);
-        beamGeo.rotateX(Math.PI / 2);
-        const beamMat = new MeshBasicMaterial({ color: 15485081, transparent: true, opacity: 0.75 });
-        const beam = new Mesh(beamGeo, beamMat);
-        beam.position.copy(trainFrontPos.clone().lerp(obsPos, 0.5));
-        beam.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-        this.fxGroup.add(beam);
-      } else {
-        [-1, 1].forEach((side) => {
-          const p1 = trainFrontPos.clone().add(new Vector3(side * 0.9, 1.8, 0));
-          const p2 = obsPos.clone().add(new Vector3(0, 1.2, 0));
-          const pts = [p1, p2];
-          const lineGeo = new BufferGeometry().setFromPoints(pts);
-          const lineMat = new LineBasicMaterial({ color: 1096065, transparent: true, opacity: 0.9 });
-          this.fxGroup.add(new Line(lineGeo, lineMat));
-        });
-        const reticle = new Mesh(new TorusGeometry(0.9, 0.03, 8, 24), new MeshBasicMaterial({ color: 1096065 }));
-        reticle.position.copy(obsPos.clone().add(new Vector3(0, 1.1, 0)));
-        reticle.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-        this.fxGroup.add(reticle);
+        const geo = new BufferGeometry().setFromPoints(pts);
+        const mat = new LineBasicMaterial({ color: sparkColor, transparent: true, opacity: isHuman ? 0.85 : 0.98 });
+        const line = new Line(geo, mat);
+        line.userData = { isLightning: true, pA: p1, pB: p2, isHuman };
+        this.fxGroup.add(line);
+      });
+      const sparkLight = new PointLight(sparkColor, isHuman ? 3.5 : 7, isHuman ? 18 : 28);
+      sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.45 : 0.75, 0)));
+      this.fxGroup.add(sparkLight);
+      const sparkCount = isHuman ? 14 : 32;
+      const sparkGeo = new BufferGeometry();
+      const sPos = [];
+      const spread = isHuman ? 0.6 : 1.2;
+      for (let s = 0; s < sparkCount; s++) {
+        sPos.push(
+          obsPos.x + (Math.random() - 0.5) * spread,
+          obsPos.y + Math.random() * (isHuman ? 0.35 : 0.6),
+          obsPos.z + (Math.random() - 0.5) * spread
+        );
       }
+      sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
+      const sparkMat = new PointsMaterial({ color: 14742270, size: isHuman ? 0.05 : 0.08, transparent: true, opacity: 0.9 });
+      this.fxGroup.add(new Points(sparkGeo, sparkMat));
     }
     updateDeterrenceFX(dt) {
       if (this.fxTimer > 0) {
@@ -41137,9 +40996,6 @@ void main() {
               arr[i * 3 + 2] = p.z;
             }
             posAttr.needsUpdate = true;
-          } else if (child.isMesh && child.userData.isAcousticRing) {
-            child.scale.multiplyScalar(1 + dt * 1.8);
-            if (child.material) child.material.opacity = Math.max(0, this.fxTimer / 1.2);
           } else if (child.isPointLight) {
             child.intensity = (Math.random() > 0.2 ? 6 : 1) * (this.fxTimer / 1.2);
           }
@@ -41641,14 +41497,18 @@ void main() {
         this.telemetry.name = closestObstacle.name;
         this.telemetry.distance = minForwardDist;
         const tailored = this.getTailoredShockSpecs(closestObstacle);
-        this.telemetry.tailoredSpec = tailored.badge;
+        this.telemetry.tailoredSpec = `\u26A1 ACTIVE [${tailored.badge}]`;
         this.telemetry.tailoredLabel = tailored.typeLabel;
         if (aiSensorAuto && !closestObstacle.hasBeenShocked) {
           this.triggerDeterrence(closestObstacle, audio);
           if (audio) audio.playTargetAcquiredBeep(false);
-          this.telemetry.action = `\u26A1 1KM LIDAR: ${tailored.typeLabel} E-SHOCK (${tailored.voltage}) FIRED`;
           this.telemetry.alertType = "deploy";
-          this.telemetry.alertMessage = `\u26A1 1KM CAMERA & LIDAR: ${closestObstacle.name.toUpperCase()} DETECTED AT ${Math.round(minForwardDist)}M! TAILORED ${tailored.voltage} E-SHOCK FIRED!`;
+          this.telemetry.alertMessage = `\u26A1 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! DELIVERING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
+        }
+        if (aiSensorAuto && !closestObstacle.isCleared && this.fxTimer <= 0) {
+          this.spawnDeterrenceFX(closestObstacle);
+          if (audio) audio.playElectricShockDischarge(closestObstacle.type, closestObstacle.mass);
+          this.fxTimer = 1;
         }
         if (closestObstacle.isCleared) {
           if (captureNet.isDeployed) {
@@ -41656,28 +41516,29 @@ void main() {
           }
           this.telemetry.mass = closestObstacle.mass;
           this.telemetry.canCollect = false;
-          this.telemetry.action = `TARGET CLEARED VIA TAILORED ${tailored.voltage} E-SHOCK - TRACK CLEAR`;
+          this.telemetry.tailoredSpec = "TARGET MOVED OFF TRACK";
+          this.telemetry.action = `\u2705 TARGET MOVED OFF TRACK VIA ELECTRIC SHOCK \u2014 TRACK CLEAR (NO NET NEEDED)`;
           this.telemetry.alertType = "success";
-          this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEARED! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA TAILORED E-SHOCK! ZERO CASUALTIES!`;
+          this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEAR! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA ELECTRIC SHOCK! ZERO CASUALTIES!`;
           if (physics && physics.emergencyBrake) {
             physics.setEmergencyBrake(false);
           }
         } else if (closestObstacle.isDeterred && closestObstacle.moveOffTrackOnShock) {
           this.telemetry.mass = closestObstacle.mass;
-          this.telemetry.action = `\u26A1 TAILORED E-SHOCK ACTIVE - TARGET MOVING OFF TRACK (${Math.round(minForwardDist)}M)`;
+          this.telemetry.action = `\u26A1 ELECTRIC SHOCK DELIVERED \u2014 TARGET MOVING OFF TRACK (${Math.round(minForwardDist)}M)`;
           this.telemetry.alertType = "deploy";
         } else {
-          const isWeightSafe = closestObstacle.mass <= 150;
+          const isUnder150kg = closestObstacle.mass < 150;
           this.telemetry.mass = closestObstacle.mass;
-          this.telemetry.canCollect = isWeightSafe;
-          if (isWeightSafe) {
+          this.telemetry.canCollect = isUnder150kg;
+          if (isUnder150kg) {
             if (minForwardDist <= 40) {
-              this.telemetry.action = `TARGET ON TRACK (30-40M) - AIRBAG CAPTURE NET DEPLOYED (${closestObstacle.mass}KG \u2264 150KG)`;
+              this.telemetry.action = `\u{1FAA4} TARGET NOT MOVED (30-40M) \u2014 CAPTURE NET DEPLOYED (${closestObstacle.mass}KG < 150KG)`;
               this.telemetry.alertType = "deploy";
               if (aiSensorAuto && !captureNet.isDeployed) {
                 captureNet.triggerSolenoidDeploy(audio);
                 if (audio) audio.playTargetAcquiredBeep(false);
-                this.telemetry.alertMessage = `\u{1FAA4} TARGET ON TRACK WITHIN 30-40M (${Math.round(minForwardDist)}M)! AIRBAG CAPTURE NET AUTOMATICALLY DEPLOYED!`;
+                this.telemetry.alertMessage = `\u{1FAA4} TARGET ON TRACK WITHIN 30-40M (${Math.round(minForwardDist)}M)! WEIGHT ${closestObstacle.mass}KG < 150KG: CAPTURE NET AUTOMATICALLY DEPLOYED!`;
               }
               if (minForwardDist <= 14) {
                 this.scene.remove(closestObstacle.mesh);
@@ -41686,26 +41547,22 @@ void main() {
                 if (audio) audio.playRescueSuccessChime();
                 this.telemetry.collectedCount++;
                 this.telemetry.collectedWeight += closestObstacle.mass;
+                this.telemetry.action = `\u{1F3AF} SAFELY SECURED IN NET CRADLE (${closestObstacle.mass}KG) \u2014 RESCUE SUCCESS!`;
                 this.telemetry.alertType = "success";
-                this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in net cradle. Zero casualties!`;
+                this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY SECURED: ${closestObstacle.name} (${closestObstacle.mass} kg) in capture net cradle. Zero harm!`;
               }
             } else {
-              this.telemetry.action = `TARGET ON TRACK (${Math.round(minForwardDist)}M) - NET ARMED FOR AUTO-DEPLOY AT 30-40M`;
+              this.telemetry.action = `\u26A1 E-SHOCK DELIVERED (NOT MOVED) \u2014 WEIGHT ${closestObstacle.mass}KG < 150KG: NET WILL DEPLOY AT 30-40M`;
               this.telemetry.alertType = "deploy";
             }
           } else {
             if (captureNet.isDeployed) {
               captureNet.setDeployed(false);
             }
-            if (this.fxTimer <= 0) {
-              this.spawnDeterrenceFX(closestObstacle);
-              if (audio) audio.playElectricShockDischarge("cattle", closestObstacle.mass);
-              this.fxTimer = 0.8;
-            }
             if (minForwardDist <= 40) {
-              this.telemetry.action = `OVERWEIGHT (${closestObstacle.mass}KG > 150KG) AT ${Math.round(minForwardDist)}M - NET STOWED! EMERGENCY BRAKE ACTIVE`;
+              this.telemetry.action = `\u26A0\uFE0F TARGET NOT MOVED \u2014 WEIGHT ${closestObstacle.mass}KG \u2265 150KG: NET STOWED (UNDER 150KG ONLY)! EMERGENCY BRAKE ENGAGED`;
               this.telemetry.alertType = "hazard";
-              this.telemetry.alertMessage = `\u26A0\uFE0F OVERWEIGHT HAZARD WITHIN 30-40M (${Math.round(minForwardDist)}M)! NET STOWED! EMERGENCY BRAKE ENGAGED!`;
+              this.telemetry.alertMessage = `\u26A0\uFE0F OVERWEIGHT HAZARD (${closestObstacle.mass}KG \u2265 150KG)! NET STOWED! EMERGENCY BRAKE ENGAGED!`;
               if (minForwardDist <= 35) {
                 if (physics && !physics.emergencyBrake) {
                   physics.setEmergencyBrake(true);
@@ -41715,7 +41572,7 @@ void main() {
                 }
               }
             } else {
-              this.telemetry.action = `OVERWEIGHT TARGET (${Math.round(minForwardDist)}M) - REPEAT ${tailored.voltage} HOOF PULSES ACTIVE`;
+              this.telemetry.action = `\u26A1 E-SHOCK DELIVERED (NOT MOVED) \u2014 WEIGHT ${closestObstacle.mass}KG \u2265 150KG: NET STOWED (OVER 150KG)! BRAKE ARMED`;
               this.telemetry.alertType = "hazard";
             }
           }
@@ -41729,7 +41586,7 @@ void main() {
         this.telemetry.tailoredSpec = null;
         this.telemetry.tailoredLabel = null;
         this.telemetry.canCollect = false;
-        this.telemetry.action = "STANDBY - SCANNING (1 km LiDAR / 4K / RADAR)";
+        this.telemetry.action = "TRACK CLEAR \u2014 ACTIVE SCANNING (1 km LiDAR & Camera)";
         this.telemetry.alertMessage = null;
         this.telemetry.alertType = "info";
         if (captureNet.isDeployed && captureNet.collectedList.length === 0) {
@@ -41810,28 +41667,20 @@ void main() {
         btnSpawnAnimal: document.getElementById("btn-spawn-animal"),
         btnSpawnAnimalFlee: document.getElementById("btn-spawn-animal-flee"),
         btnSpawnBull: document.getElementById("btn-spawn-bull"),
-        btnSpawnHumanLong: document.getElementById("btn-spawn-human-long"),
-        btnSpawnCrate: document.getElementById("btn-spawn-crate"),
+        btnSpawnBullFlee: document.getElementById("btn-spawn-bull-flee"),
         btnClearCradle: document.getElementById("btn-clear-cradle"),
-        // Floating Console Elements (Ref: media_1793808764475_89ecfc40.jpg)
+        // Floating Console Elements
         floatingConsole: document.getElementById("floating-console-container"),
         consoleSpeedVal: document.getElementById("console-speed-val"),
         btnRunPause: document.getElementById("btn-run-pause"),
         btnAiSensorMode: document.getElementById("btn-ai-sensor-mode"),
-        btnConsoleBeam: document.getElementById("btn-console-beam"),
+        btnConsoleShock: document.getElementById("btn-console-shock") || document.getElementById("btn-console-beam"),
         btnConsoleNet: document.getElementById("btn-console-net"),
         btnConsoleHorn: document.getElementById("btn-console-horn"),
         btnConsoleEmergency: document.getElementById("btn-console-emergency"),
         btnConsoleReset: document.getElementById("btn-console-reset"),
         btnAutoSpin: document.getElementById("btn-auto-spin"),
-        deterrencePopupMenu: document.getElementById("deterrence-popup-menu"),
-        tickerSysArch: document.getElementById("ticker-sys-arch"),
-        tickerTarget: document.getElementById("ticker-target"),
-        tickerRange: document.getElementById("ticker-range"),
-        tickerBeamState: document.getElementById("ticker-beam-state"),
-        tickerPolarization: document.getElementById("ticker-polarization"),
-        tickerCarrier: document.getElementById("ticker-carrier"),
-        tickerSafety: document.getElementById("ticker-safety")
+        tickerStatus: document.getElementById("ticker-status")
       };
       this.initRenderer();
       this.initEventListeners();
@@ -41984,19 +41833,14 @@ void main() {
           this.cycleWeather();
         });
       }
-      if (this.dom.btnSpawnHuman) {
-        this.dom.btnSpawnHuman.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, false);
-        });
-      }
       if (this.dom.btnSpawnHumanFlee) {
         this.dom.btnSpawnHumanFlee.addEventListener("click", () => {
           this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, true);
         });
       }
-      if (this.dom.btnSpawnAnimal) {
-        this.dom.btnSpawnAnimal.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, false);
+      if (this.dom.btnSpawnHuman) {
+        this.dom.btnSpawnHuman.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, false);
         });
       }
       if (this.dom.btnSpawnAnimalFlee) {
@@ -42004,19 +41848,19 @@ void main() {
           this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, true);
         });
       }
+      if (this.dom.btnSpawnAnimal) {
+        this.dom.btnSpawnAnimal.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, false);
+        });
+      }
+      if (this.dom.btnSpawnBullFlee) {
+        this.dom.btnSpawnBullFlee.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, true);
+        });
+      }
       if (this.dom.btnSpawnBull) {
         this.dom.btnSpawnBull.addEventListener("click", () => {
           this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, false);
-        });
-      }
-      if (this.dom.btnSpawnHumanLong) {
-        this.dom.btnSpawnHumanLong.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 500, false);
-        });
-      }
-      if (this.dom.btnSpawnCrate) {
-        this.dom.btnSpawnCrate.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, false);
         });
       }
       if (this.dom.btnClearCradle) {
@@ -42084,25 +41928,9 @@ void main() {
       if (this.dom.btnAutoSpin) {
         this.dom.btnAutoSpin.addEventListener("click", () => this.toggleAutoSpin());
       }
-      if (this.dom.tickerSysArch) {
-        this.dom.tickerSysArch.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.toggleDeterrencePopup();
-        });
+      if (this.dom.btnConsoleShock) {
+        this.dom.btnConsoleShock.addEventListener("click", () => this.fireElectricShockPulse());
       }
-      document.querySelectorAll(".deterrence-popup-item").forEach((item) => {
-        item.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const mode = item.dataset.mode;
-          this.selectDeterrenceMode(mode);
-          this.hideDeterrencePopup();
-        });
-      });
-      window.addEventListener("click", (e) => {
-        if (!e.target.closest("#deterrence-popup-menu") && !e.target.closest("#ticker-sys-arch")) {
-          this.hideDeterrencePopup();
-        }
-      });
       const btnToggleKavach = document.getElementById("btn-toggle-kavach");
       if (btnToggleKavach && this.dom.kavachCard) {
         btnToggleKavach.addEventListener("click", () => {
@@ -42142,20 +41970,18 @@ void main() {
         this.dom.btnAiSensorMode.classList.toggle("active-cyan", this.aiSensorAuto);
       }
     }
-    fireDeterrenceBeam() {
-      let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isDeterred);
+    fireElectricShockPulse() {
+      let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isCleared);
       if (!target) {
-        target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 70);
+        target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 70, false);
       }
       if (target) {
         this.obstacles.triggerDeterrence(target, this.audio);
-        this.beamDischargingTimer = 2.5;
-        if (this.dom.btnConsoleBeam) {
-          this.dom.btnConsoleBeam.innerText = "\u26A1 BEAM: FIRED";
-        }
-        if (this.dom.tickerBeamState) {
-          this.dom.tickerBeamState.innerText = "DISCHARGING PULSE (LINK 100%)";
-          this.dom.tickerBeamState.style.color = "#38bdf8";
+        if (this.dom.btnConsoleShock) {
+          this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: FIRED";
+          setTimeout(() => {
+            if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: ACTIVE";
+          }, 1200);
         }
       }
     }
@@ -42190,72 +42016,16 @@ void main() {
         this.dom.btnAutoSpin.classList.toggle("active", this.autoSpin);
       }
     }
-    toggleDeterrencePopup() {
-      if (this.dom.deterrencePopupMenu) {
-        const isVisible = this.dom.deterrencePopupMenu.style.display !== "none";
-        this.dom.deterrencePopupMenu.style.display = isVisible ? "none" : "flex";
-      }
-    }
-    hideDeterrencePopup() {
-      if (this.dom.deterrencePopupMenu) {
-        this.dom.deterrencePopupMenu.style.display = "none";
-      }
-    }
-    selectDeterrenceMode(mode) {
-      this.obstacles.setDeterrenceMode(mode);
-      document.querySelectorAll(".deterrence-popup-item").forEach((item) => {
-        const isSelected = item.dataset.mode === mode;
-        item.classList.toggle("selected", isSelected);
-        const cleanName = item.innerText.replace("\u2713 ", "");
-        item.innerText = isSelected ? `\u2713 ${cleanName}` : cleanName;
-      });
-      this.updateTelemetryTicker();
-    }
     updateTelemetryTicker() {
-      const tickerData = this.obstacles.getDeterrenceTickerData();
       const t = this.lastTelemetry;
-      if (this.dom.tickerSysArch) {
-        this.dom.tickerSysArch.innerText = tickerData.arch;
-      }
-      if (this.dom.tickerPolarization) {
-        this.dom.tickerPolarization.innerText = tickerData.polarization;
-      }
-      if (this.dom.tickerCarrier) {
-        this.dom.tickerCarrier.innerText = tickerData.carrier;
-      }
-      if (this.beamDischargingTimer > 0) {
-        if (this.dom.tickerBeamState) {
-          this.dom.tickerBeamState.innerText = "DISCHARGING PULSE (LINK 100%)";
-          this.dom.tickerBeamState.style.color = "#38bdf8";
+      if (this.dom.tickerStatus) {
+        if (t && t.targetDetected) {
+          this.dom.tickerStatus.innerText = t.action;
+          this.dom.tickerStatus.style.color = t.canCollect ? "#34d399" : "#f59e0b";
+        } else {
+          this.dom.tickerStatus.innerText = "ACTIVE MONITORING (1 km)";
+          this.dom.tickerStatus.style.color = "#34d399";
         }
-      } else if (t && t.targetDetected) {
-        if (this.dom.tickerBeamState) {
-          this.dom.tickerBeamState.innerText = t.canCollect ? "SCOOP CRADLE ARMED" : "TARGET LOCKED (TRACK-1)";
-          this.dom.tickerBeamState.style.color = t.canCollect ? "#34d399" : "#f59e0b";
-        }
-      } else {
-        if (this.dom.tickerBeamState) {
-          this.dom.tickerBeamState.innerText = tickerData.focusState;
-          this.dom.tickerBeamState.style.color = "#34d399";
-        }
-      }
-      if (t && t.targetDetected) {
-        if (this.dom.tickerTarget) {
-          this.dom.tickerTarget.innerText = `${t.name.toUpperCase()} (TRACK-1)`;
-        }
-        if (this.dom.tickerRange) {
-          this.dom.tickerRange.innerText = t.distance !== null ? `${Math.round(t.distance)}M (LINK VERIFIED)` : "1548M (LINK VERIFIED)";
-        }
-      } else {
-        if (this.dom.tickerTarget) {
-          this.dom.tickerTarget.innerText = "NONE (TRACK CLEAR)";
-        }
-        if (this.dom.tickerRange) {
-          this.dom.tickerRange.innerText = "1548M (LINK VERIFIED)";
-        }
-      }
-      if (this.dom.tickerSafety) {
-        this.dom.tickerSafety.innerText = tickerData.safety;
       }
     }
     // ---------------------------------------------------------

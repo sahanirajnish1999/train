@@ -88,28 +88,20 @@ class SimulatorApp {
       btnSpawnAnimal: document.getElementById('btn-spawn-animal'),
       btnSpawnAnimalFlee: document.getElementById('btn-spawn-animal-flee'),
       btnSpawnBull: document.getElementById('btn-spawn-bull'),
-      btnSpawnHumanLong: document.getElementById('btn-spawn-human-long'),
-      btnSpawnCrate: document.getElementById('btn-spawn-crate'),
+      btnSpawnBullFlee: document.getElementById('btn-spawn-bull-flee'),
       btnClearCradle: document.getElementById('btn-clear-cradle'),
-      // Floating Console Elements (Ref: media_1793808764475_89ecfc40.jpg)
+      // Floating Console Elements
       floatingConsole: document.getElementById('floating-console-container'),
       consoleSpeedVal: document.getElementById('console-speed-val'),
       btnRunPause: document.getElementById('btn-run-pause'),
       btnAiSensorMode: document.getElementById('btn-ai-sensor-mode'),
-      btnConsoleBeam: document.getElementById('btn-console-beam'),
+      btnConsoleShock: document.getElementById('btn-console-shock') || document.getElementById('btn-console-beam'),
       btnConsoleNet: document.getElementById('btn-console-net'),
       btnConsoleHorn: document.getElementById('btn-console-horn'),
       btnConsoleEmergency: document.getElementById('btn-console-emergency'),
       btnConsoleReset: document.getElementById('btn-console-reset'),
       btnAutoSpin: document.getElementById('btn-auto-spin'),
-      deterrencePopupMenu: document.getElementById('deterrence-popup-menu'),
-      tickerSysArch: document.getElementById('ticker-sys-arch'),
-      tickerTarget: document.getElementById('ticker-target'),
-      tickerRange: document.getElementById('ticker-range'),
-      tickerBeamState: document.getElementById('ticker-beam-state'),
-      tickerPolarization: document.getElementById('ticker-polarization'),
-      tickerCarrier: document.getElementById('ticker-carrier'),
-      tickerSafety: document.getElementById('ticker-safety')
+      tickerStatus: document.getElementById('ticker-status')
     };
 
     this.initRenderer();
@@ -288,20 +280,15 @@ class SimulatorApp {
       });
     }
 
-    // AI Kavach Obstacle Spawner Buttons
-    if (this.dom.btnSpawnHuman) {
-      this.dom.btnSpawnHuman.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, false);
-      });
-    }
+    // AI Kavach Obstacle Spawner Buttons (Directly testing the user's safety requirements)
     if (this.dom.btnSpawnHumanFlee) {
       this.dom.btnSpawnHumanFlee.addEventListener('click', () => {
         this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, true);
       });
     }
-    if (this.dom.btnSpawnAnimal) {
-      this.dom.btnSpawnAnimal.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, false);
+    if (this.dom.btnSpawnHuman) {
+      this.dom.btnSpawnHuman.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, false);
       });
     }
     if (this.dom.btnSpawnAnimalFlee) {
@@ -309,19 +296,19 @@ class SimulatorApp {
         this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, true);
       });
     }
+    if (this.dom.btnSpawnAnimal) {
+      this.dom.btnSpawnAnimal.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, false);
+      });
+    }
+    if (this.dom.btnSpawnBullFlee) {
+      this.dom.btnSpawnBullFlee.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, true);
+      });
+    }
     if (this.dom.btnSpawnBull) {
       this.dom.btnSpawnBull.addEventListener('click', () => {
         this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, false);
-      });
-    }
-    if (this.dom.btnSpawnHumanLong) {
-      this.dom.btnSpawnHumanLong.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 500, false);
-      });
-    }
-    if (this.dom.btnSpawnCrate) {
-      this.dom.btnSpawnCrate.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, false);
       });
     }
     if (this.dom.btnClearCradle) {
@@ -408,28 +395,10 @@ class SimulatorApp {
       this.dom.btnAutoSpin.addEventListener('click', () => this.toggleAutoSpin());
     }
 
-    // Deterrence Architecture Selector Popup
-    if (this.dom.tickerSysArch) {
-      this.dom.tickerSysArch.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.toggleDeterrencePopup();
-      });
+    // Manual Electric Shock Trigger Button
+    if (this.dom.btnConsoleShock) {
+      this.dom.btnConsoleShock.addEventListener('click', () => this.fireElectricShockPulse());
     }
-
-    document.querySelectorAll('.deterrence-popup-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mode = item.dataset.mode;
-        this.selectDeterrenceMode(mode);
-        this.hideDeterrencePopup();
-      });
-    });
-
-    window.addEventListener('click', (e) => {
-      if (!e.target.closest('#deterrence-popup-menu') && !e.target.closest('#ticker-sys-arch')) {
-        this.hideDeterrencePopup();
-      }
-    });
 
     // Toggle AI Kavach Safety Panel (Top bar button)
     const btnToggleKavach = document.getElementById('btn-toggle-kavach');
@@ -477,20 +446,18 @@ class SimulatorApp {
     }
   }
 
-  fireDeterrenceBeam() {
-    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isDeterred);
+  fireElectricShockPulse() {
+    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isCleared);
     if (!target) {
-      target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 70);
+      target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 70, false);
     }
     if (target) {
       this.obstacles.triggerDeterrence(target, this.audio);
-      this.beamDischargingTimer = 2.5;
-      if (this.dom.btnConsoleBeam) {
-        this.dom.btnConsoleBeam.innerText = '⚡ BEAM: FIRED';
-      }
-      if (this.dom.tickerBeamState) {
-        this.dom.tickerBeamState.innerText = 'DISCHARGING PULSE (LINK 100%)';
-        this.dom.tickerBeamState.style.color = '#38bdf8';
+      if (this.dom.btnConsoleShock) {
+        this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: FIRED';
+        setTimeout(() => {
+          if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: ACTIVE';
+        }, 1200);
       }
     }
   }
@@ -529,80 +496,16 @@ class SimulatorApp {
     }
   }
 
-  toggleDeterrencePopup() {
-    if (this.dom.deterrencePopupMenu) {
-      const isVisible = this.dom.deterrencePopupMenu.style.display !== 'none';
-      this.dom.deterrencePopupMenu.style.display = isVisible ? 'none' : 'flex';
-    }
-  }
-
-  hideDeterrencePopup() {
-    if (this.dom.deterrencePopupMenu) {
-      this.dom.deterrencePopupMenu.style.display = 'none';
-    }
-  }
-
-  selectDeterrenceMode(mode) {
-    this.obstacles.setDeterrenceMode(mode);
-    document.querySelectorAll('.deterrence-popup-item').forEach(item => {
-      const isSelected = item.dataset.mode === mode;
-      item.classList.toggle('selected', isSelected);
-      const cleanName = item.innerText.replace('✓ ', '');
-      item.innerText = isSelected ? `✓ ${cleanName}` : cleanName;
-    });
-
-    this.updateTelemetryTicker();
-  }
-
   updateTelemetryTicker() {
-    const tickerData = this.obstacles.getDeterrenceTickerData();
     const t = this.lastTelemetry;
-
-    if (this.dom.tickerSysArch) {
-      this.dom.tickerSysArch.innerText = tickerData.arch;
-    }
-    if (this.dom.tickerPolarization) {
-      this.dom.tickerPolarization.innerText = tickerData.polarization;
-    }
-    if (this.dom.tickerCarrier) {
-      this.dom.tickerCarrier.innerText = tickerData.carrier;
-    }
-
-    if (this.beamDischargingTimer > 0) {
-      if (this.dom.tickerBeamState) {
-        this.dom.tickerBeamState.innerText = 'DISCHARGING PULSE (LINK 100%)';
-        this.dom.tickerBeamState.style.color = '#38bdf8';
+    if (this.dom.tickerStatus) {
+      if (t && t.targetDetected) {
+        this.dom.tickerStatus.innerText = t.action;
+        this.dom.tickerStatus.style.color = t.canCollect ? '#34d399' : '#f59e0b';
+      } else {
+        this.dom.tickerStatus.innerText = 'ACTIVE MONITORING (1 km)';
+        this.dom.tickerStatus.style.color = '#34d399';
       }
-    } else if (t && t.targetDetected) {
-      if (this.dom.tickerBeamState) {
-        this.dom.tickerBeamState.innerText = t.canCollect ? 'SCOOP CRADLE ARMED' : 'TARGET LOCKED (TRACK-1)';
-        this.dom.tickerBeamState.style.color = t.canCollect ? '#34d399' : '#f59e0b';
-      }
-    } else {
-      if (this.dom.tickerBeamState) {
-        this.dom.tickerBeamState.innerText = tickerData.focusState;
-        this.dom.tickerBeamState.style.color = '#34d399';
-      }
-    }
-
-    if (t && t.targetDetected) {
-      if (this.dom.tickerTarget) {
-        this.dom.tickerTarget.innerText = `${t.name.toUpperCase()} (TRACK-1)`;
-      }
-      if (this.dom.tickerRange) {
-        this.dom.tickerRange.innerText = t.distance !== null ? `${Math.round(t.distance)}M (LINK VERIFIED)` : '1548M (LINK VERIFIED)';
-      }
-    } else {
-      if (this.dom.tickerTarget) {
-        this.dom.tickerTarget.innerText = 'NONE (TRACK CLEAR)';
-      }
-      if (this.dom.tickerRange) {
-        this.dom.tickerRange.innerText = '1548M (LINK VERIFIED)';
-      }
-    }
-
-    if (this.dom.tickerSafety) {
-      this.dom.tickerSafety.innerText = tickerData.safety;
     }
   }
   // ---------------------------------------------------------
