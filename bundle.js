@@ -39820,67 +39820,59 @@ void main() {
       group.name = "stylizedHuman";
       const faceData = this.createHumanFaceTexture();
       const pelvis = new Mesh(
-        new CylinderGeometry(0.15, 0.138, 0.16, 22),
+        new CylinderGeometry(0.15, 0.138, 0.16, 24),
         this.materials.humanPantsBrown
       );
       pelvis.position.y = 0.88;
-      pelvis.scale.set(1.02, 1, 0.76);
+      pelvis.scale.set(1.04, 1, 0.78);
       pelvis.castShadow = true;
       group.add(pelvis);
-      const saddle = new Mesh(
-        new SphereGeometry(0.142, 18, 14),
-        this.materials.humanPantsBrown
+      const belt = new Mesh(
+        new CylinderGeometry(0.153, 0.151, 0.035, 24),
+        new MeshStandardMaterial({ color: 4073251, roughness: 0.6 })
       );
-      saddle.position.set(0, 0.84, 0);
-      saddle.scale.set(1.02, 0.85, 0.76);
-      group.add(saddle);
+      belt.position.set(0, 0.945, 0);
+      belt.scale.set(1.05, 1, 0.79);
+      group.add(belt);
+      const buckle = new Mesh(
+        new BoxGeometry(0.032, 0.03, 0.012),
+        new MeshStandardMaterial({ color: 14870768, metalness: 0.85, roughness: 0.25 })
+      );
+      buckle.position.set(0, 0.945, 0.122);
+      group.add(buckle);
       const torsoGroup = new Group();
       torsoGroup.position.set(0, 0.94, 0);
       const chest = new Mesh(
-        new CylinderGeometry(0.185, 0.165, 0.22, 24),
+        new CylinderGeometry(0.185, 0.16, 0.24, 24),
         this.materials.humanPoloCream
       );
-      chest.position.y = 0.29;
-      chest.scale.set(1.08, 1, 0.75);
+      chest.position.y = 0.28;
+      chest.scale.set(1.08, 1, 0.76);
       chest.castShadow = true;
       torsoGroup.add(chest);
-      const midriff = new Mesh(
-        new CylinderGeometry(0.165, 0.148, 0.2, 24),
+      const waist = new Mesh(
+        new CylinderGeometry(0.16, 0.146, 0.18, 24),
         this.materials.humanPoloCream
       );
-      midriff.position.y = 0.11;
-      midriff.scale.set(1.04, 1, 0.75);
-      midriff.castShadow = true;
-      torsoGroup.add(midriff);
+      waist.position.y = 0.1;
+      waist.scale.set(1.04, 1, 0.76);
+      waist.castShadow = true;
+      torsoGroup.add(waist);
       const hem = new Mesh(
-        new CylinderGeometry(0.152, 0.152, 0.04, 24),
+        new CylinderGeometry(0.154, 0.158, 0.045, 24),
         this.materials.humanPoloCream
       );
       hem.position.y = 0.01;
-      hem.scale.set(1.04, 1, 0.76);
+      hem.scale.set(1.05, 1, 0.78);
       torsoGroup.add(hem);
-      [-0.17, 0.17].forEach((sx) => {
+      [-0.18, 0.18].forEach((sx) => {
         const deltoid = new Mesh(
-          new SphereGeometry(0.068, 18, 14),
+          new SphereGeometry(0.07, 18, 14),
           this.materials.humanPoloCream
         );
         deltoid.position.set(sx, 0.33, 0);
         deltoid.scale.set(1, 0.85, 0.95);
         torsoGroup.add(deltoid);
-      });
-      const placket = new Mesh(
-        new BoxGeometry(0.026, 0.16, 0.012),
-        this.materials.humanPoloCollar
-      );
-      placket.position.set(0, 0.26, 0.112);
-      torsoGroup.add(placket);
-      [0.3, 0.24].forEach((by) => {
-        const button = new Mesh(
-          new CylinderGeometry(5e-3, 5e-3, 6e-3, 8).rotateX(Math.PI / 2),
-          new MeshStandardMaterial({ color: 15857145, roughness: 0.3 })
-        );
-        button.position.set(0, by, 0.119);
-        torsoGroup.add(button);
       });
       const neck = new Mesh(
         new CylinderGeometry(0.046, 0.052, 0.12, 18),
@@ -39889,67 +39881,114 @@ void main() {
       neck.position.y = 0.42;
       torsoGroup.add(neck);
       const collarBand = new Mesh(
-        new CylinderGeometry(0.06, 0.072, 0.045, 20),
+        new CylinderGeometry(0.058, 0.07, 0.045, 20),
         this.materials.humanPoloCollar
       );
       collarBand.position.y = 0.39;
       torsoGroup.add(collarBand);
       [-1, 1].forEach((side) => {
-        const collarWing = new Mesh(
-          new BoxGeometry(0.07, 0.085, 0.014),
+        const lapel = new Mesh(
+          new BoxGeometry(0.065, 0.09, 0.012),
           this.materials.humanPoloCollar
         );
-        collarWing.position.set(side * 0.048, 0.36, 0.076);
-        collarWing.rotation.set(-0.35, side * 0.28, side * -0.36);
-        torsoGroup.add(collarWing);
+        lapel.position.set(side * 0.046, 0.36, 0.078);
+        lapel.rotation.set(-0.35, side * 0.28, side * -0.36);
+        torsoGroup.add(lapel);
+      });
+      const placket = new Mesh(
+        new BoxGeometry(0.024, 0.14, 0.012),
+        this.materials.humanPoloCollar
+      );
+      placket.position.set(0, 0.26, 0.114);
+      torsoGroup.add(placket);
+      [0.3, 0.24].forEach((by) => {
+        const button = new Mesh(
+          new CylinderGeometry(5e-3, 5e-3, 6e-3, 8).rotateX(Math.PI / 2),
+          new MeshStandardMaterial({ color: 15857145, roughness: 0.3 })
+        );
+        button.position.set(0, by, 0.121);
+        torsoGroup.add(button);
       });
       const headGroup = new Group();
       headGroup.position.set(0, 0.5, 0.01);
-      const headGeo = new SphereGeometry(0.122, 32, 24);
-      headGeo.rotateY(-Math.PI / 2);
-      const headMesh = new Mesh(
-        headGeo,
-        new MeshStandardMaterial({
-          map: faceData.tex,
-          roughness: 0.65
-        })
+      const cranium = new Mesh(
+        new SphereGeometry(0.122, 28, 22),
+        this.materials.humanSkinPeach
       );
-      headMesh.scale.set(0.94, 1.05, 0.96);
-      headMesh.castShadow = true;
-      headGroup.add(headMesh);
-      const hairShape = new Shape();
-      hairShape.moveTo(-0.09, 0);
-      hairShape.bezierCurveTo(-0.13, 0.08, -0.07, 0.2, 0.05, 0.22);
-      hairShape.bezierCurveTo(0.14, 0.23, 0.18, 0.14, 0.14, 0.05);
-      hairShape.bezierCurveTo(0.09, -0.01, 0.02, -0.02, -0.09, 0);
-      hairShape.closePath();
-      const hairQuiff = new Mesh(
-        new ExtrudeGeometry(hairShape, {
-          depth: 0.14,
-          bevelEnabled: true,
-          bevelThickness: 0.025,
-          bevelSize: 0.02,
-          bevelSegments: 4
-        }),
-        this.materials.humanHairGinger
+      cranium.scale.set(0.92, 1.05, 0.96);
+      cranium.castShadow = true;
+      headGroup.add(cranium);
+      const chin = new Mesh(
+        new SphereGeometry(0.066, 18, 14),
+        this.materials.humanSkinPeach
       );
-      hairQuiff.position.set(0, 0.05, 0.015);
-      hairQuiff.rotation.set(-0.3, 0.15, -0.1);
-      headGroup.add(hairQuiff);
-      const backHair = new Mesh(
-        new SphereGeometry(0.124, 24, 16, -Math.PI * 0.7, Math.PI * 1.4, 0, Math.PI * 0.65),
-        this.materials.humanHairGinger
-      );
-      backHair.position.set(0, 0.015, -0.015);
-      backHair.scale.set(0.96, 1.05, 1);
-      headGroup.add(backHair);
+      chin.position.set(0, -0.065, 0.038);
+      chin.scale.set(1.1, 0.88, 1.08);
+      headGroup.add(chin);
       [-1, 1].forEach((side) => {
-        const sideburn = new Mesh(
-          new BoxGeometry(0.016, 0.055, 0.032),
-          this.materials.humanHairGinger
+        const eyeGroup = new Group();
+        eyeGroup.position.set(side * 0.045, 0.014, 0.108);
+        eyeGroup.rotation.y = side * 0.15;
+        const sclera = new Mesh(
+          new SphereGeometry(0.026, 16, 12),
+          this.materials.humanEyesWhite
         );
-        sideburn.position.set(side * 0.108, 0.012, 0.018);
-        headGroup.add(sideburn);
+        sclera.scale.set(0.95, 1.25, 0.4);
+        eyeGroup.add(sclera);
+        const iris = new Mesh(
+          new SphereGeometry(0.017, 14, 10),
+          new MeshStandardMaterial({ color: 4528643, roughness: 0.2 })
+        );
+        iris.position.set(side * 2e-3, 0, 9e-3);
+        iris.scale.set(0.92, 1.15, 0.3);
+        eyeGroup.add(iris);
+        const pupil = new Mesh(
+          new SphereGeometry(0.01, 12, 8),
+          this.materials.humanEyesIris
+        );
+        pupil.position.set(side * 2e-3, 0, 0.014);
+        pupil.scale.set(0.85, 1.1, 0.25);
+        eyeGroup.add(pupil);
+        const hl1 = new Mesh(new SphereGeometry(45e-4, 8, 8), this.materials.humanEyeReflex);
+        hl1.position.set(side * 4e-3, 7e-3, 0.016);
+        eyeGroup.add(hl1);
+        const hl2 = new Mesh(new SphereGeometry(25e-4, 8, 8), this.materials.humanEyeReflex);
+        hl2.position.set(side * -4e-3, -5e-3, 0.016);
+        eyeGroup.add(hl2);
+        const brow = new Mesh(
+          new CylinderGeometry(5e-3, 3e-3, 0.052, 8).rotateZ(Math.PI / 2),
+          new MeshStandardMaterial({ color: 8138002, roughness: 0.75 })
+        );
+        brow.position.set(0, 0.038, 6e-3);
+        brow.rotation.z = side * -0.15;
+        brow.rotation.x = -0.25;
+        eyeGroup.add(brow);
+        headGroup.add(eyeGroup);
+      });
+      const nose = new Mesh(
+        new SphereGeometry(0.015, 12, 10),
+        this.materials.humanSkinPeach
+      );
+      nose.position.set(0, -0.014, 0.126);
+      nose.scale.set(0.9, 0.75, 1.1);
+      headGroup.add(nose);
+      const smile = new Mesh(
+        new TorusGeometry(0.025, 35e-4, 8, 16, Math.PI * 0.65),
+        this.materials.humanSmile
+      );
+      smile.position.set(0, -0.046, 0.114);
+      smile.rotation.set(0.2, 0, Math.PI * 1.18);
+      headGroup.add(smile);
+      [-1, 1].forEach((side) => {
+        const blush = new Mesh(
+          new SphereGeometry(0.022, 10, 8),
+          this.materials.humanBlush
+        );
+        blush.position.set(side * 0.072, -0.02, 0.096);
+        blush.scale.set(1, 0.65, 0.25);
+        headGroup.add(blush);
+      });
+      [-1, 1].forEach((side) => {
         const ear = new Mesh(
           new SphereGeometry(0.026, 14, 10),
           this.materials.humanSkinPeach
@@ -39958,6 +39997,53 @@ void main() {
         ear.position.set(side * 0.115, -8e-3, -5e-3);
         ear.rotation.y = side * 0.18;
         headGroup.add(ear);
+      });
+      const hairCap = new Mesh(
+        new SphereGeometry(0.126, 26, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+        this.materials.humanHairGinger
+      );
+      hairCap.position.set(0, 0.015, -0.012);
+      hairCap.scale.set(0.95, 1.06, 1.02);
+      headGroup.add(hairCap);
+      const lock1Curve = new CatmullRomCurve3([
+        new Vector3(-0.08, 0.12, 0.07),
+        new Vector3(-0.02, 0.11, 0.11),
+        new Vector3(0.05, 0.08, 0.12),
+        new Vector3(0.09, 0.03, 0.1)
+      ]);
+      const lock1 = new Mesh(
+        new TubeGeometry(lock1Curve, 16, 0.024, 10, false),
+        this.materials.humanHairGinger
+      );
+      headGroup.add(lock1);
+      const lock2Curve = new CatmullRomCurve3([
+        new Vector3(-0.06, 0.14, 0.06),
+        new Vector3(-0.03, 0.09, 0.11),
+        new Vector3(-0.02, 0.04, 0.115)
+      ]);
+      const lock2 = new Mesh(
+        new TubeGeometry(lock2Curve, 12, 0.018, 8, false),
+        this.materials.humanHairGinger
+      );
+      headGroup.add(lock2);
+      const quiffCurve = new CatmullRomCurve3([
+        new Vector3(-0.04, 0.13, 0.04),
+        new Vector3(-0.01, 0.15, -0.01),
+        new Vector3(0.03, 0.14, -0.06)
+      ]);
+      const quiff = new Mesh(
+        new TubeGeometry(quiffCurve, 14, 0.032, 10, false),
+        this.materials.humanHairGinger
+      );
+      headGroup.add(quiff);
+      [-1, 1].forEach((side) => {
+        const sideburn = new Mesh(
+          new CylinderGeometry(0.01, 6e-3, 0.055, 8),
+          this.materials.humanHairGinger
+        );
+        sideburn.position.set(side * 0.108, 0.015, 0.02);
+        sideburn.rotation.x = -0.15;
+        headGroup.add(sideburn);
       });
       torsoGroup.add(headGroup);
       [-1, 1].forEach((side) => {
@@ -40073,26 +40159,25 @@ void main() {
         cuff.position.set(0, -0.37, -6e-3);
         lowerLegGroup.add(cuff);
         const shoeGroup = new Group();
-        shoeGroup.position.set(0, -0.4, 0.025);
+        shoeGroup.position.set(0, -0.41, 0.035);
         const shoeBody = new Mesh(
-          new BoxGeometry(0.076, 0.046, 0.17),
+          new BoxGeometry(0.074, 0.065, 0.17),
           this.materials.humanShoesDark
         );
-        shoeBody.position.set(0, 0, 0.01);
         shoeGroup.add(shoeBody);
-        const toeCap = new Mesh(
-          new SphereGeometry(0.038, 14, 10),
-          this.materials.humanShoesDark
-        );
-        toeCap.scale.set(1, 0.65, 1);
-        toeCap.position.set(0, 0, 0.085);
-        shoeGroup.add(toeCap);
         const sole = new Mesh(
-          new BoxGeometry(0.082, 0.016, 0.185),
-          this.materials.humanShoesDark
+          new BoxGeometry(0.078, 0.022, 0.175),
+          new MeshStandardMaterial({ color: 16317180, roughness: 0.35 })
         );
-        sole.position.set(0, -0.028, 0.015);
+        sole.position.y = -0.032;
         shoeGroup.add(sole);
+        const toeCap = new Mesh(
+          new SphereGeometry(0.036, 12, 10),
+          new MeshStandardMaterial({ color: 16317180, roughness: 0.35 })
+        );
+        toeCap.position.set(0, -0.012, 0.075);
+        toeCap.scale.set(1, 0.65, 0.85);
+        shoeGroup.add(toeCap);
         lowerLegGroup.add(shoeGroup);
         legGroup.add(lowerLegGroup);
         group.add(legGroup);
@@ -40110,96 +40195,170 @@ void main() {
       group.userData.faceData = faceData;
       return group;
     }
+    // Seamless organic elephant body geometry generator (No flat cylinder cuts, continuous natural curves)
+    createElephantBodyGeometry() {
+      const rings = 18;
+      const segments = 24;
+      const profile = [
+        [0.58, 0.68, 0.16, 0.18],
+        // Neck junction
+        [0.5, 0.72, 0.34, 0.38],
+        // Front brisket
+        [0.4, 0.78, 0.44, 0.48],
+        // High shoulder withers
+        [0.28, 0.77, 0.47, 0.51],
+        // Shoulder crest
+        [0.14, 0.74, 0.49, 0.53],
+        // Mid-back dip
+        [0, 0.73, 0.5, 0.54],
+        // Deep belly center
+        [-0.14, 0.75, 0.49, 0.52],
+        // Lumbar rise
+        [-0.28, 0.77, 0.47, 0.5],
+        // Pelvic haunch peak
+        [-0.42, 0.73, 0.41, 0.44],
+        // Rump slope
+        [-0.52, 0.68, 0.31, 0.33],
+        // Tail root base
+        [-0.56, 0.64, 0.14, 0.16]
+        // Rounded end cap
+      ];
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+      for (let i = 0; i <= rings; i++) {
+        const t = i / rings;
+        const pIdx = t * (profile.length - 1);
+        const i0 = Math.floor(pIdx);
+        const i1 = Math.min(profile.length - 1, i0 + 1);
+        const blend = pIdx - i0;
+        const z = profile[i0][0] * (1 - blend) + profile[i1][0] * blend;
+        const y = profile[i0][1] * (1 - blend) + profile[i1][1] * blend;
+        const rx = profile[i0][2] * (1 - blend) + profile[i1][2] * blend;
+        const ry = profile[i0][3] * (1 - blend) + profile[i1][3] * blend;
+        for (let j = 0; j <= segments; j++) {
+          const theta = j / segments * Math.PI * 2;
+          const x = Math.cos(theta) * rx;
+          const vertY = y + Math.sin(theta) * ry;
+          positions.push(x, vertY, z);
+          uvs.push(j / segments, t);
+        }
+      }
+      for (let i = 0; i < rings; i++) {
+        for (let j = 0; j < segments; j++) {
+          const a = i * (segments + 1) + j;
+          const b = (i + 1) * (segments + 1) + j;
+          const c = (i + 1) * (segments + 1) + (j + 1);
+          const d = i * (segments + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+      const geo = new BufferGeometry();
+      geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
+      geo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
+    }
     // 2. Indian Elephant (Mass: 110 kg <= 150 kg -> SCOOPABLE IN RESCUE NET)
     // Exact anatomical & artistic match to media_1793820037213_e448b2e7.jpg:
-    // Plump slate blue-grey rounded body, big floppy flapping fan ears with dark contours,
-    // multi-segment articulated flexible curling/raising trunk, upward curved ivory tusks with golden tips,
-    // friendly cartoon eyes with white sclera and specular catchlights, sweet smile,
-    // 4 sturdy pillar legs with 3 cute yellow semi-circular toenails per foot, and brush-tufted tail
+    // Plump rounded seamless body, twin cranial domes, expressive 3D Pixar eyes,
+    // articulated curling trunk, upward curved ivory tusks, flapping leaf ears,
+    // 4 sturdy pillar legs with rounded foot pads & cute toenails, and tufted tail.
     buildAnimalMesh() {
       const group = new Group();
       group.name = "indianElephant";
       const elephantFaceData = this.createElephantFaceTexture();
-      const body = new Mesh(
-        new CylinderGeometry(0.44, 0.46, 0.92, 24).rotateX(Math.PI / 2),
-        this.materials.elephantSkin
-      );
-      body.position.set(0, 0.65, 0);
-      body.scale.set(1.05, 1.18, 1);
+      const bodyGeo = this.createElephantBodyGeometry();
+      const body = new Mesh(bodyGeo, this.materials.elephantSkin);
       body.castShadow = true;
       group.add(body);
       const chest = new Mesh(
-        new SphereGeometry(0.45, 22, 18),
+        new SphereGeometry(0.38, 20, 16),
         this.materials.elephantSkin
       );
-      chest.position.set(0, 0.7, 0.32);
-      chest.scale.set(0.98, 1.15, 0.92);
+      chest.position.set(0, 0.7, 0.36);
+      chest.scale.set(0.96, 1.1, 0.9);
       chest.castShadow = true;
       group.add(chest);
-      const spineHump = new Mesh(
-        new CylinderGeometry(0.28, 0.35, 0.78, 18).rotateX(Math.PI / 2),
-        this.materials.elephantSkin
-      );
-      spineHump.position.set(0, 0.88, 0.02);
-      spineHump.scale.set(0.75, 0.85, 1);
-      spineHump.castShadow = true;
-      group.add(spineHump);
       const rump = new Mesh(
-        new SphereGeometry(0.43, 22, 18),
+        new SphereGeometry(0.36, 20, 16),
         this.materials.elephantSkin
       );
-      rump.position.set(0, 0.7, -0.34);
-      rump.scale.set(0.95, 1.12, 0.92);
+      rump.position.set(0, 0.71, -0.38);
+      rump.scale.set(0.94, 1.08, 0.92);
       rump.castShadow = true;
       group.add(rump);
-      const belly = new Mesh(
-        new CylinderGeometry(0.36, 0.4, 0.64, 18).rotateX(Math.PI / 2),
-        this.materials.elephantSkin
-      );
-      belly.position.set(0, 0.5, 0);
-      belly.scale.set(0.9, 0.72, 1);
-      group.add(belly);
       const headGroup = new Group();
-      headGroup.position.set(0, 0.88, 0.45);
-      const headGeo = new SphereGeometry(0.28, 32, 24);
-      headGeo.rotateY(-Math.PI / 2);
-      const cranium = new Mesh(
-        headGeo,
-        new MeshStandardMaterial({
-          map: elephantFaceData.tex,
-          roughness: 0.68
-        })
-      );
-      cranium.scale.set(0.94, 1.06, 1.04);
-      cranium.castShadow = true;
-      headGroup.add(cranium);
-      [-0.095, 0.095].forEach((bx) => {
-        const bump = new Mesh(
-          new SphereGeometry(0.095, 16, 12),
+      headGroup.position.set(0, 0.78, 0.58);
+      [-1, 1].forEach((side) => {
+        const dome = new Mesh(
+          new SphereGeometry(0.16, 20, 16),
           this.materials.elephantSkin
         );
-        bump.position.set(bx, 0.22, 0.03);
-        bump.scale.set(0.95, 1, 1.1);
-        headGroup.add(bump);
+        dome.position.set(side * 0.11, 0.14, -0.04);
+        dome.scale.set(1, 1.15, 0.95);
+        headGroup.add(dome);
+      });
+      const forehead = new Mesh(
+        new SphereGeometry(0.24, 24, 18),
+        this.materials.elephantSkin
+      );
+      forehead.position.set(0, 0.04, 0.02);
+      forehead.scale.set(1.05, 1.12, 1.02);
+      forehead.castShadow = true;
+      headGroup.add(forehead);
+      [-1, 1].forEach((side) => {
+        const eyeGroup = new Group();
+        eyeGroup.position.set(side * 0.17, 0.08, 0.15);
+        eyeGroup.rotation.y = side * 0.42;
+        const sclera = new Mesh(
+          new SphereGeometry(0.052, 16, 12),
+          this.materials.elephantEyeWhite
+        );
+        sclera.scale.set(0.85, 1.15, 0.45);
+        eyeGroup.add(sclera);
+        const pupil = new Mesh(
+          new SphereGeometry(0.038, 14, 10),
+          this.materials.elephantEyePupil
+        );
+        pupil.position.set(side * 5e-3, -2e-3, 0.018);
+        pupil.scale.set(0.82, 1.08, 0.35);
+        eyeGroup.add(pupil);
+        const h1 = new Mesh(new SphereGeometry(0.01, 8, 8), this.materials.elephantEyeCatchlight);
+        h1.position.set(side * 0.012, 0.016, 0.03);
+        eyeGroup.add(h1);
+        const h2 = new Mesh(new SphereGeometry(5e-3, 8, 8), this.materials.elephantEyeCatchlight);
+        h2.position.set(side * -8e-3, -0.01, 0.03);
+        eyeGroup.add(h2);
+        const eyelid = new Mesh(
+          new SphereGeometry(0.054, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.45),
+          this.materials.elephantSkin
+        );
+        eyelid.position.set(0, 8e-3, 2e-3);
+        eyelid.scale.set(0.88, 1.18, 0.48);
+        eyeGroup.add(eyelid);
+        headGroup.add(eyeGroup);
       });
       const earL = new Group();
-      earL.position.set(-0.24, 0.06, -0.04);
-      const earR = new Group();
-      earR.position.set(0.24, 0.06, -0.04);
+      earL.position.set(-0.2, 0.06, -0.04);
       const earShapeL = new Shape();
       earShapeL.moveTo(0, 0.05);
-      earShapeL.bezierCurveTo(-0.08, 0.22, -0.26, 0.28, -0.36, 0.16);
-      earShapeL.bezierCurveTo(-0.44, 0.06, -0.42, -0.14, -0.32, -0.28);
-      earShapeL.bezierCurveTo(-0.2, -0.4, -0.08, -0.32, 0, -0.18);
+      earShapeL.bezierCurveTo(-0.1, 0.24, -0.3, 0.22, -0.36, 0.08);
+      earShapeL.bezierCurveTo(-0.42, -0.06, -0.38, -0.22, -0.26, -0.32);
+      earShapeL.bezierCurveTo(-0.14, -0.42, -0.06, -0.3, 0, -0.18);
       earShapeL.closePath();
-      const earGeoL = new ExtrudeGeometry(earShapeL, {
-        depth: 0.025,
-        bevelEnabled: true,
-        bevelThickness: 0.018,
-        bevelSize: 0.015,
-        bevelSegments: 4
-      });
-      const earMeshL = new Mesh(earGeoL, this.materials.elephantSkin);
+      const earMeshL = new Mesh(
+        new ExtrudeGeometry(earShapeL, {
+          depth: 0.025,
+          bevelEnabled: true,
+          bevelThickness: 0.015,
+          bevelSize: 0.012,
+          bevelSegments: 3
+        }),
+        this.materials.elephantSkin
+      );
       earL.add(earMeshL);
       const innerEarL = new Mesh(
         new ExtrudeGeometry(earShapeL, { depth: 5e-3, bevelEnabled: false }),
@@ -40208,20 +40367,24 @@ void main() {
       innerEarL.scale.set(0.82, 0.82, 1);
       innerEarL.position.set(-0.02, 0, 0.026);
       earL.add(innerEarL);
+      const earR = new Group();
+      earR.position.set(0.2, 0.06, -0.04);
       const earShapeR = new Shape();
       earShapeR.moveTo(0, 0.05);
-      earShapeR.bezierCurveTo(0.08, 0.22, 0.26, 0.28, 0.36, 0.16);
-      earShapeR.bezierCurveTo(0.44, 0.06, 0.42, -0.14, 0.32, -0.28);
-      earShapeR.bezierCurveTo(0.2, -0.4, 0.08, -0.32, 0, -0.18);
+      earShapeR.bezierCurveTo(0.1, 0.24, 0.3, 0.22, 0.36, 0.08);
+      earShapeR.bezierCurveTo(0.42, -0.06, 0.38, -0.22, 0.26, -0.32);
+      earShapeR.bezierCurveTo(0.14, -0.42, 0.06, -0.3, 0, -0.18);
       earShapeR.closePath();
-      const earGeoR = new ExtrudeGeometry(earShapeR, {
-        depth: 0.025,
-        bevelEnabled: true,
-        bevelThickness: 0.018,
-        bevelSize: 0.015,
-        bevelSegments: 4
-      });
-      const earMeshR = new Mesh(earGeoR, this.materials.elephantSkin);
+      const earMeshR = new Mesh(
+        new ExtrudeGeometry(earShapeR, {
+          depth: 0.025,
+          bevelEnabled: true,
+          bevelThickness: 0.015,
+          bevelSize: 0.012,
+          bevelSegments: 3
+        }),
+        this.materials.elephantSkin
+      );
       earR.add(earMeshR);
       const innerEarR = new Mesh(
         new ExtrudeGeometry(earShapeR, { depth: 5e-3, bevelEnabled: false }),
@@ -40234,34 +40397,23 @@ void main() {
       earR.rotation.set(-0.15, 0.45, 0.1);
       headGroup.add(earL);
       headGroup.add(earR);
-      const tuskCurveL = new CatmullRomCurve3([
-        new Vector3(-0.13, -0.14, 0.22),
-        new Vector3(-0.19, -0.25, 0.38),
-        new Vector3(-0.24, -0.1, 0.54)
-      ]);
-      const tuskGeoL = new TubeGeometry(tuskCurveL, 20, 0.035, 12, false);
-      const tuskMeshL = new Mesh(tuskGeoL, this.materials.elephantTusk);
-      headGroup.add(tuskMeshL);
-      const tuskTipL = new Mesh(
-        new SphereGeometry(0.022, 10, 8),
-        this.materials.elephantTuskTip
-      );
-      tuskTipL.position.set(-0.24, -0.1, 0.54);
-      headGroup.add(tuskTipL);
-      const tuskCurveR = new CatmullRomCurve3([
-        new Vector3(0.13, -0.14, 0.22),
-        new Vector3(0.19, -0.25, 0.38),
-        new Vector3(0.24, -0.1, 0.54)
-      ]);
-      const tuskGeoR = new TubeGeometry(tuskCurveR, 20, 0.035, 12, false);
-      const tuskMeshR = new Mesh(tuskGeoR, this.materials.elephantTusk);
-      headGroup.add(tuskMeshR);
-      const tuskTipR = new Mesh(
-        new SphereGeometry(0.022, 10, 8),
-        this.materials.elephantTuskTip
-      );
-      tuskTipR.position.set(0.24, -0.1, 0.54);
-      headGroup.add(tuskTipR);
+      [-1, 1].forEach((side) => {
+        const tuskCurve = new CatmullRomCurve3([
+          new Vector3(side * 0.09, -0.1, 0.18),
+          new Vector3(side * 0.14, -0.2, 0.32),
+          new Vector3(side * 0.18, -0.16, 0.46),
+          new Vector3(side * 0.2, -0.08, 0.56)
+        ]);
+        const tuskGeo = new TubeGeometry(tuskCurve, 18, 0.028, 12, false);
+        const tuskMesh = new Mesh(tuskGeo, this.materials.elephantTusk);
+        headGroup.add(tuskMesh);
+        const tuskTip = new Mesh(
+          new SphereGeometry(0.02, 10, 8),
+          this.materials.elephantTuskTip
+        );
+        tuskTip.position.set(side * 0.2, -0.08, 0.56);
+        headGroup.add(tuskTip);
+      });
       const trunkSegments = [];
       const trunkRoot = new Group();
       trunkRoot.position.set(0, -0.05, 0.25);
@@ -40332,71 +40484,65 @@ void main() {
       group.add(headGroup);
       const legs = [];
       [
-        { x: -0.25, z: 0.3, isFront: true },
-        { x: 0.25, z: 0.3, isFront: true },
-        { x: -0.23, z: -0.3, isFront: false },
-        { x: 0.23, z: -0.3, isFront: false }
-      ].forEach((lp) => {
+        { x: -0.25, z: 0.28, isFront: true },
+        { x: 0.25, z: 0.28, isFront: true },
+        { x: -0.25, z: -0.28, isFront: false },
+        { x: 0.25, z: -0.28, isFront: false }
+      ].forEach((pos, idx) => {
         const legGroup = new Group();
-        legGroup.position.set(lp.x, 0.62, lp.z);
-        const hipSocket = new Mesh(
-          new SphereGeometry(0.145, 18, 14),
+        legGroup.position.set(pos.x, 0.38, pos.z);
+        const thigh = new Mesh(
+          new CylinderGeometry(0.14, 0.125, 0.24, 18),
           this.materials.elephantSkin
         );
-        legGroup.add(hipSocket);
-        const pillarUpper = new Mesh(
-          new CylinderGeometry(0.138, 0.122, 0.34, 20),
+        thigh.position.y = 0.12;
+        thigh.castShadow = true;
+        legGroup.add(thigh);
+        const calf = new Mesh(
+          new CylinderGeometry(0.125, 0.138, 0.26, 18),
           this.materials.elephantSkin
         );
-        pillarUpper.position.y = -0.16;
-        legGroup.add(pillarUpper);
-        const knee = new Mesh(
-          new SphereGeometry(0.124, 16, 12),
-          this.materials.elephantSkin
-        );
-        knee.position.y = -0.34;
-        legGroup.add(knee);
-        const lowerPillar = new Mesh(
-          new CylinderGeometry(0.122, 0.14, 0.26, 20),
-          this.materials.elephantSkin
-        );
-        lowerPillar.position.y = -0.48;
-        legGroup.add(lowerPillar);
+        calf.position.y = -0.13;
+        calf.castShadow = true;
+        legGroup.add(calf);
         const footPad = new Mesh(
-          new CylinderGeometry(0.14, 0.145, 0.06, 20),
+          new CylinderGeometry(0.14, 0.145, 0.06, 18),
           this.materials.elephantSkin
         );
-        footPad.position.y = -0.59;
+        footPad.position.y = -0.27;
         legGroup.add(footPad);
-        const nailRadius = 0.144;
-        [-0.06, 0, 0.06].forEach((nx) => {
-          const nail = new Mesh(
-            new CylinderGeometry(0.028, 0.028, 0.044, 12).rotateX(Math.PI / 2),
+        for (let tn = 0; tn < 4; tn++) {
+          const nailAngle = (tn - 1.5) * 0.4;
+          const nx = Math.sin(nailAngle) * 0.142;
+          const nz = Math.cos(nailAngle) * 0.142;
+          const toenail = new Mesh(
+            new SphereGeometry(0.02, 10, 8),
             this.materials.elephantNails
           );
-          const nz = Math.sqrt(Math.max(0, nailRadius * nailRadius - nx * nx));
-          nail.position.set(nx, -0.61, nz);
-          nail.scale.set(1, 0.65, 0.85);
-          legGroup.add(nail);
-        });
+          toenail.position.set(nx, -0.27, nz);
+          toenail.scale.set(1, 0.8, 1.2);
+          legGroup.add(toenail);
+        }
         group.add(legGroup);
         legs.push(legGroup);
       });
       const tail = new Group();
-      tail.position.set(0, 0.66, -0.44);
-      const tailCord = new Mesh(
-        new CylinderGeometry(0.022, 0.015, 0.34, 10),
-        this.materials.elephantSkin
-      );
-      tailCord.position.set(0, -0.16, -0.06);
-      tailCord.rotation.x = 0.35;
+      tail.position.set(0, 0.68, -0.56);
+      const tailCurve = new CatmullRomCurve3([
+        new Vector3(0, 0, 0),
+        new Vector3(0, -0.16, -0.06),
+        new Vector3(0, -0.32, -0.08),
+        new Vector3(0, -0.42, -0.06)
+      ]);
+      const tailGeo = new TubeGeometry(tailCurve, 12, 0.018, 8, false);
+      const tailCord = new Mesh(tailGeo, this.materials.elephantSkin);
       tail.add(tailCord);
       const tailTuft = new Mesh(
-        new ConeGeometry(0.042, 0.12, 10),
+        new ConeGeometry(0.04, 0.12, 10),
         this.materials.elephantTailBrush
       );
-      tailTuft.position.set(0, -0.32, -0.12);
-      tailTuft.rotation.x = 0.35;
+      tailTuft.position.set(0, -0.46, -0.05);
+      tailTuft.rotation.x = 0.25;
       tail.add(tailTuft);
       group.add(tail);
       group.userData = {
@@ -41047,11 +41193,11 @@ void main() {
                 ud.torsoGroup.rotation.z = Math.sin(localT * 12) * 0.03;
               }
               if (ud.armL) {
-                ud.armL.rotation.set(-2.1 + Math.sin(localT * 14) * 0.3, 0, -0.45);
+                ud.armL.rotation.set(-0.75 + Math.sin(localT * 14) * 0.1, 0, -0.25);
               }
-              if (ud.forearmL) ud.forearmL.rotation.x = -0.85;
+              if (ud.forearmL) ud.forearmL.rotation.x = -1.2;
               if (ud.armR) {
-                ud.armR.rotation.set(-1.6 + Math.sin(localT * 8) * 0.15, 0, 0.35);
+                ud.armR.rotation.set(-0.65 + Math.sin(localT * 8) * 0.08, 0, 0.25);
               }
               if (ud.forearmR) ud.forearmR.rotation.x = -1.1;
               if (ud.legL) ud.legL.rotation.x = 0.38 + shiver * 0.5;
@@ -41117,16 +41263,16 @@ void main() {
               ud.torsoGroup.scale.set(1 + fastBreath, 1 + fastBreath * 0.5, 1 + fastBreath);
             }
             if (ud.armL) {
-              const waveX = MathUtils.lerp(0.05, -1.95 + Math.sin(localT * 14) * 0.35, panicLerp);
-              const waveZ = MathUtils.lerp(-0.12, -0.55 + Math.cos(localT * 14) * 0.25, panicLerp);
+              const waveX = MathUtils.lerp(0.05, -0.85 + Math.sin(localT * 12) * 0.15, panicLerp);
+              const waveZ = MathUtils.lerp(-0.12, -0.35 + Math.cos(localT * 12) * 0.1, panicLerp);
               ud.armL.rotation.set(waveX, 0, waveZ);
             }
             if (ud.forearmL) {
-              ud.forearmL.rotation.x = MathUtils.lerp(-0.22, -0.85, panicLerp);
+              ud.forearmL.rotation.x = MathUtils.lerp(-0.22, -1.25, panicLerp);
             }
             if (ud.armR) {
-              const defX = MathUtils.lerp(0.05, -1.55 + Math.sin(localT * 6) * 0.12, panicLerp);
-              const defZ = MathUtils.lerp(0.12, 0.4, panicLerp);
+              const defX = MathUtils.lerp(0.05, -0.7 + Math.sin(localT * 6) * 0.08, panicLerp);
+              const defZ = MathUtils.lerp(0.12, 0.3, panicLerp);
               ud.armR.rotation.set(defX, 0, defZ);
             }
             if (ud.forearmR) {

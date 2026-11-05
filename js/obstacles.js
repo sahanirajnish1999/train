@@ -399,59 +399,68 @@ export class ObstacleManager {
 
     const faceData = this.createHumanFaceTexture();
 
-    // A. Pelvis / Hips in Warm Brown Chinos (Root of body at y = 0.88)
+    // A. Pelvis / Hips in Mocha Brown Chinos (Root of body at y = 0.88)
     const pelvis = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.150, 0.138, 0.16, 22),
+      new THREE.CylinderGeometry(0.150, 0.138, 0.16, 24),
       this.materials.humanPantsBrown
     );
     pelvis.position.y = 0.88;
-    pelvis.scale.set(1.02, 1.0, 0.76);
+    pelvis.scale.set(1.04, 1.0, 0.78);
     pelvis.castShadow = true;
     group.add(pelvis);
 
-    const saddle = new THREE.Mesh(
-      new THREE.SphereGeometry(0.142, 18, 14),
-      this.materials.humanPantsBrown
+    // Subtle dark brown belt with silver buckle
+    const belt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.153, 0.151, 0.035, 24),
+      new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.6 })
     );
-    saddle.position.set(0, 0.84, 0);
-    saddle.scale.set(1.02, 0.85, 0.76);
-    group.add(saddle);
+    belt.position.set(0, 0.945, 0);
+    belt.scale.set(1.05, 1.0, 0.79);
+    group.add(belt);
 
-    // B. Torso Group (Cream Polo Shirt + Folded White Collar) pivoted at y = 0.94
+    const buckle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.032, 0.030, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.85, roughness: 0.25 })
+    );
+    buckle.position.set(0, 0.945, 0.122);
+    group.add(buckle);
+
+    // B. Torso Group (Cream Polo Shirt + Collar) pivoted at y = 0.94
     const torsoGroup = new THREE.Group();
     torsoGroup.position.set(0, 0.94, 0);
 
-    // Athletic Tapered Polo Shirt Chest & Waist
+    // Athletic Tapered Polo Shirt Chest & Waist (Natural V-taper)
     const chest = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.185, 0.165, 0.22, 24),
+      new THREE.CylinderGeometry(0.185, 0.160, 0.24, 24),
       this.materials.humanPoloCream
     );
-    chest.position.y = 0.29;
-    chest.scale.set(1.08, 1.0, 0.75);
+    chest.position.y = 0.28;
+    chest.scale.set(1.08, 1.0, 0.76);
     chest.castShadow = true;
     torsoGroup.add(chest);
 
-    const midriff = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.165, 0.148, 0.20, 24),
+    const waist = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.160, 0.146, 0.18, 24),
       this.materials.humanPoloCream
     );
-    midriff.position.y = 0.11;
-    midriff.scale.set(1.04, 1.0, 0.75);
-    midriff.castShadow = true;
-    torsoGroup.add(midriff);
+    waist.position.y = 0.10;
+    waist.scale.set(1.04, 1.0, 0.76);
+    waist.castShadow = true;
+    torsoGroup.add(waist);
 
+    // Overlapping Polo Hem (Covers waistband smoothly to eliminate any clipping gap)
     const hem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.152, 0.152, 0.04, 24),
+      new THREE.CylinderGeometry(0.154, 0.158, 0.045, 24),
       this.materials.humanPoloCream
     );
     hem.position.y = 0.01;
-    hem.scale.set(1.04, 1.0, 0.76);
+    hem.scale.set(1.05, 1.0, 0.78);
     torsoGroup.add(hem);
 
-    // Smooth Rounded Deltoid Caps (Connecting shoulders smoothly into arms)
-    [-0.17, 0.17].forEach(sx => {
+    // Smooth Deltoid Shoulder Caps
+    [-0.18, 0.18].forEach(sx => {
       const deltoid = new THREE.Mesh(
-        new THREE.SphereGeometry(0.068, 18, 14),
+        new THREE.SphereGeometry(0.070, 18, 14),
         this.materials.humanPoloCream
       );
       deltoid.position.set(sx, 0.33, 0);
@@ -459,24 +468,7 @@ export class ObstacleManager {
       torsoGroup.add(deltoid);
     });
 
-    // Center Button Placket on Chest with Pearl Buttons
-    const placket = new THREE.Mesh(
-      new THREE.BoxGeometry(0.026, 0.16, 0.012),
-      this.materials.humanPoloCollar
-    );
-    placket.position.set(0, 0.26, 0.112);
-    torsoGroup.add(placket);
-
-    [0.30, 0.24].forEach(by => {
-      const button = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.005, 0.005, 0.006, 8).rotateX(Math.PI / 2),
-        new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.3 })
-      );
-      button.position.set(0, by, 0.119);
-      torsoGroup.add(button);
-    });
-
-    // Peach Skin Neck
+    // Neck
     const neck = new THREE.Mesh(
       new THREE.CylinderGeometry(0.046, 0.052, 0.12, 18),
       this.materials.humanSkinPeach
@@ -484,83 +476,147 @@ export class ObstacleManager {
     neck.position.y = 0.42;
     torsoGroup.add(neck);
 
-    // Crisp Folded White Polo Collar (Neckband + Flat Folded Collar Wings)
+    // Crisp Folded White Polo Collar (Neckband + Folded Lapels in stylish open V)
     const collarBand = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.060, 0.072, 0.045, 20),
+      new THREE.CylinderGeometry(0.058, 0.070, 0.045, 20),
       this.materials.humanPoloCollar
     );
     collarBand.position.y = 0.39;
     torsoGroup.add(collarBand);
 
     [-1, 1].forEach(side => {
-      const collarWing = new THREE.Mesh(
-        new THREE.BoxGeometry(0.070, 0.085, 0.014),
+      const lapel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.065, 0.090, 0.012),
         this.materials.humanPoloCollar
       );
-      collarWing.position.set(side * 0.048, 0.36, 0.076);
-      collarWing.rotation.set(-0.35, side * 0.28, side * -0.36);
-      torsoGroup.add(collarWing);
+      lapel.position.set(side * 0.046, 0.36, 0.078);
+      lapel.rotation.set(-0.35, side * 0.28, side * -0.36);
+      torsoGroup.add(lapel);
+    });
+
+    // Center Placket with Pearl Buttons
+    const placket = new THREE.Mesh(
+      new THREE.BoxGeometry(0.024, 0.14, 0.012),
+      this.materials.humanPoloCollar
+    );
+    placket.position.set(0, 0.26, 0.114);
+    torsoGroup.add(placket);
+
+    [0.30, 0.24].forEach(by => {
+      const button = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.006, 8).rotateX(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.3 })
+      );
+      button.position.set(0, by, 0.121);
+      torsoGroup.add(button);
     });
 
     // C. Sculpted Head Group pivoted at neck top (y = 0.50 on torso)
     const headGroup = new THREE.Group();
     headGroup.position.set(0, 0.50, 0.010);
 
-    // Seamless Head Sphere with Integrated Canvas Texture (Zero clipping, zero planes!)
-    const headGeo = new THREE.SphereGeometry(0.122, 32, 24);
-    headGeo.rotateY(-Math.PI / 2); // Aligns center UV to face forward (+Z)
-
-    const headMesh = new THREE.Mesh(
-      headGeo,
-      new THREE.MeshStandardMaterial({
-        map: faceData.tex,
-        roughness: 0.65
-      })
+    // Sculpted Cranium & Jaw
+    const cranium = new THREE.Mesh(
+      new THREE.SphereGeometry(0.122, 28, 22),
+      this.materials.humanSkinPeach
     );
-    headMesh.scale.set(0.94, 1.05, 0.96);
-    headMesh.castShadow = true;
-    headGroup.add(headMesh);
+    cranium.scale.set(0.92, 1.05, 0.96);
+    cranium.castShadow = true;
+    headGroup.add(cranium);
 
-    // Auburn / Ginger Sculpted 3D Quiff Hair (Volumetric sweep on top/back, zero face clipping!)
-    const hairShape = new THREE.Shape();
-    hairShape.moveTo(-0.09, 0);
-    hairShape.bezierCurveTo(-0.13, 0.08, -0.07, 0.20, 0.05, 0.22);
-    hairShape.bezierCurveTo(0.14, 0.23, 0.18, 0.14, 0.14, 0.05);
-    hairShape.bezierCurveTo(0.09, -0.01, 0.02, -0.02, -0.09, 0);
-    hairShape.closePath();
-
-    const hairQuiff = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(hairShape, {
-        depth: 0.14,
-        bevelEnabled: true,
-        bevelThickness: 0.025,
-        bevelSize: 0.020,
-        bevelSegments: 4
-      }),
-      this.materials.humanHairGinger
+    const chin = new THREE.Mesh(
+      new THREE.SphereGeometry(0.066, 18, 14),
+      this.materials.humanSkinPeach
     );
-    hairQuiff.position.set(0, 0.05, 0.015);
-    hairQuiff.rotation.set(-0.30, 0.15, -0.10);
-    headGroup.add(hairQuiff);
+    chin.position.set(0, -0.065, 0.038);
+    chin.scale.set(1.10, 0.88, 1.08);
+    headGroup.add(chin);
 
-    // Crown & Back Hair Volume Cap (Covers top and back only, leaving face clear)
-    const backHair = new THREE.Mesh(
-      new THREE.SphereGeometry(0.124, 24, 16, -Math.PI * 0.70, Math.PI * 1.40, 0, Math.PI * 0.65),
-      this.materials.humanHairGinger
-    );
-    backHair.position.set(0, 0.015, -0.015);
-    backHair.scale.set(0.96, 1.05, 1.0);
-    headGroup.add(backHair);
-
-    // Sideburns & Stylized Ears
+    // 3D Pixar-Style Expressive Eyes with Specular Highlights & Brows
     [-1, 1].forEach(side => {
-      const sideburn = new THREE.Mesh(
-        new THREE.BoxGeometry(0.016, 0.055, 0.032),
-        this.materials.humanHairGinger
-      );
-      sideburn.position.set(side * 0.108, 0.012, 0.018);
-      headGroup.add(sideburn);
+      const eyeGroup = new THREE.Group();
+      eyeGroup.position.set(side * 0.045, 0.014, 0.108);
+      eyeGroup.rotation.y = side * 0.15;
 
+      // Glossy White Sclera
+      const sclera = new THREE.Mesh(
+        new THREE.SphereGeometry(0.026, 16, 12),
+        this.materials.humanEyesWhite
+      );
+      sclera.scale.set(0.95, 1.25, 0.40);
+      eyeGroup.add(sclera);
+
+      // Deep Hazel/Espresso Iris
+      const iris = new THREE.Mesh(
+        new THREE.SphereGeometry(0.017, 14, 10),
+        new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.20 })
+      );
+      iris.position.set(side * 0.002, 0, 0.009);
+      iris.scale.set(0.92, 1.15, 0.30);
+      eyeGroup.add(iris);
+
+      // Dark Pupil
+      const pupil = new THREE.Mesh(
+        new THREE.SphereGeometry(0.010, 12, 8),
+        this.materials.humanEyesIris
+      );
+      pupil.position.set(side * 0.002, 0, 0.014);
+      pupil.scale.set(0.85, 1.10, 0.25);
+      eyeGroup.add(pupil);
+
+      // Dual Specular Twinkle Dots
+      const hl1 = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 8, 8), this.materials.humanEyeReflex);
+      hl1.position.set(side * 0.004, 0.007, 0.016);
+      eyeGroup.add(hl1);
+
+      const hl2 = new THREE.Mesh(new THREE.SphereGeometry(0.0025, 8, 8), this.materials.humanEyeReflex);
+      hl2.position.set(side * -0.004, -0.005, 0.016);
+      eyeGroup.add(hl2);
+
+      // Curved Eyebrow
+      const brow = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.003, 0.052, 8).rotateZ(Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.75 })
+      );
+      brow.position.set(0, 0.038, 0.006);
+      brow.rotation.z = side * -0.15;
+      brow.rotation.x = -0.25;
+      eyeGroup.add(brow);
+
+      headGroup.add(eyeGroup);
+    });
+
+    // Cute Sculpted Nose Tip
+    const nose = new THREE.Mesh(
+      new THREE.SphereGeometry(0.015, 12, 10),
+      this.materials.humanSkinPeach
+    );
+    nose.position.set(0, -0.014, 0.126);
+    nose.scale.set(0.9, 0.75, 1.1);
+    headGroup.add(nose);
+
+    // Soft Smile Curve
+    const smile = new THREE.Mesh(
+      new THREE.TorusGeometry(0.025, 0.0035, 8, 16, Math.PI * 0.65),
+      this.materials.humanSmile
+    );
+    smile.position.set(0, -0.046, 0.114);
+    smile.rotation.set(0.2, 0, Math.PI * 1.18);
+    headGroup.add(smile);
+
+    // Airbrushed Pink Blush Discs
+    [-1, 1].forEach(side => {
+      const blush = new THREE.Mesh(
+        new THREE.SphereGeometry(0.022, 10, 8),
+        this.materials.humanBlush
+      );
+      blush.position.set(side * 0.072, -0.020, 0.096);
+      blush.scale.set(1.0, 0.65, 0.25);
+      headGroup.add(blush);
+    });
+
+    // Sculpted Ears
+    [-1, 1].forEach(side => {
       const ear = new THREE.Mesh(
         new THREE.SphereGeometry(0.026, 14, 10),
         this.materials.humanSkinPeach
@@ -569,6 +625,63 @@ export class ObstacleManager {
       ear.position.set(side * 0.115, -0.008, -0.005);
       ear.rotation.y = side * 0.18;
       headGroup.add(ear);
+    });
+
+    // D. STYLISH SCULPTED GINGER / AUBURN HAIR (Matching Reference Image 1)
+    // 1. Fitted cranial hair cap (zero gaps, zero bread loaf shape!)
+    const hairCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.126, 26, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
+      this.materials.humanHairGinger
+    );
+    hairCap.position.set(0, 0.015, -0.012);
+    hairCap.scale.set(0.95, 1.06, 1.02);
+    headGroup.add(hairCap);
+
+    // 2. Layered Side-Swept Fringe / Bangs across forehead
+    const lock1Curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.08, 0.12, 0.07),
+      new THREE.Vector3(-0.02, 0.11, 0.11),
+      new THREE.Vector3( 0.05, 0.08, 0.12),
+      new THREE.Vector3( 0.09, 0.03, 0.10)
+    ]);
+    const lock1 = new THREE.Mesh(
+      new THREE.TubeGeometry(lock1Curve, 16, 0.024, 10, false),
+      this.materials.humanHairGinger
+    );
+    headGroup.add(lock1);
+
+    const lock2Curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.06, 0.14, 0.06),
+      new THREE.Vector3(-0.03, 0.09, 0.11),
+      new THREE.Vector3(-0.02, 0.04, 0.115)
+    ]);
+    const lock2 = new THREE.Mesh(
+      new THREE.TubeGeometry(lock2Curve, 12, 0.018, 8, false),
+      this.materials.humanHairGinger
+    );
+    headGroup.add(lock2);
+
+    // 3. Volumetric Crown Quiff flowing naturally backwards along cranium
+    const quiffCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.04, 0.13, 0.04),
+      new THREE.Vector3(-0.01, 0.15, -0.01),
+      new THREE.Vector3( 0.03, 0.14, -0.06)
+    ]);
+    const quiff = new THREE.Mesh(
+      new THREE.TubeGeometry(quiffCurve, 14, 0.032, 10, false),
+      this.materials.humanHairGinger
+    );
+    headGroup.add(quiff);
+
+    // 4. Tapered Sideburns framing the ears
+    [-1, 1].forEach(side => {
+      const sideburn = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.010, 0.006, 0.055, 8),
+        this.materials.humanHairGinger
+      );
+      sideburn.position.set(side * 0.108, 0.015, 0.020);
+      sideburn.rotation.x = -0.15;
+      headGroup.add(sideburn);
     });
 
     torsoGroup.add(headGroup);
@@ -721,31 +834,30 @@ export class ObstacleManager {
       cuff.position.set(0, -0.37, -0.006);
       lowerLegGroup.add(cuff);
 
-      // Dark Casual Slip-On Loafer / Shoe (Exact match to Reference Image 1)
+      // Stylish Casual Oxford Sneaker (White rubber sole rim + toe cap + dark espresso body)
       const shoeGroup = new THREE.Group();
-      shoeGroup.position.set(0, -0.40, 0.025);
+      shoeGroup.position.set(0, -0.41, 0.035);
 
       const shoeBody = new THREE.Mesh(
-        new THREE.BoxGeometry(0.076, 0.046, 0.17),
+        new THREE.BoxGeometry(0.074, 0.065, 0.17),
         this.materials.humanShoesDark
       );
-      shoeBody.position.set(0, 0, 0.01);
       shoeGroup.add(shoeBody);
 
-      const toeCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.038, 14, 10),
-        this.materials.humanShoesDark
-      );
-      toeCap.scale.set(1.0, 0.65, 1.0);
-      toeCap.position.set(0, 0, 0.085);
-      shoeGroup.add(toeCap);
-
       const sole = new THREE.Mesh(
-        new THREE.BoxGeometry(0.082, 0.016, 0.185),
-        this.materials.humanShoesDark
+        new THREE.BoxGeometry(0.078, 0.022, 0.175),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 })
       );
-      sole.position.set(0, -0.028, 0.015);
+      sole.position.y = -0.032;
       shoeGroup.add(sole);
+
+      const toeCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.036, 12, 10),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 })
+      );
+      toeCap.position.set(0, -0.012, 0.075);
+      toeCap.scale.set(1.0, 0.65, 0.85);
+      shoeGroup.add(toeCap);
 
       lowerLegGroup.add(shoeGroup);
       legGroup.add(lowerLegGroup);
@@ -768,119 +880,198 @@ export class ObstacleManager {
     return group;
   }
 
+  // Seamless organic elephant body geometry generator (No flat cylinder cuts, continuous natural curves)
+  createElephantBodyGeometry() {
+    const rings = 18;
+    const segments = 24;
+
+    const profile = [
+      [ 0.58, 0.68, 0.16, 0.18],  // Neck junction
+      [ 0.50, 0.72, 0.34, 0.38],  // Front brisket
+      [ 0.40, 0.78, 0.44, 0.48],  // High shoulder withers
+      [ 0.28, 0.77, 0.47, 0.51],  // Shoulder crest
+      [ 0.14, 0.74, 0.49, 0.53],  // Mid-back dip
+      [ 0.00, 0.73, 0.50, 0.54],  // Deep belly center
+      [-0.14, 0.75, 0.49, 0.52],  // Lumbar rise
+      [-0.28, 0.77, 0.47, 0.50],  // Pelvic haunch peak
+      [-0.42, 0.73, 0.41, 0.44],  // Rump slope
+      [-0.52, 0.68, 0.31, 0.33],  // Tail root base
+      [-0.56, 0.64, 0.14, 0.16]   // Rounded end cap
+    ];
+
+    const positions = [];
+    const uvs = [];
+    const indices = [];
+
+    for (let i = 0; i <= rings; i++) {
+      const t = i / rings;
+      const pIdx = t * (profile.length - 1);
+      const i0 = Math.floor(pIdx);
+      const i1 = Math.min(profile.length - 1, i0 + 1);
+      const blend = pIdx - i0;
+
+      const z = profile[i0][0] * (1 - blend) + profile[i1][0] * blend;
+      const y = profile[i0][1] * (1 - blend) + profile[i1][1] * blend;
+      const rx = profile[i0][2] * (1 - blend) + profile[i1][2] * blend;
+      const ry = profile[i0][3] * (1 - blend) + profile[i1][3] * blend;
+
+      for (let j = 0; j <= segments; j++) {
+        const theta = (j / segments) * Math.PI * 2;
+        const x = Math.cos(theta) * rx;
+        const vertY = y + Math.sin(theta) * ry;
+
+        positions.push(x, vertY, z);
+        uvs.push(j / segments, t);
+      }
+    }
+
+    for (let i = 0; i < rings; i++) {
+      for (let j = 0; j < segments; j++) {
+        const a = i * (segments + 1) + j;
+        const b = (i + 1) * (segments + 1) + j;
+        const c = (i + 1) * (segments + 1) + (j + 1);
+        const d = i * (segments + 1) + (j + 1);
+
+        indices.push(a, b, d);
+        indices.push(b, c, d);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
   // 2. Indian Elephant (Mass: 110 kg <= 150 kg -> SCOOPABLE IN RESCUE NET)
   // Exact anatomical & artistic match to media_1793820037213_e448b2e7.jpg:
-  // Plump slate blue-grey rounded body, big floppy flapping fan ears with dark contours,
-  // multi-segment articulated flexible curling/raising trunk, upward curved ivory tusks with golden tips,
-  // friendly cartoon eyes with white sclera and specular catchlights, sweet smile,
-  // 4 sturdy pillar legs with 3 cute yellow semi-circular toenails per foot, and brush-tufted tail
+  // Plump rounded seamless body, twin cranial domes, expressive 3D Pixar eyes,
+  // articulated curling trunk, upward curved ivory tusks, flapping leaf ears,
+  // 4 sturdy pillar legs with rounded foot pads & cute toenails, and tufted tail.
   buildAnimalMesh() {
     const group = new THREE.Group();
     group.name = 'indianElephant';
 
     const elephantFaceData = this.createElephantFaceTexture();
 
-    // A. Plump Rounded Slate Blue-Grey Body Barrel & Spine Contours
-    const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.44, 0.46, 0.92, 24).rotateX(Math.PI / 2),
-      this.materials.elephantSkin
-    );
-    body.position.set(0, 0.65, 0);
-    body.scale.set(1.05, 1.18, 1.0);
+    // A. 100% Seamless Organic Body (Withers hump, saddle dip, rounded haunches & plump belly)
+    const bodyGeo = this.createElephantBodyGeometry();
+    const body = new THREE.Mesh(bodyGeo, this.materials.elephantSkin);
     body.castShadow = true;
     group.add(body);
 
-    // Front Chest Brisket / Withers
+    // Front Chest Brisket & Shoulder Blend
     const chest = new THREE.Mesh(
-      new THREE.SphereGeometry(0.45, 22, 18),
+      new THREE.SphereGeometry(0.38, 20, 16),
       this.materials.elephantSkin
     );
-    chest.position.set(0, 0.70, 0.32);
-    chest.scale.set(0.98, 1.15, 0.92);
+    chest.position.set(0, 0.70, 0.36);
+    chest.scale.set(0.96, 1.10, 0.90);
     chest.castShadow = true;
     group.add(chest);
 
-    // Arched Back Spine Hump (Signature Indian Elephant Profile)
-    const spineHump = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.35, 0.78, 18).rotateX(Math.PI / 2),
-      this.materials.elephantSkin
-    );
-    spineHump.position.set(0, 0.88, 0.02);
-    spineHump.scale.set(0.75, 0.85, 1.0);
-    spineHump.castShadow = true;
-    group.add(spineHump);
-
     // Rounded Pelvic Rump Haunches
     const rump = new THREE.Mesh(
-      new THREE.SphereGeometry(0.43, 22, 18),
+      new THREE.SphereGeometry(0.36, 20, 16),
       this.materials.elephantSkin
     );
-    rump.position.set(0, 0.70, -0.34);
-    rump.scale.set(0.95, 1.12, 0.92);
+    rump.position.set(0, 0.71, -0.38);
+    rump.scale.set(0.94, 1.08, 0.92);
     rump.castShadow = true;
     group.add(rump);
 
-    // Deep Rounded Underbelly
-    const belly = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.36, 0.40, 0.64, 18).rotateX(Math.PI / 2),
-      this.materials.elephantSkin
-    );
-    belly.position.set(0, 0.50, 0);
-    belly.scale.set(0.90, 0.72, 1.0);
-    group.add(belly);
-
-    // B. Expressive Elephant Head Group (Pivoted at y = 0.88, z = 0.45)
+    // B. Expressive Elephant Head Group (Pivoted at y = 0.78, z = 0.58)
     const headGroup = new THREE.Group();
-    headGroup.position.set(0, 0.88, 0.45);
+    headGroup.position.set(0, 0.78, 0.58);
 
-    // Seamless Domed Elephant Head with Integrated Canvas Texture (Zero planes, zero clipping!)
-    const headGeo = new THREE.SphereGeometry(0.28, 32, 24);
-    headGeo.rotateY(-Math.PI / 2); // Aligns center UV to face forward (+Z)
-
-    const cranium = new THREE.Mesh(
-      headGeo,
-      new THREE.MeshStandardMaterial({
-        map: elephantFaceData.tex,
-        roughness: 0.68
-      })
-    );
-    cranium.scale.set(0.94, 1.06, 1.04);
-    cranium.castShadow = true;
-    headGroup.add(cranium);
-
-    // Twin Forehead Bumps (Distinct Indian Elephant cranial profile)
-    [-0.095, 0.095].forEach(bx => {
-      const bump = new THREE.Mesh(
-        new THREE.SphereGeometry(0.095, 16, 12),
+    // Indian Elephant Twin Cranial Domes
+    [-1, 1].forEach(side => {
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 20, 16),
         this.materials.elephantSkin
       );
-      bump.position.set(bx, 0.22, 0.03);
-      bump.scale.set(0.95, 1.0, 1.1);
-      headGroup.add(bump);
+      dome.position.set(side * 0.11, 0.14, -0.04);
+      dome.scale.set(1.0, 1.15, 0.95);
+      headGroup.add(dome);
     });
 
-    // Big Floppy Fan Ears with Extruded Wavy Contours (Exact match to Reference Image 2)
-    const earL = new THREE.Group();
-    earL.position.set(-0.24, 0.06, -0.04);
-    const earR = new THREE.Group();
-    earR.position.set(0.24, 0.06, -0.04);
+    // Central Forehead & Cheeks
+    const forehead = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 24, 18),
+      this.materials.elephantSkin
+    );
+    forehead.position.set(0, 0.04, 0.02);
+    forehead.scale.set(1.05, 1.12, 1.02);
+    forehead.castShadow = true;
+    headGroup.add(forehead);
 
-    // Left Ear Extruded Shape
+    // 3D Expressive Cartoon Eyes (Glossy sclera, dark pupil, dual catchlights, soft eyelid)
+    [-1, 1].forEach(side => {
+      const eyeGroup = new THREE.Group();
+      eyeGroup.position.set(side * 0.17, 0.08, 0.15);
+      eyeGroup.rotation.y = side * 0.42;
+
+      // Glossy White Sclera
+      const sclera = new THREE.Mesh(
+        new THREE.SphereGeometry(0.052, 16, 12),
+        this.materials.elephantEyeWhite
+      );
+      sclera.scale.set(0.85, 1.15, 0.45);
+      eyeGroup.add(sclera);
+
+      // Deep Dark Pupil
+      const pupil = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 14, 10),
+        this.materials.elephantEyePupil
+      );
+      pupil.position.set(side * 0.005, -0.002, 0.018);
+      pupil.scale.set(0.82, 1.08, 0.35);
+      eyeGroup.add(pupil);
+
+      // Dual Specular Twinkle Highlights
+      const h1 = new THREE.Mesh(new THREE.SphereGeometry(0.010, 8, 8), this.materials.elephantEyeCatchlight);
+      h1.position.set(side * 0.012, 0.016, 0.030);
+      eyeGroup.add(h1);
+
+      const h2 = new THREE.Mesh(new THREE.SphereGeometry(0.005, 8, 8), this.materials.elephantEyeCatchlight);
+      h2.position.set(side * -0.008, -0.010, 0.030);
+      eyeGroup.add(h2);
+
+      // Slate Blue Eyelid
+      const eyelid = new THREE.Mesh(
+        new THREE.SphereGeometry(0.054, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.45),
+        this.materials.elephantSkin
+      );
+      eyelid.position.set(0, 0.008, 0.002);
+      eyelid.scale.set(0.88, 1.18, 0.48);
+      eyeGroup.add(eyelid);
+
+      headGroup.add(eyeGroup);
+    });
+
+    // Organic Leaf-Shaped Flapping Fan Ears (Angled naturally back over shoulders)
+    const earL = new THREE.Group();
+    earL.position.set(-0.20, 0.06, -0.04);
+
     const earShapeL = new THREE.Shape();
     earShapeL.moveTo(0, 0.05);
-    earShapeL.bezierCurveTo(-0.08, 0.22, -0.26, 0.28, -0.36, 0.16);
-    earShapeL.bezierCurveTo(-0.44, 0.06, -0.42, -0.14, -0.32, -0.28);
-    earShapeL.bezierCurveTo(-0.20, -0.40, -0.08, -0.32, 0, -0.18);
+    earShapeL.bezierCurveTo(-0.10, 0.24, -0.30, 0.22, -0.36, 0.08);
+    earShapeL.bezierCurveTo(-0.42, -0.06, -0.38, -0.22, -0.26, -0.32);
+    earShapeL.bezierCurveTo(-0.14, -0.42, -0.06, -0.30, 0, -0.18);
     earShapeL.closePath();
 
-    const earGeoL = new THREE.ExtrudeGeometry(earShapeL, {
-      depth: 0.025,
-      bevelEnabled: true,
-      bevelThickness: 0.018,
-      bevelSize: 0.015,
-      bevelSegments: 4
-    });
-    const earMeshL = new THREE.Mesh(earGeoL, this.materials.elephantSkin);
+    const earMeshL = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(earShapeL, {
+        depth: 0.025,
+        bevelEnabled: true,
+        bevelThickness: 0.015,
+        bevelSize: 0.012,
+        bevelSegments: 3
+      }),
+      this.materials.elephantSkin
+    );
     earL.add(earMeshL);
 
     const innerEarL = new THREE.Mesh(
@@ -891,22 +1082,26 @@ export class ObstacleManager {
     innerEarL.position.set(-0.02, 0, 0.026);
     earL.add(innerEarL);
 
-    // Right Ear Extruded Shape (Mirrored)
+    const earR = new THREE.Group();
+    earR.position.set(0.20, 0.06, -0.04);
+
     const earShapeR = new THREE.Shape();
     earShapeR.moveTo(0, 0.05);
-    earShapeR.bezierCurveTo(0.08, 0.22, 0.26, 0.28, 0.36, 0.16);
-    earShapeR.bezierCurveTo(0.44, 0.06, 0.42, -0.14, 0.32, -0.28);
-    earShapeR.bezierCurveTo(0.20, -0.40, 0.08, -0.32, 0, -0.18);
+    earShapeR.bezierCurveTo(0.10, 0.24, 0.30, 0.22, 0.36, 0.08);
+    earShapeR.bezierCurveTo(0.42, -0.06, 0.38, -0.22, 0.26, -0.32);
+    earShapeR.bezierCurveTo(0.14, -0.42, 0.06, -0.30, 0, -0.18);
     earShapeR.closePath();
 
-    const earGeoR = new THREE.ExtrudeGeometry(earShapeR, {
-      depth: 0.025,
-      bevelEnabled: true,
-      bevelThickness: 0.018,
-      bevelSize: 0.015,
-      bevelSegments: 4
-    });
-    const earMeshR = new THREE.Mesh(earGeoR, this.materials.elephantSkin);
+    const earMeshR = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(earShapeR, {
+        depth: 0.025,
+        bevelEnabled: true,
+        bevelThickness: 0.015,
+        bevelSize: 0.012,
+        bevelSegments: 3
+      }),
+      this.materials.elephantSkin
+    );
     earR.add(earMeshR);
 
     const innerEarR = new THREE.Mesh(
@@ -917,7 +1112,6 @@ export class ObstacleManager {
     innerEarR.position.set(0.02, 0, 0.026);
     earR.add(innerEarR);
 
-    // Resting rotation: naturally angled back over shoulders
     earL.rotation.set(-0.15, -0.45, -0.10);
     earR.rotation.set(-0.15, 0.45, 0.10);
 
@@ -925,40 +1119,26 @@ export class ObstacleManager {
     headGroup.add(earR);
 
     // Upward-Curved Ivory Tusks with Golden Tips (Smooth 3D Catmull-Rom Tube Curves)
-    const tuskCurveL = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.13, -0.14, 0.22),
-      new THREE.Vector3(-0.19, -0.25, 0.38),
-      new THREE.Vector3(-0.24, -0.10, 0.54)
-    ]);
-    const tuskGeoL = new THREE.TubeGeometry(tuskCurveL, 20, 0.035, 12, false);
-    const tuskMeshL = new THREE.Mesh(tuskGeoL, this.materials.elephantTusk);
-    headGroup.add(tuskMeshL);
+    [-1, 1].forEach(side => {
+      const tuskCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(side * 0.09, -0.10, 0.18),
+        new THREE.Vector3(side * 0.14, -0.20, 0.32),
+        new THREE.Vector3(side * 0.18, -0.16, 0.46),
+        new THREE.Vector3(side * 0.20, -0.08, 0.56)
+      ]);
+      const tuskGeo = new THREE.TubeGeometry(tuskCurve, 18, 0.028, 12, false);
+      const tuskMesh = new THREE.Mesh(tuskGeo, this.materials.elephantTusk);
+      headGroup.add(tuskMesh);
 
-    const tuskTipL = new THREE.Mesh(
-      new THREE.SphereGeometry(0.022, 10, 8),
-      this.materials.elephantTuskTip
-    );
-    tuskTipL.position.set(-0.24, -0.10, 0.54);
-    headGroup.add(tuskTipL);
+      const tuskTip = new THREE.Mesh(
+        new THREE.SphereGeometry(0.020, 10, 8),
+        this.materials.elephantTuskTip
+      );
+      tuskTip.position.set(side * 0.20, -0.08, 0.56);
+      headGroup.add(tuskTip);
+    });
 
-    const tuskCurveR = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0.13, -0.14, 0.22),
-      new THREE.Vector3(0.19, -0.25, 0.38),
-      new THREE.Vector3(0.24, -0.10, 0.54)
-    ]);
-    const tuskGeoR = new THREE.TubeGeometry(tuskCurveR, 20, 0.035, 12, false);
-    const tuskMeshR = new THREE.Mesh(tuskGeoR, this.materials.elephantTusk);
-    headGroup.add(tuskMeshR);
-
-    const tuskTipR = new THREE.Mesh(
-      new THREE.SphereGeometry(0.022, 10, 8),
-      this.materials.elephantTuskTip
-    );
-    tuskTipR.position.set(0.24, -0.10, 0.54);
-    headGroup.add(tuskTipR);
-
-    // Articulated 5-Segment Forward-Curling Flexible Trunk
-    // (Negative rotations arch trunk FORWARD and UP gracefully over the track)
+    // Articulated 5-Segment Flexible Waving Trunk (Negative rotations arch trunk forward & up)
     const trunkSegments = [];
 
     // Segment 0: Trunk Base (Root at front of face)
@@ -994,10 +1174,10 @@ export class ObstacleManager {
     m2.position.y = -0.08;
     trunkSeg2.add(m2);
 
-    // Segment 3
+    // Segment 3: Curls upward
     const trunkSeg3 = new THREE.Group();
     trunkSeg3.position.set(0, -0.14, 0);
-    trunkSeg3.rotation.x = 0.70; // Curls UPWARD
+    trunkSeg3.rotation.x = 0.70;
     const m3 = new THREE.Mesh(
       new THREE.CylinderGeometry(0.062, 0.050, 0.14, 16),
       this.materials.elephantSkin
@@ -1008,7 +1188,7 @@ export class ObstacleManager {
     // Segment 4: Curled Trunk Tip with Nostrils
     const trunkTip = new THREE.Group();
     trunkTip.position.set(0, -0.13, 0);
-    trunkTip.rotation.x = 0.75; // Upward-pointing tip
+    trunkTip.rotation.x = 0.75;
     const m4 = new THREE.Mesh(
       new THREE.CylinderGeometry(0.050, 0.040, 0.12, 14),
       this.materials.elephantSkin
@@ -1040,94 +1220,84 @@ export class ObstacleManager {
     headGroup.add(trunkRoot);
 
     trunkSegments.push(trunkRoot, trunkSeg1, trunkSeg2, trunkSeg3, trunkTip);
-
     group.add(headGroup);
 
-    // C. 4 Sturdy Pillar Legs with 3 Cute Yellow Toenails Each (Exact match to Reference Image 2)
+    // C. 4 Sturdy Pillar Legs with 4 Cute Rounded Cream/Yellow Toenails Each
     const legs = [];
     [
-      { x: -0.25, z:  0.30, isFront: true },
-      { x:  0.25, z:  0.30, isFront: true },
-      { x: -0.23, z: -0.30, isFront: false },
-      { x:  0.23, z: -0.30, isFront: false }
-    ].forEach(lp => {
+      { x: -0.25, z:  0.28, isFront: true },
+      { x:  0.25, z:  0.28, isFront: true },
+      { x: -0.25, z: -0.28, isFront: false },
+      { x:  0.25, z: -0.28, isFront: false }
+    ].forEach((pos, idx) => {
       const legGroup = new THREE.Group();
-      legGroup.position.set(lp.x, 0.62, lp.z);
+      legGroup.position.set(pos.x, 0.38, pos.z);
 
-      // Spherical Shoulder/Hip Socket blending smoothly into body
-      const hipSocket = new THREE.Mesh(
-        new THREE.SphereGeometry(0.145, 18, 14),
+      // Upper shoulder/hip taper
+      const thigh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.140, 0.125, 0.24, 18),
         this.materials.elephantSkin
       );
-      legGroup.add(hipSocket);
+      thigh.position.y = 0.12;
+      thigh.castShadow = true;
+      legGroup.add(thigh);
 
-      // Upper Pillar Leg
-      const pillarUpper = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.138, 0.122, 0.34, 20),
+      // Lower calf & knee
+      const calf = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.125, 0.138, 0.26, 18),
         this.materials.elephantSkin
       );
-      pillarUpper.position.y = -0.16;
-      legGroup.add(pillarUpper);
+      calf.position.y = -0.13;
+      calf.castShadow = true;
+      legGroup.add(calf);
 
-      // Knee Joint Bulge
-      const knee = new THREE.Mesh(
-        new THREE.SphereGeometry(0.124, 16, 12),
-        this.materials.elephantSkin
-      );
-      knee.position.y = -0.34;
-      legGroup.add(knee);
-
-      // Lower Pillar Foot
-      const lowerPillar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.122, 0.140, 0.26, 20),
-        this.materials.elephantSkin
-      );
-      lowerPillar.position.y = -0.48;
-      legGroup.add(lowerPillar);
-
-      // Round Padded Foot Base
+      // Foot pad
       const footPad = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.140, 0.145, 0.06, 20),
+        new THREE.CylinderGeometry(0.140, 0.145, 0.06, 18),
         this.materials.elephantSkin
       );
-      footPad.position.y = -0.59;
+      footPad.position.y = -0.27;
       legGroup.add(footPad);
 
-      // 3 Cute Yellow Semi-Circular Toenails along the front curve
-      const nailRadius = 0.144;
-      [-0.060, 0.0, 0.060].forEach((nx) => {
-        const nail = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.028, 0.028, 0.044, 12).rotateX(Math.PI / 2),
+      // 4 Rounded Cream Toenails along the forward foot rim
+      for (let tn = 0; tn < 4; tn++) {
+        const nailAngle = (tn - 1.5) * 0.40;
+        const nx = Math.sin(nailAngle) * 0.142;
+        const nz = Math.cos(nailAngle) * 0.142;
+
+        const toenail = new THREE.Mesh(
+          new THREE.SphereGeometry(0.020, 10, 8),
           this.materials.elephantNails
         );
-        const nz = Math.sqrt(Math.max(0, nailRadius * nailRadius - nx * nx));
-        nail.position.set(nx, -0.61, nz);
-        nail.scale.set(1.0, 0.65, 0.85);
-        legGroup.add(nail);
-      });
+        toenail.position.set(nx, -0.27, nz);
+        toenail.scale.set(1.0, 0.8, 1.2);
+        legGroup.add(toenail);
+      }
 
       group.add(legGroup);
       legs.push(legGroup);
     });
 
-    // D. Cute Slender Tail with Dark Brush Tuft
+    // D. Slender Tail with Brush Tuft
     const tail = new THREE.Group();
-    tail.position.set(0, 0.66, -0.44);
+    tail.position.set(0, 0.68, -0.56);
 
-    const tailCord = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.022, 0.015, 0.34, 10),
-      this.materials.elephantSkin
-    );
-    tailCord.position.set(0, -0.16, -0.06);
-    tailCord.rotation.x = 0.35;
+    const tailCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, -0.16, -0.06),
+      new THREE.Vector3(0, -0.32, -0.08),
+      new THREE.Vector3(0, -0.42, -0.06)
+    ]);
+    const tailGeo = new THREE.TubeGeometry(tailCurve, 12, 0.018, 8, false);
+    const tailCord = new THREE.Mesh(tailGeo, this.materials.elephantSkin);
     tail.add(tailCord);
 
     const tailTuft = new THREE.Mesh(
-      new THREE.ConeGeometry(0.042, 0.12, 10),
+      new THREE.ConeGeometry(0.040, 0.12, 10),
       this.materials.elephantTailBrush
     );
-    tailTuft.position.set(0, -0.32, -0.12);
-    tailTuft.rotation.x = 0.35;
+    tailTuft.position.set(0, -0.46, -0.05);
+    tailTuft.rotation.x = 0.25;
     tail.add(tailTuft);
 
     group.add(tail);
@@ -1912,11 +2082,11 @@ export class ObstacleManager {
               ud.torsoGroup.rotation.z = Math.sin(localT * 12.0) * 0.03;
             }
             if (ud.armL) {
-              ud.armL.rotation.set(-2.1 + Math.sin(localT * 14.0) * 0.3, 0, -0.45);
+              ud.armL.rotation.set(-0.75 + Math.sin(localT * 14.0) * 0.10, 0, -0.25);
             }
-            if (ud.forearmL) ud.forearmL.rotation.x = -0.85;
+            if (ud.forearmL) ud.forearmL.rotation.x = -1.2;
             if (ud.armR) {
-              ud.armR.rotation.set(-1.6 + Math.sin(localT * 8.0) * 0.15, 0, 0.35);
+              ud.armR.rotation.set(-0.65 + Math.sin(localT * 8.0) * 0.08, 0, 0.25);
             }
             if (ud.forearmR) ud.forearmR.rotation.x = -1.1;
 
@@ -1996,20 +2166,20 @@ export class ObstacleManager {
             ud.torsoGroup.scale.set(1.0 + fastBreath, 1.0 + fastBreath * 0.5, 1.0 + fastBreath);
           }
 
-          // Left arm frantically waving overhead to signal oncoming train
+          // Left arm held protectively in front of chest
           if (ud.armL) {
-            const waveX = THREE.MathUtils.lerp(0.05, -1.95 + Math.sin(localT * 14.0) * 0.35, panicLerp);
-            const waveZ = THREE.MathUtils.lerp(-0.12, -0.55 + Math.cos(localT * 14.0) * 0.25, panicLerp);
+            const waveX = THREE.MathUtils.lerp(0.05, -0.85 + Math.sin(localT * 12.0) * 0.15, panicLerp);
+            const waveZ = THREE.MathUtils.lerp(-0.12, -0.35 + Math.cos(localT * 12.0) * 0.10, panicLerp);
             ud.armL.rotation.set(waveX, 0, waveZ);
           }
           if (ud.forearmL) {
-            ud.forearmL.rotation.x = THREE.MathUtils.lerp(-0.22, -0.85, panicLerp);
+            ud.forearmL.rotation.x = THREE.MathUtils.lerp(-0.22, -1.25, panicLerp);
           }
 
-          // Right arm held defensively in front
+          // Right arm held defensively in front of chest
           if (ud.armR) {
-            const defX = THREE.MathUtils.lerp(0.05, -1.55 + Math.sin(localT * 6.0) * 0.12, panicLerp);
-            const defZ = THREE.MathUtils.lerp(0.12, 0.40, panicLerp);
+            const defX = THREE.MathUtils.lerp(0.05, -0.70 + Math.sin(localT * 6.0) * 0.08, panicLerp);
+            const defZ = THREE.MathUtils.lerp(0.12, 0.30, panicLerp);
             ud.armR.rotation.set(defX, 0, defZ);
           }
           if (ud.forearmR) {
