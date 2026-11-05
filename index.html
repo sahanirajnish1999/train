@@ -68,12 +68,12 @@
         </div>
         <button id="btn-kavach-minimize" class="kavach-min-btn" title="Minimize / Expand AI Sensor Card">−</button>
       </div>
-      <div class="kavach-sub">300m LiDAR • 77GHz Radar • 4K Stereo • Kavach AI Core</div>
+      <div class="kavach-sub">1 km LiDAR • 4K Stereo Vision • 77GHz Radar • Kavach AI Core</div>
 
       <!-- Active Sensors Status Row -->
       <div class="kavach-sensors-row">
-        <span class="sensor-badge active" id="badge-cam">📷 4K CAM</span>
-        <span class="sensor-badge active" id="badge-lidar">📡 LiDAR 300m</span>
+        <span class="sensor-badge active" id="badge-cam">📷 4K CAM 1km</span>
+        <span class="sensor-badge active" id="badge-lidar">📡 LiDAR 1km</span>
         <span class="sensor-badge active" id="badge-radar">🛰️ 77GHz RADAR</span>
         <span class="sensor-badge active" id="badge-ai">🧠 AI 120FPS</span>
       </div>
@@ -93,8 +93,12 @@
           <span class="scanner-value" id="kavach-target-mass">---</span>
         </div>
         <div class="scanner-row">
+          <span class="scanner-label">TAILORED PULSE:</span>
+          <span class="scanner-value" id="kavach-target-spec">STANDBY (1 km)</span>
+        </div>
+        <div class="scanner-row">
           <span class="scanner-label">DECISION:</span>
-          <span class="scanner-status" id="kavach-action">STANDBY SCANNING</span>
+          <span class="scanner-status" id="kavach-action">STANDBY SCANNING (1 km)</span>
         </div>
       </div>
 
@@ -110,14 +114,15 @@
       </div>
 
       <!-- Interactive Test Spawner Buttons -->
-      <div class="kavach-spawner-header">TEST LIDAR E-SHOCK & RESCUE SCOOP:</div>
+      <div class="kavach-spawner-header">TEST 1KM LIDAR E-SHOCK & 30-40M NET RESCUE:</div>
       <div class="kavach-spawner-grid">
-        <button class="spawn-btn" id="btn-spawn-human" title="Spawn Human: E-Shock fires -> Target freezes on track -> Mass 72kg ≤ 150kg -> Scoop Net Collects!">👤 Human (72kg - Net Scoop)</button>
-        <button class="spawn-btn" id="btn-spawn-human-flee" title="Spawn Human: E-Shock fires -> Target flees off track into grass -> Track Clear!">🏃 Human (72kg - Flees Track)</button>
-        <button class="spawn-btn" id="btn-spawn-animal" title="Spawn Elephant Calf: E-Shock fires -> Target freezes -> Mass 110kg ≤ 150kg -> Scoop Net Collects!">🐘 Elephant (110kg - Net Scoop)</button>
-        <button class="spawn-btn" id="btn-spawn-animal-flee" title="Spawn Elephant: E-Shock fires -> Target flees into meadow -> Track Clear!">🐘 Elephant (110kg - Flees)</button>
-        <button class="spawn-btn hazard" id="btn-spawn-bull" title="Spawn Heavy Bull: E-Shock fires -> Mass 480kg > 150kg -> Net Stowed, Horn & Emergency Brake!">🐂 Bull (480kg - Overweight)</button>
-        <button class="spawn-btn" id="btn-spawn-crate" title="Spawn Cargo Crate: Inanimate -> Mass 40kg ≤ 150kg -> Scoop Net Collects!">📦 Crate (40kg - Net Scoop)</button>
+        <button class="spawn-btn" id="btn-spawn-human" title="Spawn Person: 1km LiDAR detects -> Tailored 2.0kV Human E-Shock -> Stays on track -> Net deploys at 30-40m -> Scooped!">👤 Person (72kg - Net at 30-40m)</button>
+        <button class="spawn-btn" id="btn-spawn-human-flee" title="Spawn Person: 1km LiDAR detects -> Tailored 2.0kV Human E-Shock -> Flees track -> Track Clear!">🏃 Person (72kg - Flees Track)</button>
+        <button class="spawn-btn" id="btn-spawn-animal" title="Spawn Wildlife Calf: 1km LiDAR detects -> Tailored 5.5kV E-Shock -> Stays -> Net deploys at 30-40m -> Scooped!">🐘 Animal (110kg - Net at 30-40m)</button>
+        <button class="spawn-btn" id="btn-spawn-animal-flee" title="Spawn Wildlife: 1km LiDAR detects -> Tailored 5.5kV E-Shock -> Flees into meadow -> Track Clear!">🐘 Animal (110kg - Flees)</button>
+        <button class="spawn-btn hazard" id="btn-spawn-bull" title="Spawn Heavy Bull: 1km LiDAR detects -> Tailored 7.8kV E-Shock -> Mass 480kg > 150kg -> Net Stowed, Horn & Brake!">🐂 Bull (480kg - Overweight)</button>
+        <button class="spawn-btn" id="btn-spawn-human-long" title="Spawn Person at 500m (Testing 1km Long-Range Detection & Early E-Shock)">📡 Person (500m Long Range)</button>
+        <button class="spawn-btn" id="btn-spawn-crate" title="Spawn Cargo Crate: Inanimate -> Mass 40kg ≤ 150kg -> Net deploys at 30-40m -> Scooped!">📦 Crate (40kg - Net Scoop)</button>
         <button class="spawn-btn clear" id="btn-clear-cradle" title="Clear and Release Captured Obstacles">🔄 Clear Net</button>
       </div>
     </div>

@@ -34396,44 +34396,48 @@ void main() {
     // ---------------------------------------------------------
     // Active Non-Lethal Deterrence Sound Effects (>150kg Animals)
     // ---------------------------------------------------------
-    // 1. High-Voltage Track Electric Pulse / Arc Crackle
-    playElectricShockDischarge() {
+    // 1. High-Voltage Track Electric Pulse / Arc Crackle (Tailored for Human vs Animal)
+    playElectricShockDischarge(type = "animal", mass = 150) {
       if (!this.ctx || this.isMuted) return;
       try {
         this.resume();
         const now = this.ctx.currentTime;
-        const bufferSize = this.ctx.sampleRate * 0.45;
+        const isHuman = type === "human";
+        const duration = isHuman ? 0.22 : 0.45;
+        const bufferSize = Math.floor(this.ctx.sampleRate * duration);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
+        const decayRate = isHuman ? 0.05 : 0.12;
         for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.12));
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * decayRate));
         }
         const noiseNode = this.ctx.createBufferSource();
         noiseNode.buffer = buffer;
         const bpf = this.ctx.createBiquadFilter();
         bpf.type = "bandpass";
-        bpf.frequency.setValueAtTime(3200, now);
-        bpf.frequency.exponentialRampToValueAtTime(1400, now + 0.4);
-        bpf.Q.value = 4;
+        bpf.frequency.setValueAtTime(isHuman ? 4800 : 3200, now);
+        bpf.frequency.exponentialRampToValueAtTime(isHuman ? 2200 : 1400, now + duration * 0.85);
+        bpf.Q.value = isHuman ? 6 : 4;
         const noiseGain = this.ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.75, now);
-        noiseGain.gain.exponentialRampToValueAtTime(1e-3, now + 0.45);
+        noiseGain.gain.setValueAtTime(isHuman ? 0.35 : 0.75, now);
+        noiseGain.gain.exponentialRampToValueAtTime(1e-3, now + duration);
         noiseNode.connect(bpf);
         bpf.connect(noiseGain);
         noiseGain.connect(this.masterGain);
         noiseNode.start(now);
-        [420, 840, 1680].forEach((freq, idx) => {
+        const freqs = isHuman ? [880, 1760] : [420, 840, 1680];
+        freqs.forEach((freq, idx) => {
           const zapOsc = this.ctx.createOscillator();
           const zapGain = this.ctx.createGain();
-          zapOsc.type = "sawtooth";
-          zapOsc.frequency.setValueAtTime(freq + Math.random() * 120, now);
-          zapOsc.frequency.exponentialRampToValueAtTime(180, now + 0.35);
-          zapGain.gain.setValueAtTime(0.35 / (idx + 1), now);
-          zapGain.gain.exponentialRampToValueAtTime(1e-3, now + 0.38);
+          zapOsc.type = isHuman ? "sine" : "sawtooth";
+          zapOsc.frequency.setValueAtTime(freq + Math.random() * (isHuman ? 40 : 120), now);
+          zapOsc.frequency.exponentialRampToValueAtTime(isHuman ? 350 : 180, now + duration * 0.75);
+          zapGain.gain.setValueAtTime((isHuman ? 0.15 : 0.35) / (idx + 1), now);
+          zapGain.gain.exponentialRampToValueAtTime(1e-3, now + duration * 0.85);
           zapOsc.connect(zapGain);
           zapGain.connect(this.masterGain);
           zapOsc.start(now);
-          zapOsc.stop(now + 0.4);
+          zapOsc.stop(now + duration);
         });
       } catch (e) {
       }
@@ -39537,6 +39541,8 @@ void main() {
         name: "NONE (TRACK CLEAR)",
         distance: null,
         mass: null,
+        tailoredSpec: null,
+        tailoredLabel: null,
         canCollect: false,
         action: "STANDBY",
         alertMessage: null,
@@ -40718,6 +40724,58 @@ void main() {
           };
       }
     }
+    // ------------------------------------------------------------------
+    // Subject-Tailored Electric Shock Specifications (Human vs Animal)
+    // Requirement: Calibrated to subject's size & type to compel moving off track safely
+    // ------------------------------------------------------------------
+    getTailoredShockSpecs(obs) {
+      if (!obs) return { voltage: "2.0 kV", current: "1.2 mA", energy: "0.04 J", typeLabel: "HUMAN SAFE", badge: "2.0 kV / 1.2 mA", desc: "Mild sensory pulse" };
+      if (obs.type === "human") {
+        return {
+          voltage: "2.0 kV",
+          current: "1.2 mA",
+          energy: "0.04 J",
+          compliance: "IEC 60479-1 (Safe Sensory Perception)",
+          typeLabel: "HUMAN (PERSON)",
+          badge: "2.0 kV / 1.2 mA",
+          color: "#38bdf8",
+          desc: "Low-energy non-lethal sensory tactile pulse (2.0 kV, 1.2 mA, 0.04 J). Induces an instantaneous harmless startle reflex at boots to prompt moving off track with ZERO burns or injury."
+        };
+      } else if (obs.type === "animal") {
+        return {
+          voltage: "5.5 kV",
+          current: "2.8 mA",
+          energy: "0.80 J",
+          compliance: "IEC 60335-2-76 / RDSO Wildlife Protocol",
+          typeLabel: "ANIMAL (WILDLIFE CALF)",
+          badge: "5.5 kV / 2.8 mA",
+          color: "#f59e0b",
+          desc: "Veterinary pulsed fence gradient (5.5 kV, 2.8 mA, 0.8 J). Tailored for quadruped wildlife hooves to induce an involuntary flight trot into the meadow without harm."
+        };
+      } else if (obs.type === "cattle") {
+        return {
+          voltage: "7.8 kV",
+          current: "3.8 mA",
+          energy: "1.40 J",
+          compliance: "RDSO Tech Circular 129 / IEC 60335-2-76",
+          typeLabel: "ANIMAL (HEAVY BULL)",
+          badge: "7.8 kV / 3.8 mA",
+          color: "#ec4899",
+          desc: "High-impedance cattle pulsed flight gradient (7.8 kV, 3.8 mA, 1.4 J). Overcomes thick keratin hooves to prompt immediate jump reflex off ballast."
+        };
+      } else {
+        return {
+          voltage: "2.5 kV",
+          current: "1.5 mA",
+          energy: "0.05 J",
+          compliance: "RDSO Track Sensor Pulse",
+          typeLabel: "CARGO DEBRIS",
+          badge: "2.5 kV / 1.5 mA",
+          color: "#94a3b8",
+          desc: "Calibrated diagnostic pulse across track circuit."
+        };
+      }
+    }
     triggerDeterrence(obs, audio) {
       if (!obs || obs.isDeterred) return;
       obs.isDeterred = true;
@@ -40730,7 +40788,7 @@ void main() {
       this.fxTimer = 1.2;
       if (audio) {
         if (this.activeDeterrenceMode === "electric_shock") {
-          audio.playElectricShockDischarge();
+          audio.playElectricShockDischarge(obs.type, obs.mass);
         } else if (this.activeDeterrenceMode === "bio_acoustic") {
           audio.playBeeSwarmSound();
         } else if (this.activeDeterrenceMode === "lrad") {
@@ -40738,7 +40796,7 @@ void main() {
         } else if (this.activeDeterrenceMode === "mmw_denial") {
           audio.playActiveDenialHum();
         } else {
-          audio.playElectricShockDischarge();
+          audio.playElectricShockDischarge(obs.type, obs.mass);
         }
       }
       this.spawnDeterrenceFX(obs);
@@ -40758,9 +40816,15 @@ void main() {
       const tangent = transform.tangent.clone().normalize();
       const forwardMeters = Math.max(15, Math.min(obs.forwardMeters || 65, 80));
       const trainFrontPos = obsPos.clone().sub(tangent.clone().multiplyScalar(forwardMeters));
+      const isHuman = obs.type === "human";
       if (this.activeDeterrenceMode === "electric_shock") {
-        const sparkColor = 6809849;
-        const arcOffsets = [
+        const sparkColor = isHuman ? 10875900 : 3718648;
+        const arcOffsets = isHuman ? [
+          { pA: new Vector3(-0.45, 0.3, 0), pB: new Vector3(-0.15, 0.15, 0) },
+          { pA: new Vector3(0.45, 0.3, 0), pB: new Vector3(0.15, 0.15, 0) },
+          { pA: new Vector3(-0.35, 0.25, -1), pB: new Vector3(-0.1, 0.18, 0.5) },
+          { pA: new Vector3(0.35, 0.25, -1), pB: new Vector3(0.1, 0.18, 0.5) }
+        ] : [
           { pA: new Vector3(-0.84, 0.35, 0), pB: new Vector3(-0.35, 0.35, 0) },
           { pA: new Vector3(0.84, 0.35, 0), pB: new Vector3(0.35, 0.35, 0) },
           { pA: new Vector3(-0.6, 0.38, -2), pB: new Vector3(-0.25, 0.4, 1) },
@@ -40771,36 +40835,38 @@ void main() {
           const p2 = obsPos.clone().add(arc.pB);
           const pts = [];
           const segs = 10;
+          const jitter = isHuman ? 0.25 : 0.45;
           for (let i = 0; i <= segs; i++) {
             const t = i / segs;
             const p = p1.clone().lerp(p2, t);
             if (i > 0 && i < segs) {
-              p.x += (Math.random() - 0.5) * 0.45;
-              p.y += (Math.random() - 0.5) * 0.35;
+              p.x += (Math.random() - 0.5) * jitter;
+              p.y += (Math.random() - 0.5) * (jitter * 0.8);
             }
             pts.push(p);
           }
           const geo = new BufferGeometry().setFromPoints(pts);
-          const mat = new LineBasicMaterial({ color: sparkColor, transparent: true, opacity: 0.95 });
+          const mat = new LineBasicMaterial({ color: sparkColor, transparent: true, opacity: isHuman ? 0.85 : 0.98 });
           const line = new Line(geo, mat);
-          line.userData = { isLightning: true, pA: p1, pB: p2 };
+          line.userData = { isLightning: true, pA: p1, pB: p2, isHuman };
           this.fxGroup.add(line);
         });
-        const sparkLight = new PointLight(3718648, 6, 25);
-        sparkLight.position.copy(obsPos.clone().add(new Vector3(0, 0.75, 0)));
+        const sparkLight = new PointLight(sparkColor, isHuman ? 3.5 : 7, isHuman ? 18 : 28);
+        sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.45 : 0.75, 0)));
         this.fxGroup.add(sparkLight);
-        const sparkCount = 28;
+        const sparkCount = isHuman ? 14 : 32;
         const sparkGeo = new BufferGeometry();
         const sPos = [];
+        const spread = isHuman ? 0.6 : 1.2;
         for (let s = 0; s < sparkCount; s++) {
           sPos.push(
-            obsPos.x + (Math.random() - 0.5) * 1.2,
-            obsPos.y + Math.random() * 0.6,
-            obsPos.z + (Math.random() - 0.5) * 1.2
+            obsPos.x + (Math.random() - 0.5) * spread,
+            obsPos.y + Math.random() * (isHuman ? 0.35 : 0.6),
+            obsPos.z + (Math.random() - 0.5) * spread
           );
         }
         sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
-        const sparkMat = new PointsMaterial({ color: 14742270, size: 0.08, transparent: true, opacity: 0.9 });
+        const sparkMat = new PointsMaterial({ color: 14742270, size: isHuman ? 0.05 : 0.08, transparent: true, opacity: 0.9 });
         this.fxGroup.add(new Points(sparkGeo, sparkMat));
       } else if (this.activeDeterrenceMode === "bio_acoustic") {
         const ringGeo = new TorusGeometry(0.85, 0.04, 8, 24);
@@ -41350,30 +41416,34 @@ void main() {
       let closestObstacle = null;
       let minForwardDist = Infinity;
       const speedKmh = trainSpeedMs * 3.6;
+      const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
       this.obstacles.forEach((obs) => {
         if (obs.isCollected) return;
         let diff = obs.progress - trainProgress;
         if (diff < 0) diff += 1;
-        const forwardMeters = diff * trackLength;
+        const forwardMeters = diff * actualTrackLength;
         obs.forwardMeters = forwardMeters;
-        if (forwardMeters < minForwardDist && forwardMeters < 140) {
+        if (forwardMeters < minForwardDist && forwardMeters <= 1e3) {
           minForwardDist = forwardMeters;
           closestObstacle = obs;
         }
       });
       this.animateLivingObstacles(dt, trainSpeedMs);
       this.updateDeterrenceFX(dt);
-      if (closestObstacle && minForwardDist < 110) {
+      if (closestObstacle && minForwardDist <= 1e3) {
         this.telemetry.targetDetected = true;
         this.telemetry.type = closestObstacle.type;
         this.telemetry.name = closestObstacle.name;
         this.telemetry.distance = minForwardDist;
-        if (aiSensorAuto && minForwardDist <= 95 && !closestObstacle.hasBeenShocked) {
+        const tailored = this.getTailoredShockSpecs(closestObstacle);
+        this.telemetry.tailoredSpec = tailored.badge;
+        this.telemetry.tailoredLabel = tailored.typeLabel;
+        if (aiSensorAuto && !closestObstacle.hasBeenShocked) {
           this.triggerDeterrence(closestObstacle, audio);
           if (audio) audio.playTargetAcquiredBeep(false);
-          this.telemetry.action = "\u26A1 LI-DAR TARGET DETECTED - E-SHOCK DETERRENCE FIRED (MOVING OFF TRACK?)";
+          this.telemetry.action = `\u26A1 1KM LIDAR: ${tailored.typeLabel} E-SHOCK (${tailored.voltage}) FIRED`;
           this.telemetry.alertType = "deploy";
-          this.telemetry.alertMessage = `\u26A1 AI KAVACH: ${closestObstacle.name.toUpperCase()} DETECTED! NON-LETHAL E-SHOCK DELIVERED TO CLEAR TRACK!`;
+          this.telemetry.alertMessage = `\u26A1 1KM CAMERA & LIDAR: ${closestObstacle.name.toUpperCase()} DETECTED AT ${Math.round(minForwardDist)}M! TAILORED ${tailored.voltage} E-SHOCK FIRED!`;
         }
         if (closestObstacle.isCleared) {
           if (captureNet.isDeployed) {
@@ -41381,37 +41451,42 @@ void main() {
           }
           this.telemetry.mass = closestObstacle.mass;
           this.telemetry.canCollect = false;
-          this.telemetry.action = "TARGET CLEARED VIA E-SHOCK - TRACK CLEAR";
+          this.telemetry.action = `TARGET CLEARED VIA TAILORED ${tailored.voltage} E-SHOCK - TRACK CLEAR`;
           this.telemetry.alertType = "success";
-          this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEARED! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA E-SHOCK! ZERO CASUALTIES!`;
+          this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEARED! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA TAILORED E-SHOCK! ZERO CASUALTIES!`;
           if (physics && physics.emergencyBrake) {
             physics.setEmergencyBrake(false);
           }
         } else if (closestObstacle.isDeterred && closestObstacle.moveOffTrackOnShock) {
           this.telemetry.mass = closestObstacle.mass;
-          this.telemetry.action = "\u26A1 E-SHOCK ACTIVE - TARGET SCRAMBLING OFF TRACK";
+          this.telemetry.action = `\u26A1 TAILORED E-SHOCK ACTIVE - TARGET MOVING OFF TRACK (${Math.round(minForwardDist)}M)`;
           this.telemetry.alertType = "deploy";
         } else {
           const isWeightSafe = closestObstacle.mass <= 150;
           this.telemetry.mass = closestObstacle.mass;
           this.telemetry.canCollect = isWeightSafe;
           if (isWeightSafe) {
-            this.telemetry.action = `WEIGHT \u2264 150KG (${closestObstacle.mass}KG) - AIRBAG NET RAPID DEPLOY & RESCUE SCOOP`;
-            this.telemetry.alertType = "deploy";
-            if (aiSensorAuto && minForwardDist <= 75 && !captureNet.isDeployed) {
-              captureNet.triggerSolenoidDeploy(audio);
-              if (audio) audio.playTargetAcquiredBeep(false);
-              this.telemetry.alertMessage = `\u26A1 TARGET ON TRACK! MASS CALC: ${closestObstacle.mass}KG \u2264 150KG. AIRBAG NET DEPLOYED FOR RESCUE SCOOP!`;
-            }
-            if (minForwardDist <= 14) {
-              this.scene.remove(closestObstacle.mesh);
-              captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
-              closestObstacle.isCollected = true;
-              if (audio) audio.playRescueSuccessChime();
-              this.telemetry.collectedCount++;
-              this.telemetry.collectedWeight += closestObstacle.mass;
-              this.telemetry.alertType = "success";
-              this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in scoop cradle. Zero casualties!`;
+            if (minForwardDist <= 40) {
+              this.telemetry.action = `TARGET ON TRACK (30-40M) - AIRBAG CAPTURE NET DEPLOYED (${closestObstacle.mass}KG \u2264 150KG)`;
+              this.telemetry.alertType = "deploy";
+              if (aiSensorAuto && !captureNet.isDeployed) {
+                captureNet.triggerSolenoidDeploy(audio);
+                if (audio) audio.playTargetAcquiredBeep(false);
+                this.telemetry.alertMessage = `\u{1FAA4} TARGET ON TRACK WITHIN 30-40M (${Math.round(minForwardDist)}M)! AIRBAG CAPTURE NET AUTOMATICALLY DEPLOYED!`;
+              }
+              if (minForwardDist <= 14) {
+                this.scene.remove(closestObstacle.mesh);
+                captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+                closestObstacle.isCollected = true;
+                if (audio) audio.playRescueSuccessChime();
+                this.telemetry.collectedCount++;
+                this.telemetry.collectedWeight += closestObstacle.mass;
+                this.telemetry.alertType = "success";
+                this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY COLLECTED: ${closestObstacle.name} (${closestObstacle.mass} kg) secured in net cradle. Zero casualties!`;
+              }
+            } else {
+              this.telemetry.action = `TARGET ON TRACK (${Math.round(minForwardDist)}M) - NET ARMED FOR AUTO-DEPLOY AT 30-40M`;
+              this.telemetry.alertType = "deploy";
             }
           } else {
             if (captureNet.isDeployed) {
@@ -41419,19 +41494,24 @@ void main() {
             }
             if (this.fxTimer <= 0) {
               this.spawnDeterrenceFX(closestObstacle);
-              if (audio) audio.playElectricShockDischarge();
+              if (audio) audio.playElectricShockDischarge("cattle", closestObstacle.mass);
               this.fxTimer = 0.8;
             }
-            this.telemetry.action = `OVERWEIGHT (${closestObstacle.mass}KG > 150KG) - NET STOWED! E-SHOCK + EMERGENCY BRAKE`;
-            this.telemetry.alertType = "hazard";
-            this.telemetry.alertMessage = `\u26A0\uFE0F OVERWEIGHT HAZARD: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG > 150KG)! NET STOWED! REPEAT E-SHOCK ACTIVE!`;
-            if (minForwardDist <= 35) {
-              if (physics && !physics.emergencyBrake) {
-                physics.setEmergencyBrake(true);
+            if (minForwardDist <= 40) {
+              this.telemetry.action = `OVERWEIGHT (${closestObstacle.mass}KG > 150KG) AT ${Math.round(minForwardDist)}M - NET STOWED! EMERGENCY BRAKE ACTIVE`;
+              this.telemetry.alertType = "hazard";
+              this.telemetry.alertMessage = `\u26A0\uFE0F OVERWEIGHT HAZARD WITHIN 30-40M (${Math.round(minForwardDist)}M)! NET STOWED! EMERGENCY BRAKE ENGAGED!`;
+              if (minForwardDist <= 35) {
+                if (physics && !physics.emergencyBrake) {
+                  physics.setEmergencyBrake(true);
+                }
+                if (audio) {
+                  audio.startHorn();
+                }
               }
-              if (audio) {
-                audio.startHorn();
-              }
+            } else {
+              this.telemetry.action = `OVERWEIGHT TARGET (${Math.round(minForwardDist)}M) - REPEAT ${tailored.voltage} HOOF PULSES ACTIVE`;
+              this.telemetry.alertType = "hazard";
             }
           }
         }
@@ -41441,8 +41521,10 @@ void main() {
         this.telemetry.name = "NONE (TRACK CLEAR)";
         this.telemetry.distance = null;
         this.telemetry.mass = null;
+        this.telemetry.tailoredSpec = null;
+        this.telemetry.tailoredLabel = null;
         this.telemetry.canCollect = false;
-        this.telemetry.action = "STANDBY - SCANNING (LiDAR / RADAR / 4K)";
+        this.telemetry.action = "STANDBY - SCANNING (1 km LiDAR / 4K / RADAR)";
         this.telemetry.alertMessage = null;
         this.telemetry.alertType = "info";
         if (captureNet.isDeployed && captureNet.collectedList.length === 0) {
@@ -41514,6 +41596,7 @@ void main() {
         kavachTargetName: document.getElementById("kavach-target-name"),
         kavachTargetDist: document.getElementById("kavach-target-dist"),
         kavachTargetMass: document.getElementById("kavach-target-mass"),
+        kavachTargetSpec: document.getElementById("kavach-target-spec"),
         kavachAction: document.getElementById("kavach-action"),
         kavachPayloadVal: document.getElementById("kavach-payload-val"),
         kavachPayloadBar: document.getElementById("kavach-payload-bar"),
@@ -41522,6 +41605,7 @@ void main() {
         btnSpawnAnimal: document.getElementById("btn-spawn-animal"),
         btnSpawnAnimalFlee: document.getElementById("btn-spawn-animal-flee"),
         btnSpawnBull: document.getElementById("btn-spawn-bull"),
+        btnSpawnHumanLong: document.getElementById("btn-spawn-human-long"),
         btnSpawnCrate: document.getElementById("btn-spawn-crate"),
         btnClearCradle: document.getElementById("btn-clear-cradle"),
         // Floating Console Elements (Ref: media_1793808764475_89ecfc40.jpg)
@@ -41718,6 +41802,11 @@ void main() {
       if (this.dom.btnSpawnBull) {
         this.dom.btnSpawnBull.addEventListener("click", () => {
           this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, false);
+        });
+      }
+      if (this.dom.btnSpawnHumanLong) {
+        this.dom.btnSpawnHumanLong.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 500, false);
         });
       }
       if (this.dom.btnSpawnCrate) {
@@ -42176,6 +42265,15 @@ void main() {
         } else {
           this.dom.kavachTargetMass.innerText = "---";
           this.dom.kavachTargetMass.style.color = "#f1f5f9";
+        }
+        if (this.dom.kavachTargetSpec) {
+          if (t.tailoredSpec && t.tailoredLabel) {
+            this.dom.kavachTargetSpec.innerText = `${t.tailoredLabel} [${t.tailoredSpec}]`;
+            this.dom.kavachTargetSpec.style.color = "#38bdf8";
+          } else {
+            this.dom.kavachTargetSpec.innerText = "STANDBY (1 km)";
+            this.dom.kavachTargetSpec.style.color = "#94a3b8";
+          }
         }
         this.dom.kavachAction.innerText = t.action;
         this.dom.kavachAction.className = "scanner-status";

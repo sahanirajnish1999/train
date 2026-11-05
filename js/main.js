@@ -79,6 +79,7 @@ class SimulatorApp {
       kavachTargetName: document.getElementById('kavach-target-name'),
       kavachTargetDist: document.getElementById('kavach-target-dist'),
       kavachTargetMass: document.getElementById('kavach-target-mass'),
+      kavachTargetSpec: document.getElementById('kavach-target-spec'),
       kavachAction: document.getElementById('kavach-action'),
       kavachPayloadVal: document.getElementById('kavach-payload-val'),
       kavachPayloadBar: document.getElementById('kavach-payload-bar'),
@@ -87,6 +88,7 @@ class SimulatorApp {
       btnSpawnAnimal: document.getElementById('btn-spawn-animal'),
       btnSpawnAnimalFlee: document.getElementById('btn-spawn-animal-flee'),
       btnSpawnBull: document.getElementById('btn-spawn-bull'),
+      btnSpawnHumanLong: document.getElementById('btn-spawn-human-long'),
       btnSpawnCrate: document.getElementById('btn-spawn-crate'),
       btnClearCradle: document.getElementById('btn-clear-cradle'),
       // Floating Console Elements (Ref: media_1793808764475_89ecfc40.jpg)
@@ -310,6 +312,11 @@ class SimulatorApp {
     if (this.dom.btnSpawnBull) {
       this.dom.btnSpawnBull.addEventListener('click', () => {
         this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, false);
+      });
+    }
+    if (this.dom.btnSpawnHumanLong) {
+      this.dom.btnSpawnHumanLong.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 500, false);
       });
     }
     if (this.dom.btnSpawnCrate) {
@@ -878,6 +885,16 @@ class SimulatorApp {
       } else {
         this.dom.kavachTargetMass.innerText = '---';
         this.dom.kavachTargetMass.style.color = '#f1f5f9';
+      }
+
+      if (this.dom.kavachTargetSpec) {
+        if (t.tailoredSpec && t.tailoredLabel) {
+          this.dom.kavachTargetSpec.innerText = `${t.tailoredLabel} [${t.tailoredSpec}]`;
+          this.dom.kavachTargetSpec.style.color = '#38bdf8';
+        } else {
+          this.dom.kavachTargetSpec.innerText = 'STANDBY (1 km)';
+          this.dom.kavachTargetSpec.style.color = '#94a3b8';
+        }
       }
 
       this.dom.kavachAction.innerText = t.action;
