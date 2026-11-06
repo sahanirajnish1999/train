@@ -1448,11 +1448,12 @@ export class TrainModel {
     });
   }
 
-  pulseShockEmitters(intensity = 1.0) {
+  pulseShockEmitters(intensity = 1.0, activeIndices = null) {
     if (!this.shockEmitters) return;
-    this.shockEmitters.forEach(e => {
+    this.shockEmitters.forEach((e, idx) => {
+      const isActive = !activeIndices || activeIndices.includes(idx);
       if (e.core && e.mat) {
-        if (intensity > 0.05) {
+        if (isActive && intensity > 0.05) {
           e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
           e.core.scale.setScalar(1.0 + intensity * 0.8);
         } else {

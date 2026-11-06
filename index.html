@@ -117,8 +117,17 @@
         </div>
       </div>
 
+      <!-- Weight-Tiered Power Source Test Buttons (1 to 4 Power Sources) -->
+      <div class="kavach-spawner-header">WEIGHT POWER SOURCES (1 TO 4 SOURCES):</div>
+      <div class="kavach-spawner-grid" style="margin-bottom: 8px;">
+        <button class="spawn-btn" id="btn-spawn-tier1" style="background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #38bdf8;" title="< 150 kg: 1 Power Source at preferred ground angle">⚡ &lt;150kg (72kg) ➔ 1 Source</button>
+        <button class="spawn-btn" id="btn-spawn-tier2" style="background: rgba(249, 115, 22, 0.15); border-color: #f97316; color: #f97316;" title="150kg - 250kg: 2 Power Sources (DL + DR bilateral sweep)">⚡ 150-250kg (200kg) ➔ 2 Sources</button>
+        <button class="spawn-btn" id="btn-spawn-tier3" style="background: rgba(225, 29, 72, 0.15); border-color: #e11d48; color: #e11d48;" title="250kg - 350kg: 3 Power Sources (TL + TR + DL tri-beam)">⚡ 250-350kg (300kg) ➔ 3 Sources</button>
+        <button class="spawn-btn hazard" id="btn-spawn-tier4" style="background: rgba(236, 72, 153, 0.15); border-color: #ec4899; color: #ec4899;" title="≥ 350kg: All 4 Power Sources (Full quad convergence)">⚡ ≥350kg (480kg) ➔ 4 Sources</button>
+      </div>
+
       <!-- Interactive Test Spawner Buttons (Directly executing user requirement) -->
-      <div class="kavach-spawner-header">TEST SAFETY PROTOCOL:</div>
+      <div class="kavach-spawner-header">SAFETY PROTOCOL TESTS:</div>
       <div class="kavach-spawner-grid">
         <button class="spawn-btn" id="btn-spawn-human-flee" title="Person: Electric shock fires -> Person moves off track safely -> Track Clear">🏃 Person (Shock -> Flees)</button>
         <button class="spawn-btn" id="btn-spawn-human" title="Person: Electric shock fires -> Person does NOT move -> Weight 72kg < 150kg -> Capture net deploys at 30-40m & Scoops!">👤 Person (72kg - Net at 30-40m)</button>
@@ -265,7 +274,7 @@
   </div>
 
   <!-- Main Self-Contained Bundle with Cache-Buster -->
-  <script src="bundle.js?v=20261105_v9"></script>
+  <script src="bundle.js?v=20261106_v1"></script>
 </body>
 </html>
 

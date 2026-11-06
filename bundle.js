@@ -38685,11 +38685,12 @@ void main() {
         };
       });
     }
-    pulseShockEmitters(intensity = 1) {
+    pulseShockEmitters(intensity = 1, activeIndices = null) {
       if (!this.shockEmitters) return;
-      this.shockEmitters.forEach((e) => {
+      this.shockEmitters.forEach((e, idx) => {
+        const isActive = !activeIndices || activeIndices.includes(idx);
         if (e.core && e.mat) {
-          if (intensity > 0.05) {
+          if (isActive && intensity > 0.05) {
             e.mat.color.setHex(intensity > 0.6 ? 16777215 : 3718648);
             e.core.scale.setScalar(1 + intensity * 0.8);
           } else {
@@ -41055,7 +41056,7 @@ void main() {
     // ------------------------------------------------------------------
     // Spawn and Positioning Logic
     // ------------------------------------------------------------------
-    spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0) {
+    spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0, customMass = null, customName = null) {
       let mesh, name, mass;
       switch (type) {
         case "human":
@@ -41079,6 +41080,12 @@ void main() {
           name = "Track Debris (Cargo Crate)";
           mass = 40;
           break;
+      }
+      if (customMass !== null && customMass !== void 0) {
+        mass = customMass;
+      }
+      if (customName !== null && customName !== void 0) {
+        name = customName;
       }
       const transform = this.track.getTrackTransform(trackProgress, 0);
       mesh.position.copy(transform.position);
@@ -41121,10 +41128,10 @@ void main() {
       this.spawnObstacle("human", 0.18, true, 2.4);
     }
     // Spawn immediately ahead of the train on demand (via HUD test buttons)
-    spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null) {
+    spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
       const deltaProgress = distanceMeters / trackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      return this.spawnObstacle(type, targetProgress, moveOffTrack);
+      return this.spawnObstacle(type, targetProgress, moveOffTrack, 0, customMass, customName);
     }
     // Spawn person or animal directly beside one of the train coaches within 2-3m perimeter
     spawnBesideCoach(trainProgress, trackLength, coachIndex = 1, lateralOffset = 2.4) {
@@ -41157,54 +41164,94 @@ void main() {
       };
     }
     // ------------------------------------------------------------------
-    // Subject-Tailored Electric Shock Specifications (Human vs Animal)
-    // Requirement: Calibrated to subject's size & type to compel moving off track safely
+    // Weight-Tiered Subject-Tailored Electric Shock Specifications
+    // Rule 1: Under 150 kg -> ONLY 1 power source (at preferred ground angle)
+    // Rule 2: 150 kg to 250 kg -> 2 power sources (bilateral sweep)
+    // Rule 3: 250 kg to 350 kg -> 3 power sources (tri-channel focal beam)
+    // Rule 4: 350 kg and above -> All 4 power sources (quad full-power)
     // ------------------------------------------------------------------
     getTailoredShockSpecs(obs) {
-      if (!obs) return { voltage: "2.0 kV", current: "1.2 mA", energy: "0.04 J", typeLabel: "HUMAN SAFE", badge: "2.0 kV / 1.2 mA", desc: "Mild sensory pulse" };
-      if (obs.type === "human") {
+      if (!obs) {
         return {
+          tier: 1,
+          powerSourcesCount: 1,
+          activeIndices: [2],
           voltage: "2.0 kV",
           current: "1.2 mA",
           energy: "0.04 J",
-          compliance: "IEC 60479-1 (Safe Sensory Perception)",
-          typeLabel: "HUMAN (PERSON)",
-          badge: "2.0 kV / 1.2 mA",
-          color: "#38bdf8",
-          desc: "Low-energy non-lethal sensory tactile pulse (2.0 kV, 1.2 mA, 0.04 J). Induces an instantaneous harmless startle reflex at boots to prompt moving off track with ZERO burns or injury."
+          typeLabel: "HUMAN SAFE",
+          badge: "1x POWER SOURCE [2.0 kV / 1.2 mA]",
+          desc: "Single power source at preferred ground angle"
         };
-      } else if (obs.type === "animal") {
+      }
+      const mass = obs.mass !== void 0 ? obs.mass : 72;
+      const isHuman = obs.type === "human";
+      if (mass < 150) {
+        const voltage = isHuman ? "2.0 kV" : "5.5 kV";
+        const current = isHuman ? "1.2 mA" : "2.8 mA";
+        const energy = isHuman ? "0.04 J" : "0.80 J";
         return {
-          voltage: "5.5 kV",
-          current: "2.8 mA",
-          energy: "0.80 J",
-          compliance: "IEC 60335-2-76 / RDSO Wildlife Protocol",
-          typeLabel: "ANIMAL (WILDLIFE CALF)",
-          badge: "5.5 kV / 2.8 mA",
-          color: "#f59e0b",
-          desc: "Veterinary pulsed fence gradient (5.5 kV, 2.8 mA, 0.8 J). Tailored for quadruped wildlife hooves to induce an involuntary flight trot into the meadow without harm."
+          tier: 1,
+          powerSourcesCount: 1,
+          activeIndices: [2],
+          // Down-Left (Preferred ground sweep angle)
+          activeLabels: ["Down-Left (Preferred Ground Angle)"],
+          voltage,
+          current,
+          energy,
+          compliance: isHuman ? "IEC 60479-1 (Safe Sensory Perception)" : "RDSO Wildlife Protocol",
+          typeLabel: isHuman ? "HUMAN (PERSON)" : "ANIMAL (WILDLIFE CALF)",
+          badge: `1x POWER SOURCE: ${voltage} / ${current}`,
+          color: isHuman ? "#38bdf8" : "#f59e0b",
+          desc: `Under 150 kg (${mass} kg): 1 power source active (Down-Left at preferred ground angle) for mild startle reflex.`
         };
-      } else if (obs.type === "cattle") {
+      } else if (mass >= 150 && mass < 250) {
         return {
+          tier: 2,
+          powerSourcesCount: 2,
+          activeIndices: [2, 3],
+          // Down-Left + Down-Right (Dual bilateral ground sweep)
+          activeLabels: ["Down-Left", "Down-Right"],
+          voltage: "6.0 kV",
+          current: "3.0 mA",
+          energy: "0.95 J",
+          compliance: "IEC 60335-2-76 / RDSO Animal Deterrence",
+          typeLabel: "ANIMAL (MEDIUM HAZARD 150-250KG)",
+          badge: "2x POWER SOURCES: 6.0 kV / 3.0 mA",
+          color: "#f97316",
+          desc: `150-250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep) to prompt immediate flight.`
+        };
+      } else if (mass >= 250 && mass < 350) {
+        return {
+          tier: 3,
+          powerSourcesCount: 3,
+          activeIndices: [0, 1, 2],
+          // Top-Left + Top-Right + Down-Left
+          activeLabels: ["Top-Left", "Top-Right", "Down-Left"],
+          voltage: "7.2 kV",
+          current: "3.5 mA",
+          energy: "1.25 J",
+          compliance: "RDSO Livestock Safety Tier 3",
+          typeLabel: "ANIMAL (SUB-ADULT CATTLE 250-350KG)",
+          badge: "3x POWER SOURCES: 7.2 kV / 3.5 mA",
+          color: "#e11d48",
+          desc: `250-350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam) to compel animal off track.`
+        };
+      } else {
+        return {
+          tier: 4,
+          powerSourcesCount: 4,
+          activeIndices: [0, 1, 2, 3],
+          // All 4 emitters
+          activeLabels: ["Top-Left", "Top-Right", "Down-Left", "Down-Right"],
           voltage: "7.8 kV",
           current: "3.8 mA",
           energy: "1.40 J",
           compliance: "RDSO Tech Circular 129 / IEC 60335-2-76",
-          typeLabel: "ANIMAL (HEAVY BULL)",
-          badge: "7.8 kV / 3.8 mA",
+          typeLabel: "ANIMAL (HEAVY BULL \u2265350KG)",
+          badge: "4x POWER SOURCES: 7.8 kV / 3.8 mA",
           color: "#ec4899",
-          desc: "High-impedance cattle pulsed flight gradient (7.8 kV, 3.8 mA, 1.4 J). Overcomes thick keratin hooves to prompt immediate jump reflex off ballast."
-        };
-      } else {
-        return {
-          voltage: "2.5 kV",
-          current: "1.5 mA",
-          energy: "0.05 J",
-          compliance: "RDSO Track Sensor Pulse",
-          typeLabel: "CARGO DEBRIS",
-          badge: "2.5 kV / 1.5 mA",
-          color: "#94a3b8",
-          desc: "Calibrated diagnostic pulse across track circuit."
+          desc: `350 kg and above (${mass} kg): All 4 power sources active (Quad full-power convergence) for heavy cattle deterrence.`
         };
       }
     }
@@ -41267,8 +41314,12 @@ void main() {
         new Vector3(-1.35, 0.95, 0),
         new Vector3(1.35, 0.95, 0)
       ];
+      const tailored = this.getTailoredShockSpecs(obs);
+      const activeIndices = tailored.activeIndices || [0, 1, 2, 3];
+      this.activePowerSourceIndices = activeIndices;
       const segs = 16;
-      for (let i = 0; i < 4; i++) {
+      for (let k = 0; k < activeIndices.length; k++) {
+        const i = activeIndices[k];
         const emitter = emitters && emitters[i] ? emitters[i] : null;
         const p1 = emitter ? emitter.pos.clone() : fallbackFront.clone().add(fallbackOffsets[i]);
         const targetOffset = targetOffsets[i];
@@ -41313,10 +41364,15 @@ void main() {
           this.fxGroup.add(nozzleFlare);
         }
       }
-      const sparkLight = new PointLight(sparkColor, isHuman ? 4.5 : 9, isHuman ? 20 : 32);
+      const lightPowerMult = activeIndices.length / 4;
+      const sparkLight = new PointLight(
+        sparkColor,
+        (isHuman ? 4.5 : 9) * (0.5 + 0.5 * lightPowerMult),
+        isHuman ? 20 : 32
+      );
       sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.8 : 1, 0)));
       this.fxGroup.add(sparkLight);
-      const sparkCount = isHuman ? 18 : 36;
+      const sparkCount = Math.round((isHuman ? 18 : 36) * (0.4 + 0.6 * lightPowerMult));
       const sparkGeo = new BufferGeometry();
       const sPos = [];
       const spread = isHuman ? 0.5 : 1.2;
@@ -41336,7 +41392,7 @@ void main() {
       });
       this.fxGroup.add(new Points(sparkGeo, sparkMat));
       if (activeTrain && activeTrain.pulseShockEmitters) {
-        activeTrain.pulseShockEmitters(1);
+        activeTrain.pulseShockEmitters(1, activeIndices);
       }
     }
     updateDeterrenceFX(dt) {
@@ -41344,7 +41400,7 @@ void main() {
         this.fxTimer -= dt;
         const progress = Math.max(0, this.fxTimer / 1.2);
         if (this.train && this.train.pulseShockEmitters) {
-          this.train.pulseShockEmitters(progress);
+          this.train.pulseShockEmitters(progress, this.activePowerSourceIndices);
         }
         const tempStart = new Vector3();
         const tempEnd = new Vector3();
@@ -41402,6 +41458,7 @@ void main() {
           if (this.train && this.train.pulseCoachSideEmitters) {
             this.train.pulseCoachSideEmitters(null, "all", 0);
           }
+          this.activePowerSourceIndices = null;
           while (this.fxGroup.children.length > 0) {
             const c = this.fxGroup.children[0];
             if (c.geometry) c.geometry.dispose();
@@ -42036,13 +42093,13 @@ void main() {
         this.telemetry.name = closestObstacle.name;
         this.telemetry.distance = minForwardDist;
         const tailored = this.getTailoredShockSpecs(closestObstacle);
-        this.telemetry.tailoredSpec = `\u26A1 ACTIVE [${tailored.badge}]`;
+        this.telemetry.tailoredSpec = tailored.badge;
         this.telemetry.tailoredLabel = tailored.typeLabel;
         if (aiSensorAuto && !closestObstacle.hasBeenShocked) {
           this.triggerDeterrence(closestObstacle, audio, this.train);
           if (audio) audio.playTargetAcquiredBeep(false);
           this.telemetry.alertType = "deploy";
-          this.telemetry.alertMessage = `\u26A1 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! QUAD SENDER FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
+          this.telemetry.alertMessage = `\u26A1 1KM DETECTION: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG) AT ${Math.round(minForwardDist)}M! ${tailored.powerSourcesCount}X POWER SOURCE(S) FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
         }
         if (aiSensorAuto && !closestObstacle.isCleared && this.fxTimer <= 0) {
           this.spawnDeterrenceFX(closestObstacle, this.train);
@@ -42202,6 +42259,10 @@ void main() {
         kavachAction: document.getElementById("kavach-action"),
         kavachPayloadVal: document.getElementById("kavach-payload-val"),
         kavachPayloadBar: document.getElementById("kavach-payload-bar"),
+        btnSpawnTier1: document.getElementById("btn-spawn-tier1"),
+        btnSpawnTier2: document.getElementById("btn-spawn-tier2"),
+        btnSpawnTier3: document.getElementById("btn-spawn-tier3"),
+        btnSpawnTier4: document.getElementById("btn-spawn-tier4"),
         btnSpawnHuman: document.getElementById("btn-spawn-human"),
         btnSpawnHumanFlee: document.getElementById("btn-spawn-human-flee"),
         btnSpawnAnimal: document.getElementById("btn-spawn-animal"),
@@ -42372,6 +42433,26 @@ void main() {
       if (btnWeather) {
         btnWeather.addEventListener("click", () => {
           this.cycleWeather();
+        });
+      }
+      if (this.dom.btnSpawnTier1) {
+        this.dom.btnSpawnTier1.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, true, 72, "Person (<150kg)");
+        });
+      }
+      if (this.dom.btnSpawnTier2) {
+        this.dom.btnSpawnTier2.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, true, 200, "Sub-Adult Animal (200kg)");
+        });
+      }
+      if (this.dom.btnSpawnTier3) {
+        this.dom.btnSpawnTier3.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, true, 300, "Livestock (300kg)");
+        });
+      }
+      if (this.dom.btnSpawnTier4) {
+        this.dom.btnSpawnTier4.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, true, 480, "Heavy Bull (480kg)");
         });
       }
       if (this.dom.btnSpawnHumanFlee) {

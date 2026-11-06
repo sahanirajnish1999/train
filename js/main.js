@@ -84,6 +84,10 @@ class SimulatorApp {
       kavachAction: document.getElementById('kavach-action'),
       kavachPayloadVal: document.getElementById('kavach-payload-val'),
       kavachPayloadBar: document.getElementById('kavach-payload-bar'),
+      btnSpawnTier1: document.getElementById('btn-spawn-tier1'),
+      btnSpawnTier2: document.getElementById('btn-spawn-tier2'),
+      btnSpawnTier3: document.getElementById('btn-spawn-tier3'),
+      btnSpawnTier4: document.getElementById('btn-spawn-tier4'),
       btnSpawnHuman: document.getElementById('btn-spawn-human'),
       btnSpawnHumanFlee: document.getElementById('btn-spawn-human-flee'),
       btnSpawnAnimal: document.getElementById('btn-spawn-animal'),
@@ -279,6 +283,28 @@ class SimulatorApp {
     if (btnWeather) {
       btnWeather.addEventListener('click', () => {
         this.cycleWeather();
+      });
+    }
+
+    // Weight-Tiered Power Source Spawners (User requirement: 1, 2, 3, 4 Power Sources)
+    if (this.dom.btnSpawnTier1) {
+      this.dom.btnSpawnTier1.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, true, 72, 'Person (<150kg)');
+      });
+    }
+    if (this.dom.btnSpawnTier2) {
+      this.dom.btnSpawnTier2.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, true, 200, 'Sub-Adult Animal (200kg)');
+      });
+    }
+    if (this.dom.btnSpawnTier3) {
+      this.dom.btnSpawnTier3.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, true, 300, 'Livestock (300kg)');
+      });
+    }
+    if (this.dom.btnSpawnTier4) {
+      this.dom.btnSpawnTier4.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, true, 480, 'Heavy Bull (480kg)');
       });
     }
 

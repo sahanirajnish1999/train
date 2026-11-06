@@ -1586,7 +1586,7 @@ export class ObstacleManager {
   // ------------------------------------------------------------------
   // Spawn and Positioning Logic
   // ------------------------------------------------------------------
-  spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0) {
+  spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0, customMass = null, customName = null) {
     let mesh, name, mass;
     switch (type) {
       case 'human':
@@ -1610,6 +1610,13 @@ export class ObstacleManager {
         name = 'Track Debris (Cargo Crate)';
         mass = 40; // kg
         break;
+    }
+
+    if (customMass !== null && customMass !== undefined) {
+      mass = customMass;
+    }
+    if (customName !== null && customName !== undefined) {
+      name = customName;
     }
 
     const transform = this.track.getTrackTransform(trackProgress, 0); // Placed directly on Track 1
@@ -1664,10 +1671,10 @@ export class ObstacleManager {
   }
 
   // Spawn immediately ahead of the train on demand (via HUD test buttons)
-  spawnAheadOfTrain(trainProgress, trackLength, type = 'human', distanceMeters = 85, moveOffTrack = null) {
+  spawnAheadOfTrain(trainProgress, trackLength, type = 'human', distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
     const deltaProgress = distanceMeters / trackLength;
     const targetProgress = (trainProgress + deltaProgress) % 1.0;
-    return this.spawnObstacle(type, targetProgress, moveOffTrack);
+    return this.spawnObstacle(type, targetProgress, moveOffTrack, 0, customMass, customName);
   }
 
   // Spawn person or animal directly beside one of the train coaches within 2-3m perimeter
@@ -1705,57 +1712,100 @@ export class ObstacleManager {
   }
 
   // ------------------------------------------------------------------
-  // Subject-Tailored Electric Shock Specifications (Human vs Animal)
-  // Requirement: Calibrated to subject's size & type to compel moving off track safely
+  // Weight-Tiered Subject-Tailored Electric Shock Specifications
+  // Rule 1: Under 150 kg -> ONLY 1 power source (at preferred ground angle)
+  // Rule 2: 150 kg to 250 kg -> 2 power sources (bilateral sweep)
+  // Rule 3: 250 kg to 350 kg -> 3 power sources (tri-channel focal beam)
+  // Rule 4: 350 kg and above -> All 4 power sources (quad full-power)
   // ------------------------------------------------------------------
   getTailoredShockSpecs(obs) {
-    if (!obs) return { voltage: '2.0 kV', current: '1.2 mA', energy: '0.04 J', typeLabel: 'HUMAN SAFE', badge: '2.0 kV / 1.2 mA', desc: 'Mild sensory pulse' };
-
-    if (obs.type === 'human') {
+    if (!obs) {
       return {
+        tier: 1,
+        powerSourcesCount: 1,
+        activeIndices: [2],
         voltage: '2.0 kV',
         current: '1.2 mA',
         energy: '0.04 J',
-        compliance: 'IEC 60479-1 (Safe Sensory Perception)',
-        typeLabel: 'HUMAN (PERSON)',
-        badge: '2.0 kV / 1.2 mA',
-        color: '#38bdf8',
-        desc: 'Low-energy non-lethal sensory tactile pulse (2.0 kV, 1.2 mA, 0.04 J). Induces an instantaneous harmless startle reflex at boots to prompt moving off track with ZERO burns or injury.'
+        typeLabel: 'HUMAN SAFE',
+        badge: '1x POWER SOURCE [2.0 kV / 1.2 mA]',
+        desc: 'Single power source at preferred ground angle'
       };
-    } else if (obs.type === 'animal') {
-      // Elephant calf / wildlife ~110kg
+    }
+
+    const mass = obs.mass !== undefined ? obs.mass : 72;
+    const isHuman = obs.type === 'human';
+
+    if (mass < 150) {
+      // TIER 1: Under 150 kg -> ONLY ONE power source at preferred angle
+      // Preferred angle: Down-Left (Index 2) ground sweep angle aimed at feet/ground contact
+      const voltage = isHuman ? '2.0 kV' : '5.5 kV';
+      const current = isHuman ? '1.2 mA' : '2.8 mA';
+      const energy = isHuman ? '0.04 J' : '0.80 J';
       return {
-        voltage: '5.5 kV',
-        current: '2.8 mA',
-        energy: '0.80 J',
-        compliance: 'IEC 60335-2-76 / RDSO Wildlife Protocol',
-        typeLabel: 'ANIMAL (WILDLIFE CALF)',
-        badge: '5.5 kV / 2.8 mA',
-        color: '#f59e0b',
-        desc: 'Veterinary pulsed fence gradient (5.5 kV, 2.8 mA, 0.8 J). Tailored for quadruped wildlife hooves to induce an involuntary flight trot into the meadow without harm.'
+        tier: 1,
+        powerSourcesCount: 1,
+        activeIndices: [2], // Down-Left (Preferred ground sweep angle)
+        activeLabels: ['Down-Left (Preferred Ground Angle)'],
+        voltage: voltage,
+        current: current,
+        energy: energy,
+        compliance: isHuman ? 'IEC 60479-1 (Safe Sensory Perception)' : 'RDSO Wildlife Protocol',
+        typeLabel: isHuman ? 'HUMAN (PERSON)' : 'ANIMAL (WILDLIFE CALF)',
+        badge: `1x POWER SOURCE: ${voltage} / ${current}`,
+        color: isHuman ? '#38bdf8' : '#f59e0b',
+        desc: `Under 150 kg (${mass} kg): 1 power source active (Down-Left at preferred ground angle) for mild startle reflex.`
       };
-    } else if (obs.type === 'cattle') {
-      // Heavy Bull ~480kg
+    } else if (mass >= 150 && mass < 250) {
+      // TIER 2: 150 kg to 250 kg -> TWO power sources
+      // Dual bilateral ground sweep: Down-Left (Index 2) + Down-Right (Index 3)
       return {
+        tier: 2,
+        powerSourcesCount: 2,
+        activeIndices: [2, 3], // Down-Left + Down-Right (Dual bilateral ground sweep)
+        activeLabels: ['Down-Left', 'Down-Right'],
+        voltage: '6.0 kV',
+        current: '3.0 mA',
+        energy: '0.95 J',
+        compliance: 'IEC 60335-2-76 / RDSO Animal Deterrence',
+        typeLabel: 'ANIMAL (MEDIUM HAZARD 150-250KG)',
+        badge: '2x POWER SOURCES: 6.0 kV / 3.0 mA',
+        color: '#f97316',
+        desc: `150-250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep) to prompt immediate flight.`
+      };
+    } else if (mass >= 250 && mass < 350) {
+      // TIER 3: 250 kg to 350 kg -> THREE power sources
+      // Tri-channel focal convergence: Top-Left (0) + Top-Right (1) + Down-Left (2)
+      return {
+        tier: 3,
+        powerSourcesCount: 3,
+        activeIndices: [0, 1, 2], // Top-Left + Top-Right + Down-Left
+        activeLabels: ['Top-Left', 'Top-Right', 'Down-Left'],
+        voltage: '7.2 kV',
+        current: '3.5 mA',
+        energy: '1.25 J',
+        compliance: 'RDSO Livestock Safety Tier 3',
+        typeLabel: 'ANIMAL (SUB-ADULT CATTLE 250-350KG)',
+        badge: '3x POWER SOURCES: 7.2 kV / 3.5 mA',
+        color: '#e11d48',
+        desc: `250-350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam) to compel animal off track.`
+      };
+    } else {
+      // TIER 4: 350 kg and above -> ALL FOUR power sources
+      // Quad full-power convergence: Top-Left (0) + Top-Right (1) + Down-Left (2) + Down-Right (3)
+      return {
+        tier: 4,
+        powerSourcesCount: 4,
+        activeIndices: [0, 1, 2, 3], // All 4 emitters
+        activeLabels: ['Top-Left', 'Top-Right', 'Down-Left', 'Down-Right'],
         voltage: '7.8 kV',
         current: '3.8 mA',
         energy: '1.40 J',
         compliance: 'RDSO Tech Circular 129 / IEC 60335-2-76',
-        typeLabel: 'ANIMAL (HEAVY BULL)',
-        badge: '7.8 kV / 3.8 mA',
+        typeLabel: 'ANIMAL (HEAVY BULL ≥350KG)',
+        badge: '4x POWER SOURCES: 7.8 kV / 3.8 mA',
         color: '#ec4899',
-        desc: 'High-impedance cattle pulsed flight gradient (7.8 kV, 3.8 mA, 1.4 J). Overcomes thick keratin hooves to prompt immediate jump reflex off ballast.'
-      };
-    } else {
-      return {
-        voltage: '2.5 kV',
-        current: '1.5 mA',
-        energy: '0.05 J',
-        compliance: 'RDSO Track Sensor Pulse',
-        typeLabel: 'CARGO DEBRIS',
-        badge: '2.5 kV / 1.5 mA',
-        color: '#94a3b8',
-        desc: 'Calibrated diagnostic pulse across track circuit.'
+        desc: `350 kg and above (${mass} kg): All 4 power sources active (Quad full-power convergence) for heavy cattle deterrence.`
       };
     }
   }
@@ -1836,8 +1886,13 @@ export class ObstacleManager {
       new THREE.Vector3( 1.35, 0.95, 0)
     ];
 
+    const tailored = this.getTailoredShockSpecs(obs);
+    const activeIndices = tailored.activeIndices || [0, 1, 2, 3];
+    this.activePowerSourceIndices = activeIndices;
+
     const segs = 16;
-    for (let i = 0; i < 4; i++) {
+    for (let k = 0; k < activeIndices.length; k++) {
+      const i = activeIndices[k];
       const emitter = (emitters && emitters[i]) ? emitters[i] : null;
       const p1 = emitter ? emitter.pos.clone() : fallbackFront.clone().add(fallbackOffsets[i]);
       const targetOffset = targetOffsets[i];
@@ -1880,7 +1935,7 @@ export class ObstacleManager {
       };
       this.fxGroup.add(line);
 
-      // Plasma flare at the mouth of each sender nozzle on the train engine
+      // Plasma flare at the mouth of each active sender nozzle on the train engine
       if (emitter && emitter.tip) {
         const nozzleFlare = new THREE.PointLight(sparkColor, isHuman ? 2.5 : 4.5, 8);
         emitter.tip.getWorldPosition(nozzleFlare.position);
@@ -1889,13 +1944,18 @@ export class ObstacleManager {
       }
     }
 
-    // High-intensity illumination at the target
-    const sparkLight = new THREE.PointLight(sparkColor, isHuman ? 4.5 : 9.0, isHuman ? 20 : 32);
+    // High-intensity illumination at the target scaled with power sources
+    const lightPowerMult = activeIndices.length / 4;
+    const sparkLight = new THREE.PointLight(
+      sparkColor,
+      (isHuman ? 4.5 : 9.0) * (0.5 + 0.5 * lightPowerMult),
+      isHuman ? 20 : 32
+    );
     sparkLight.position.copy(obsPos.clone().add(new THREE.Vector3(0, isHuman ? 0.8 : 1.0, 0)));
     this.fxGroup.add(sparkLight);
 
     // Spark particles at ground hooves / boots
-    const sparkCount = isHuman ? 18 : 36;
+    const sparkCount = Math.round((isHuman ? 18 : 36) * (0.4 + 0.6 * lightPowerMult));
     const sparkGeo = new THREE.BufferGeometry();
     const sPos = [];
     const spread = isHuman ? 0.5 : 1.2;
@@ -1915,9 +1975,9 @@ export class ObstacleManager {
     });
     this.fxGroup.add(new THREE.Points(sparkGeo, sparkMat));
 
-    // Flash train plasma emitters
+    // Flash train plasma emitters (only active power sources glow and pulse)
     if (activeTrain && activeTrain.pulseShockEmitters) {
-      activeTrain.pulseShockEmitters(1.0);
+      activeTrain.pulseShockEmitters(1.0, activeIndices);
     }
   }
 
@@ -1927,7 +1987,7 @@ export class ObstacleManager {
       const progress = Math.max(0, this.fxTimer / 1.2);
 
       if (this.train && this.train.pulseShockEmitters) {
-        this.train.pulseShockEmitters(progress);
+        this.train.pulseShockEmitters(progress, this.activePowerSourceIndices);
       }
 
       const tempStart = new THREE.Vector3();
@@ -1993,6 +2053,7 @@ export class ObstacleManager {
         if (this.train && this.train.pulseCoachSideEmitters) {
           this.train.pulseCoachSideEmitters(null, 'all', 0);
         }
+        this.activePowerSourceIndices = null;
         while (this.fxGroup.children.length > 0) {
           const c = this.fxGroup.children[0];
           if (c.geometry) c.geometry.dispose();
@@ -2807,9 +2868,9 @@ export class ObstacleManager {
       this.telemetry.name = closestObstacle.name;
       this.telemetry.distance = minForwardDist;
 
-      // Obtain subject-tailored electric shock specifications (Human vs Animal)
+      // Obtain weight-tiered subject-tailored electric shock specifications
       const tailored = this.getTailoredShockSpecs(closestObstacle);
-      this.telemetry.tailoredSpec = `⚡ ACTIVE [${tailored.badge}]`;
+      this.telemetry.tailoredSpec = tailored.badge;
       this.telemetry.tailoredLabel = tailored.typeLabel;
 
       // ================================================================
@@ -2820,7 +2881,7 @@ export class ObstacleManager {
         this.triggerDeterrence(closestObstacle, audio, this.train);
         if (audio) audio.playTargetAcquiredBeep(false);
         this.telemetry.alertType = 'deploy';
-        this.telemetry.alertMessage = `⚡ 1KM DETECTION: ${closestObstacle.name.toUpperCase()} ON TRACK AT ${Math.round(minForwardDist)}M! QUAD SENDER FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
+        this.telemetry.alertMessage = `⚡ 1KM DETECTION: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG) AT ${Math.round(minForwardDist)}M! ${tailored.powerSourcesCount}X POWER SOURCE(S) FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
       }
 
       // Continuous repeat electric shock pulse every 1.4s while target remains on track
