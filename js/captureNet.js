@@ -1281,6 +1281,7 @@ export class ObstacleCaptureNet {
   }
 
   beginCaptureSequence(obstacleMesh, obstacleInfo) {
+    const isHuman = obstacleInfo && obstacleInfo.type === 'human';
     const count = this.collectedList.length;
     const xPattern = [0, -0.34, 0.34, -0.18, 0.18];
     const targetX = xPattern[count % xPattern.length];
@@ -1291,20 +1292,20 @@ export class ObstacleCaptureNet {
     this.totalPayloadWeight += obstacleInfo.mass;
 
     // Start position: right at the front scoop mouth entrance lip (z = 1.55m in cradleCargoGroup local space)
-    obstacleMesh.position.set(0, -0.15, 1.55);
+    obstacleMesh.position.set(0, isHuman ? -0.32 : -0.15, 1.55);
     obstacleMesh.rotation.set(0, 0, 0);
 
-    const targetPos = new THREE.Vector3(targetX, -0.15, zOffset);
-    const targetRotX = 0;
+    const targetPos = new THREE.Vector3(targetX, isHuman ? -0.38 : -0.15, isHuman ? zOffset - 0.05 : zOffset);
+    const targetRotX = isHuman ? -0.16 : 0;
     const targetRotY = (count % 2 === 1 ? -0.14 : 0.14);
-    const targetRotZ = 0;
+    const targetRotZ = isHuman ? (count % 2 === 1 ? 0.05 : -0.05) : 0;
 
     const animItem = {
       mesh: obstacleMesh,
       info: obstacleInfo,
       time: 0,
       duration: 0.75, // simulation seconds
-      startPos: new THREE.Vector3(0, -0.15, 1.55),
+      startPos: new THREE.Vector3(0, isHuman ? -0.32 : -0.15, 1.55),
       targetPos: targetPos,
       targetRotX: targetRotX,
       targetRotY: targetRotY,
@@ -1487,6 +1488,21 @@ export class ObstacleCaptureNet {
             this.cradlePayloadSag = -0.16 * Math.sin(((p - 0.40) / 0.25) * Math.PI);
           }
 
+          // Articulate human joints during scoop
+          const ud = cap.userData;
+          if (ud && ud.type === 'human') {
+            if (ud.torsoGroup) ud.torsoGroup.rotation.x = THREE.MathUtils.lerp(0, -0.38, rotS);
+            if (ud.legL) ud.legL.rotation.x = THREE.MathUtils.lerp(0, 1.25, rotS);
+            if (ud.legR) ud.legR.rotation.x = THREE.MathUtils.lerp(0, 1.15, rotS);
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = THREE.MathUtils.lerp(0, -1.65, rotS);
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = THREE.MathUtils.lerp(0, -1.55, rotS);
+            if (ud.armL) ud.armL.rotation.set(THREE.MathUtils.lerp(0, -0.45, rotS), 0.15, -0.48);
+            if (ud.armR) ud.armR.rotation.set(THREE.MathUtils.lerp(0, -0.40, rotS), -0.12, 0.45);
+            if (ud.forearmL) ud.forearmL.rotation.x = THREE.MathUtils.lerp(-0.22, -1.12, rotS);
+            if (ud.forearmR) ud.forearmR.rotation.x = THREE.MathUtils.lerp(-0.22, -1.08, rotS);
+            if (ud.headGroup) ud.headGroup.rotation.x = THREE.MathUtils.lerp(0, -0.25, rotS);
+          }
+
           if (p >= 1.0) {
             cap.settled = true;
             cap.mesh.position.copy(cap.targetPos);
@@ -1498,6 +1514,18 @@ export class ObstacleCaptureNet {
           // Gentle whole-body hammock sway from train inertia and aerodynamic draft
           cap.mesh.rotation.z = 0.025 * Math.sin(this.aeroTime * 3.2) * vNorm;
           cap.mesh.rotation.x = cap.targetRotX + 0.018 * Math.cos(this.aeroTime * 3.8) * vNorm;
+
+          const ud = cap.userData;
+          if (ud && ud.type === 'human') {
+            const breath = Math.sin(this.aeroTime * 1.8);
+            if (ud.torsoGroup) {
+              const exp = 0.038 * breath;
+              ud.torsoGroup.scale.set(1.0 + exp, 1.0 + exp * 0.6, 1.0 + exp);
+            }
+            if (ud.headGroup) {
+              ud.headGroup.rotation.set(-0.25 + 0.04 * Math.sin(this.aeroTime * 1.5), 0.22 * Math.sin(this.aeroTime * 0.7), 0);
+            }
+          }
         }
     }
 

@@ -453,20 +453,21 @@ export class TrainAudio {
   // Active Non-Lethal Deterrence Sound Effects (>150kg Animals)
   // ---------------------------------------------------------
 
-  // 1. High-Voltage Track Electric Pulse / Arc Crackle (Tailored by Mass)
-  playElectricShockDischarge(type = 'debris', mass = 150) {
+  // 1. High-Voltage Track Electric Pulse / Arc Crackle (Tailored for Human / Low Mass vs Heavy Mass)
+  playElectricShockDischarge(type = 'human', mass = 72) {
     if (!this.ctx || this.isMuted) return;
     try {
       this.resume();
       const now = this.ctx.currentTime;
-      const isLowMass = (mass || 150) < 150;
+      const isHuman = type === 'human';
+      const isLowMass = (mass || 72) < 150 || isHuman;
 
-      // Tailored acoustics: Low mass gets a mild high-frequency sensory static pulse; heavy mass gets a full capacitive arc crackle
-      const duration = isLowMass ? 0.22 : 0.45;
+      // Tailored acoustics: Human gets a mild, high-frequency sensory static pulse; heavy mass gets a full capacitive arc crackle
+      const duration = isHuman ? 0.22 : (isLowMass ? 0.30 : 0.45);
       const bufferSize = Math.floor(this.ctx.sampleRate * duration);
       const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const data = buffer.getChannelData(0);
-      const decayRate = isLowMass ? 0.05 : 0.12;
+      const decayRate = isHuman ? 0.05 : (isLowMass ? 0.08 : 0.12);
 
       for (let i = 0; i < bufferSize; i++) {
         data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * decayRate));
@@ -477,12 +478,12 @@ export class TrainAudio {
 
       const bpf = this.ctx.createBiquadFilter();
       bpf.type = 'bandpass';
-      bpf.frequency.setValueAtTime(isLowMass ? 4800 : 3200, now);
-      bpf.frequency.exponentialRampToValueAtTime(isLowMass ? 2200 : 1400, now + duration * 0.85);
-      bpf.Q.value = isLowMass ? 6.0 : 4.0;
+      bpf.frequency.setValueAtTime(isHuman ? 4800 : (isLowMass ? 3800 : 3200), now);
+      bpf.frequency.exponentialRampToValueAtTime(isHuman ? 2200 : (isLowMass ? 1800 : 1400), now + duration * 0.85);
+      bpf.Q.value = isHuman ? 6.0 : (isLowMass ? 5.0 : 4.0);
 
       const noiseGain = this.ctx.createGain();
-      noiseGain.gain.setValueAtTime(isLowMass ? 0.35 : 0.75, now);
+      noiseGain.gain.setValueAtTime(isHuman ? 0.35 : (isLowMass ? 0.50 : 0.75), now);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       noiseNode.connect(bpf);
@@ -491,15 +492,15 @@ export class TrainAudio {
       noiseNode.start(now);
 
       // Tailored ionization zapping harmonics
-      const freqs = isLowMass ? [880, 1760] : [420, 840, 1680];
+      const freqs = isHuman ? [880, 1760] : (isLowMass ? [580, 1160] : [420, 840, 1680]);
       freqs.forEach((freq, idx) => {
         const zapOsc = this.ctx.createOscillator();
         const zapGain = this.ctx.createGain();
-        zapOsc.type = isLowMass ? 'sine' : 'sawtooth';
-        zapOsc.frequency.setValueAtTime(freq + Math.random() * (isLowMass ? 40 : 120), now);
-        zapOsc.frequency.exponentialRampToValueAtTime(isLowMass ? 350 : 180, now + duration * 0.75);
+        zapOsc.type = isHuman ? 'sine' : 'sawtooth';
+        zapOsc.frequency.setValueAtTime(freq + Math.random() * (isHuman ? 40 : 120), now);
+        zapOsc.frequency.exponentialRampToValueAtTime(isHuman ? 350 : (isLowMass ? 280 : 180), now + duration * 0.75);
 
-        zapGain.gain.setValueAtTime((isLowMass ? 0.15 : 0.35) / (idx + 1), now);
+        zapGain.gain.setValueAtTime((isHuman ? 0.15 : (isLowMass ? 0.25 : 0.35)) / (idx + 1), now);
         zapGain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.85);
 
         zapOsc.connect(zapGain);

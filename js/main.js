@@ -67,6 +67,9 @@ class SimulatorApp {
     this.mouseX = 0;
     this.mouseY = 0;
 
+    // Scenario Runner State (1-by-1 Mode)
+    this.currentScenario = 1;
+
     // DOM UI elements
     this.dom = {
       stationDistText: document.getElementById('station-dist'),
@@ -84,6 +87,32 @@ class SimulatorApp {
       kavachAction: document.getElementById('kavach-action'),
       kavachPayloadVal: document.getElementById('kavach-payload-val'),
       kavachPayloadBar: document.getElementById('kavach-payload-bar'),
+      // Human & Animal Obstacle Scenario Buttons
+      btnHumanEnter: document.getElementById('btn-human-enter'),
+      btnHumanExit: document.getElementById('btn-human-exit'),
+      btnHumanMid: document.getElementById('btn-human-mid'),
+      btnHumanSudden: document.getElementById('btn-human-sudden'),
+      btnAnimalDog: document.getElementById('btn-animal-dog'),
+      btnAnimalDeer: document.getElementById('btn-animal-deer'),
+      btnAnimalCow: document.getElementById('btn-animal-cow'),
+      btnAnimalElephant: document.getElementById('btn-animal-elephant'),
+      btnAnimalCowSudden: document.getElementById('btn-animal-cow-sudden'),
+      btnClearObstacles: document.getElementById('btn-clear-obstacles'),
+      // Scenario Stepper Dock Elements (1-by-1 Scenarios 1 to 9)
+      btnScenPrev: document.getElementById('btn-scen-prev'),
+      btnScenNext: document.getElementById('btn-scen-next'),
+      btnScen1: document.getElementById('btn-scen-1'),
+      btnScen2: document.getElementById('btn-scen-2'),
+      btnScen3: document.getElementById('btn-scen-3'),
+      btnScen4: document.getElementById('btn-scen-4'),
+      btnScen5: document.getElementById('btn-scen-5'),
+      btnScen6: document.getElementById('btn-scen-6'),
+      btnScen7: document.getElementById('btn-scen-7'),
+      btnScen8: document.getElementById('btn-scen-8'),
+      btnScen9: document.getElementById('btn-scen-9'),
+      btnScenCam: document.getElementById('btn-scen-cam'),
+      btnScenShock: document.getElementById('btn-scen-shock'),
+      btnScenReplay: document.getElementById('btn-scen-replay'),
       // Floating Console Elements
       floatingConsole: document.getElementById('floating-console-container'),
       consoleSpeedVal: document.getElementById('console-speed-val'),
@@ -101,6 +130,7 @@ class SimulatorApp {
     this.initRenderer();
     this.initEventListeners();
     this.initUIControls();
+    this.updateScenarioHUD(1);
     this.setCameraMode('orbit');
 
     // Start render loop
@@ -194,6 +224,54 @@ class SimulatorApp {
           break;
         case 'KeyV':
           this.cycleWeather();
+          break;
+        case 'KeyB':
+          this.fireElectricShockPulse();
+          break;
+        case 'Digit1':
+        case 'Numpad1':
+          this.applyScenario(1);
+          break;
+        case 'Digit2':
+        case 'Numpad2':
+          this.applyScenario(2);
+          break;
+        case 'Digit3':
+        case 'Numpad3':
+          this.applyScenario(3);
+          break;
+        case 'Digit4':
+        case 'Numpad4':
+          this.applyScenario(4);
+          break;
+        case 'Digit5':
+        case 'Numpad5':
+          this.applyScenario(5);
+          break;
+        case 'Digit6':
+        case 'Numpad6':
+          this.applyScenario(6);
+          break;
+        case 'Digit7':
+        case 'Numpad7':
+          this.applyScenario(7);
+          break;
+        case 'Digit8':
+        case 'Numpad8':
+          this.applyScenario(8);
+          break;
+        case 'Digit9':
+        case 'Numpad9':
+          this.applyScenario(9);
+          break;
+        case 'BracketLeft':
+          this.prevScenario();
+          break;
+        case 'BracketRight':
+          this.nextScenario();
+          break;
+        case 'KeyX':
+          this.replayCurrentScenario();
           break;
       }
     });
@@ -357,6 +435,49 @@ class SimulatorApp {
       this.dom.btnConsoleShock.addEventListener('click', () => this.fireElectricShockPulse());
     }
 
+    // Obstacle Scenario Buttons inside Kavach Card
+    if (this.dom.btnHumanEnter) this.dom.btnHumanEnter.addEventListener('click', () => this.applyScenario(1));
+    if (this.dom.btnHumanExit) this.dom.btnHumanExit.addEventListener('click', () => this.applyScenario(2));
+    if (this.dom.btnHumanMid) this.dom.btnHumanMid.addEventListener('click', () => this.applyScenario(3));
+    if (this.dom.btnHumanSudden) this.dom.btnHumanSudden.addEventListener('click', () => this.applyScenario(4));
+    if (this.dom.btnAnimalDog) this.dom.btnAnimalDog.addEventListener('click', () => this.applyScenario(5));
+    if (this.dom.btnAnimalDeer) this.dom.btnAnimalDeer.addEventListener('click', () => this.applyScenario(6));
+    if (this.dom.btnAnimalCow) this.dom.btnAnimalCow.addEventListener('click', () => this.applyScenario(7));
+    if (this.dom.btnAnimalElephant) this.dom.btnAnimalElephant.addEventListener('click', () => this.applyScenario(8));
+    if (this.dom.btnAnimalCowSudden) this.dom.btnAnimalCowSudden.addEventListener('click', () => this.applyScenario(9));
+    if (this.dom.btnClearObstacles) {
+      this.dom.btnClearObstacles.addEventListener('click', () => {
+        this.obstacles.clearAllObstacles();
+        this.obstacles.resetCollected(this.train.captureNet);
+      });
+    }
+
+    // Scenario Stepper Dock Buttons (1-by-1 Scenarios Toolbar 1 to 9)
+    if (this.dom.btnScenPrev) {
+      this.dom.btnScenPrev.addEventListener('click', () => this.prevScenario());
+    }
+    if (this.dom.btnScenNext) {
+      this.dom.btnScenNext.addEventListener('click', () => this.nextScenario());
+    }
+    for (let i = 1; i <= 9; i++) {
+      const btn = document.getElementById(`btn-scen-${i}`);
+      if (btn) {
+        btn.addEventListener('click', () => this.applyScenario(i));
+      }
+    }
+    if (this.dom.btnScenCam) {
+      this.dom.btnScenCam.addEventListener('click', () => {
+        this.setCameraMode('target');
+        this.focusOnTarget(true);
+      });
+    }
+    if (this.dom.btnScenShock) {
+      this.dom.btnScenShock.addEventListener('click', () => this.fireElectricShockPulse());
+    }
+    if (this.dom.btnScenReplay) {
+      this.dom.btnScenReplay.addEventListener('click', () => this.replayCurrentScenario());
+    }
+
     // Toggle AI Kavach Safety Panel (Top bar button)
     const btnToggleKavach = document.getElementById('btn-toggle-kavach');
     if (btnToggleKavach && this.dom.kavachCard) {
@@ -404,6 +525,13 @@ class SimulatorApp {
   }
 
   fireElectricShockPulse() {
+    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isCleared);
+    if (!target) {
+      target = this.obstacles.spawnHumanAhead('mid', this.physics.trackProgress, this.track.totalLength, 70, false);
+    }
+    if (target) {
+      this.obstacles.triggerDeterrence(target, this.audio, this.train);
+    }
     if (this.train && this.train.pulseShockEmitters) {
       this.train.pulseShockEmitters(1.0);
       setTimeout(() => {
@@ -411,7 +539,7 @@ class SimulatorApp {
       }, 1000);
     }
     if (this.audio) {
-      this.audio.playElectricShockDischarge('shock', 100);
+      this.audio.playElectricShockDischarge(target ? target.type : 'human', target ? target.mass : 72);
     }
     if (this.dom.btnConsoleShock) {
       this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: FIRED';
@@ -483,11 +611,206 @@ class SimulatorApp {
       b.classList.toggle('active', isActive);
     });
 
-    if (mode === 'orbit' || mode === 'drone') {
+    if (mode === 'orbit' || mode === 'drone' || mode === 'target') {
       this.controls.enabled = true;
     } else {
       this.controls.enabled = false;
     }
+
+    if (mode === 'target') {
+      this.focusOnTarget(true);
+    }
+  }
+
+  // ---------------------------------------------------------
+  // Focus RX TARGET Camera directly on the Human Obstacle (Head-to-Toe 3/4 Orbit)
+  // ---------------------------------------------------------
+  focusOnTarget(forceReposition = true) {
+    let targetObs = this.obstacles.obstacles.find(o => !o.isCollected && o.mesh);
+    if (!targetObs || !targetObs.mesh) {
+      const aheadProg = (this.physics.trackProgress + (75 / this.track.totalLength)) % 1.0;
+      const spot = this.track.getTrackTransform(aheadProg, 0);
+      const camPos = spot.position.clone().add(new THREE.Vector3(2.5, 1.8, 4.0));
+      this.camera.position.copy(camPos);
+      this.controls.target.copy(spot.position.clone().add(new THREE.Vector3(0, 1.0, 0)));
+      this.controls.update();
+      return;
+    }
+
+    let centerOffsetY = 0.95;
+    let camDist = 3.6;
+    let latDist = 2.0;
+    let heightOff = 0.45;
+
+    if (targetObs.type === 'dog') {
+      centerOffsetY = 0.35;
+      camDist = 2.4;
+      latDist = 1.4;
+      heightOff = 0.30;
+    } else if (targetObs.type === 'deer') {
+      centerOffsetY = 0.70;
+      camDist = 3.6;
+      latDist = 1.8;
+      heightOff = 0.40;
+    } else if (targetObs.type === 'cow') {
+      centerOffsetY = 0.85;
+      camDist = 5.0;
+      latDist = 2.6;
+      heightOff = 0.60;
+    } else if (targetObs.type === 'elephant') {
+      centerOffsetY = 1.60;
+      camDist = 8.5;
+      latDist = 4.5;
+      heightOff = 1.20;
+    }
+
+    const targetPos = targetObs.mesh.position;
+    const targetCenter = targetPos.clone().add(new THREE.Vector3(0, centerOffsetY, 0));
+
+    const transform = this.track.getTrackTransform(targetObs.progress, 0);
+    const tangent = transform.tangent ? transform.tangent.clone().normalize() : new THREE.Vector3(0, 0, 1);
+    const normal = transform.normal ? transform.normal.clone().normalize() : new THREE.Vector3(1, 0, 0);
+    const up = new THREE.Vector3(0, 1, 0);
+
+    // 3/4 front-lateral perspective framing the full obstacle + rails + ground + approaching train
+    const camOffset = tangent.clone().multiplyScalar(camDist)
+      .add(normal.clone().multiplyScalar(latDist))
+      .add(up.clone().multiplyScalar(heightOff));
+    const idealCamPos = targetCenter.clone().add(camOffset);
+
+    if (forceReposition) {
+      this.camera.position.copy(idealCamPos);
+    }
+    this.controls.target.copy(targetCenter);
+    this.camera.lookAt(targetCenter);
+    this.controls.update();
+  }
+
+  // ---------------------------------------------------------
+  // One-by-One Scenario Execution Suite (Applies 1 Scenario in Isolation)
+  // ---------------------------------------------------------
+  applyScenario(index = 1, forceRepositionCam = true) {
+    this.currentScenario = index;
+    const obs = this.obstacles.applyScenario(index, this.physics.trackProgress, this.track.totalLength);
+
+    // Auto-switch to RX TARGET view to immediately observe the scenario and its animations
+    this.setCameraMode('target');
+    this.focusOnTarget(forceRepositionCam);
+
+    // Synchronize Scenario UI Buttons (1 through 9)
+    for (let i = 1; i <= 9; i++) {
+      const btn = document.getElementById(`btn-scen-${i}`);
+      if (btn) btn.classList.toggle('active', i === index);
+    }
+
+    if (this.dom.btnHumanEnter) this.dom.btnHumanEnter.classList.toggle('active', index === 1);
+    if (this.dom.btnHumanExit) this.dom.btnHumanExit.classList.toggle('active', index === 2);
+    if (this.dom.btnHumanMid) this.dom.btnHumanMid.classList.toggle('active', index === 3);
+    if (this.dom.btnHumanSudden) this.dom.btnHumanSudden.classList.toggle('active', index === 4);
+    if (this.dom.btnAnimalDog) this.dom.btnAnimalDog.classList.toggle('active', index === 5);
+    if (this.dom.btnAnimalDeer) this.dom.btnAnimalDeer.classList.toggle('active', index === 6);
+    if (this.dom.btnAnimalCow) this.dom.btnAnimalCow.classList.toggle('active', index === 7);
+    if (this.dom.btnAnimalElephant) this.dom.btnAnimalElephant.classList.toggle('active', index === 8);
+    if (this.dom.btnAnimalCowSudden) this.dom.btnAnimalCowSudden.classList.toggle('active', index === 9);
+
+    // Update Scenario Information HUD Card
+    this.updateScenarioHUD(index);
+  }
+
+  prevScenario() {
+    const nextIdx = this.currentScenario <= 1 ? 9 : this.currentScenario - 1;
+    this.applyScenario(nextIdx, true);
+  }
+
+  nextScenario() {
+    const nextIdx = this.currentScenario >= 9 ? 1 : this.currentScenario + 1;
+    this.applyScenario(nextIdx, true);
+  }
+
+  replayCurrentScenario() {
+    this.applyScenario(this.currentScenario || 1, true);
+  }
+
+  updateScenarioHUD(index) {
+    const badgeEl = document.getElementById('scen-card-badge');
+    const titleEl = document.getElementById('scen-card-title');
+    const leadEl = document.getElementById('scen-leg-lead');
+    const trailEl = document.getElementById('scen-leg-trail');
+    const descEl = document.getElementById('scen-card-desc');
+
+    const meta = [
+      null,
+      {
+        badge: 'SCENARIO 1 / 9 • 800M-80M ELECTRICITY ONLY',
+        title: '1. HUMAN ENTER ON TRACK (72 KG)',
+        lead: 'LEAD LEG: ON RAIL HEAD (+32 cm)',
+        trail: 'TRAILING LEG: ON GROUND (0 cm)',
+        desc: 'Inside lead foot steps UP onto elevated rail (+32cm). Trailing foot on ground (0cm). Early detection at 800m-80m uses ONLY non-lethal electricity to deter human safely.'
+      },
+      {
+        badge: 'SCENARIO 2 / 9 • 800M-80M ELECTRICITY ONLY',
+        title: '2. HUMAN EXIT TO TRACK (70 KG)',
+        lead: 'LEAD LEG: ON GROUND LEVEL (0 cm)',
+        trail: 'TRAILING LEG: ON RAIL HEAD (+32 cm)',
+        desc: 'Outside lead foot reaches DOWN to ground (0cm). Trailing foot pushes off elevated rail (+32cm). Early 800m-80m electricity ensures rapid egress off track.'
+      },
+      {
+        badge: 'SCENARIO 3 / 9 • 800M-80M ELECTRICITY ONLY',
+        title: '3. HUMAN MID-TRACK (74 KG)',
+        lead: 'POSITION: TRACK CENTERLINE (x = 0.00m)',
+        trail: 'FEET: PLANTED ON SLEEPERS BETWEEN RAILS',
+        desc: 'Walking along track centerline between rails. AI LiDAR & Camera detect at 800m; non-lethal electric shock pulse deters off track before 80m. No capture net used.'
+      },
+      {
+        badge: 'SCENARIO 4 / 9 • 80M-0M SUDDEN (NET OPEN)',
+        title: '4. HUMAN SUDDEN DASH (72 KG ≤ 150 KG)',
+        lead: 'INTRUSION: FAST SPRINT FROM BUSHES (<80M)',
+        trail: 'SAFETY: NO ELECTRICITY • CAPTURE NET DEPLOYS',
+        desc: 'Sudden emergence at 75m! High-voltage shock is DISABLED for sudden safety. Weight 72kg ≤ 150kg triggers automatic capture net deployment and scoop at 14m.'
+      },
+      {
+        badge: 'SCENARIO 5 / 9 • 80M-0M SUDDEN (NET OPEN)',
+        title: '5. STRAY DOG SUDDEN INTRUSION (22 KG)',
+        lead: 'SPECIES: CANIS LUPUS FAMILIARIS (22 KG)',
+        trail: 'SAFETY: NO ELECTRICITY • CAPTURE NET DEPLOYS',
+        desc: 'Stray dog darts across ballast at 72m! NO electricity is fired. Weight 22kg is well under 150kg limit, opening front capture net to rescue dog into cradle.'
+      },
+      {
+        badge: 'SCENARIO 6 / 9 • 80M-0M SUDDEN (NET OPEN)',
+        title: '6. SPOTTED DEER SUDDEN BOUND (48 KG)',
+        lead: 'SPECIES: AXIS AXIS / CHITAL (48 KG)',
+        trail: 'SAFETY: NO ELECTRICITY • CAPTURE NET DEPLOYS',
+        desc: 'Spotted deer bounds onto track at 76m! NO electricity is used. Payload 48kg is within 150kg safety rating, smoothly scooping deer without harm.'
+      },
+      {
+        badge: 'SCENARIO 7 / 9 • 800M-80M ONLY ELECTRICITY',
+        title: '7. INDIAN ZEBU COW ON TRACK (360 KG)',
+        lead: 'SPECIES: BOS INDICUS (360 KG > 150 KG)',
+        trail: 'SAFETY: ONLY ELECTRICITY (800M-80M) • NET LOCKED',
+        desc: 'Heavy cattle grazing 650m ahead. Weight 360kg > 150kg: Net is LOCKED. Non-lethal electric shock (4 power sources) clears cow off track safely before 80m.'
+      },
+      {
+        badge: 'SCENARIO 8 / 9 • 800M-80M ONLY ELECTRICITY',
+        title: '8. WILD ASIAN ELEPHANT (3,800 KG)',
+        lead: 'SPECIES: ELEPHAS MAXIMUS (3,800 KG > 150 KG)',
+        trail: 'SAFETY: QUAD ELECTRICITY (800M-80M) • NET LOCKED',
+        desc: 'Massive elephant 720m ahead. Net is strictly LOCKED (>150kg limit). Quad 7.8kV/3.8mA non-lethal shock pulse deters elephant off track without injury.'
+      },
+      {
+        badge: 'SCENARIO 9 / 9 • WEIGHT LIMIT TEST (>150KG)',
+        title: '9. COW SUDDEN INTRUSION (360 KG > 150 KG)',
+        lead: 'SUDDEN (<80M): 360 KG EXCEEDS 150 KG CAPACITY',
+        trail: 'SAFETY: NET LOCKED • NO ELECTRICITY • E-BRAKE',
+        desc: 'CRITICAL WEIGHT LIMIT TEST: 360kg cow enters suddenly at 75m. Net CANNOT open (>150kg structural lock prevents damage). NO electricity. Emergency brakes slam!'
+      }
+    ][index];
+
+    if (!meta) return;
+    if (badgeEl) badgeEl.innerText = meta.badge;
+    if (titleEl) titleEl.innerText = meta.title;
+    if (leadEl) leadEl.innerText = meta.lead;
+    if (trailEl) trailEl.innerText = meta.trail;
+    if (descEl) descEl.innerText = meta.desc;
   }
 
   cycleCamera() {
@@ -605,22 +928,29 @@ class SimulatorApp {
       }
 
     } else if (this.cameraMode === 'target') {
-      // RX TARGET: Camera placed ahead at target/obstacle looking back at oncoming train
+      // RX TARGET: Camera placed ahead at target/obstacle focused directly on the character/animal (head-to-toe 3/4 orbit)
       let targetObs = this.obstacles.obstacles.find(o => !o.isCollected && o.mesh);
-      if (targetObs) {
+      if (targetObs && targetObs.mesh) {
+        let centerOffsetY = 0.95;
+        if (targetObs.type === 'dog') centerOffsetY = 0.35;
+        else if (targetObs.type === 'deer') centerOffsetY = 0.70;
+        else if (targetObs.type === 'cow') centerOffsetY = 0.85;
+        else if (targetObs.type === 'elephant') centerOffsetY = 1.60;
+
         const targetPos = targetObs.mesh.position;
-        const camPos = targetPos.clone()
-          .add(forward.clone().multiplyScalar(5.5))
-          .add(right.clone().multiplyScalar(-2.5))
-          .add(up.clone().multiplyScalar(1.6));
-        this.camera.position.copy(camPos);
-        this.camera.lookAt(locoPos.clone().add(up.clone().multiplyScalar(2.0)));
+        const targetCenter = targetPos.clone().add(new THREE.Vector3(0, centerOffsetY, 0));
+
+        // Smoothly maintain OrbitControls focus on the target's center of mass
+        this.controls.target.lerp(targetCenter, 0.18);
+        this.controls.minDistance = 1.0;
+        this.controls.maxDistance = 35.0;
+        this.controls.update();
       } else {
-        const aheadProg = (this.physics.trackProgress + (85 / this.track.totalLength)) % 1.0;
+        const aheadProg = (this.physics.trackProgress + (75 / this.track.totalLength)) % 1.0;
         const spot = this.track.getTrackTransform(aheadProg, 0);
-        const camPos = spot.position.clone().add(spot.normal.clone().multiplyScalar(2.8)).setY(spot.position.y + 1.8);
-        this.camera.position.copy(camPos);
-        this.camera.lookAt(locoPos.clone().add(up.clone().multiplyScalar(2.0)));
+        const lookTarget = spot.position.clone().add(new THREE.Vector3(0, 1.0, 0));
+        this.controls.target.lerp(lookTarget, 0.15);
+        this.controls.update();
       }
 
     } else if (this.cameraMode === 'cab') {

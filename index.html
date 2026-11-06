@@ -85,6 +85,27 @@
         </div>
       </header>
 
+      <!-- SCENARIO INFORMATION HUD CARD (One-by-One Inspection & Biomechanics Telemetry) -->
+      <div id="scenario-info-card" class="scenario-info-card hud-interactive">
+        <div class="scen-card-header">
+          <span class="scen-badge" id="scen-card-badge">SCENARIO 1 / 4</span>
+          <span class="scen-title" id="scen-card-title">1. ENTER ON TRACK</span>
+          <span class="scen-cam-indicator" id="scen-card-cam">🎥 RX TARGET (360° ORBIT)</span>
+        </div>
+        <div class="scen-card-body">
+          <div class="scen-leg-row">
+            <span class="leg-pill rail" id="scen-leg-lead">LEAD LEG: ON RAIL HEAD (+32 cm)</span>
+            <span class="leg-pill ground" id="scen-leg-trail">TRAILING LEG: ON GROUND (0 cm)</span>
+          </div>
+          <div class="scen-desc" id="scen-card-desc">
+            Inside lead foot steps UP onto the elevated rail head (+32cm). Trailing foot planted on lower ballast slope (0cm). Weight shifting balance dynamics.
+          </div>
+          <div class="scen-hint">
+            💡 Drag Mouse to Orbit 360° | Scroll to Zoom | Press [B] or [⚡ E-SHOCK] to test deterrence
+          </div>
+        </div>
+      </div>
+
       <!-- CENTER ALERT BANNER (Only active during obstacle safety rescue events) -->
       <div id="alert-banner" style="display: none"></div>
 
@@ -196,6 +217,90 @@
             ></div>
           </div>
         </div>
+
+        <!-- HUMAN OBSTACLE CONTROLS (4 DISTINCT SCENARIOS) -->
+        <div class="kavach-spawner-header" style="margin-top: 10px;">HUMAN OBSTACLES (4 SCENARIOS):</div>
+        <div class="kavach-spawner-grid" style="margin-bottom: 6px;">
+          <button
+            class="spawn-btn"
+            id="btn-human-enter"
+            title="1. Enter on Track: First leg on track, second on ground [Key 1]"
+          >
+            🚶 1. Enter (Rail/Ground)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-human-exit"
+            title="2. Exit to Track: First leg on ground, second on track [Key 2]"
+          >
+            🏃 2. Exit (Ground/Rail)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-human-mid"
+            title="3. Mid in Track: Centered between rails [Key 3]"
+          >
+            🧍 3. Mid-Track (Center)
+          </button>
+          <button
+            class="spawn-btn hazard"
+            id="btn-human-sudden"
+            title="4. Suddenly Appear: 80m-0m Net Rescue (No Electricity) [Key 4]"
+          >
+            🪤 4. Sudden (Net Open)
+          </button>
+        </div>
+
+        <!-- ANIMAL OBSTACLES (DIFFERENT SIZE & WEIGHT) -->
+        <div class="kavach-spawner-header" style="margin-top: 6px;">ANIMAL OBSTACLES (SIZE & WEIGHT TIERS):</div>
+        <div class="kavach-spawner-grid" style="margin-bottom: 8px;">
+          <button
+            class="spawn-btn"
+            id="btn-animal-dog"
+            title="5. Stray Dog Sudden (22kg ≤ 150kg Net Scoop, No Electricity) [Key 5]"
+          >
+            🐕 5. Dog (22kg Net)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-animal-deer"
+            title="6. Spotted Deer Sudden (48kg ≤ 150kg Net Scoop, No Electricity) [Key 6]"
+          >
+            🦌 6. Deer (48kg Net)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-animal-cow"
+            title="7. Indian Cow on Track (360kg: 800m-80m Electricity Only, Net Locked) [Key 7]"
+          >
+            🐄 7. Cow (360kg Shock)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-animal-elephant"
+            title="8. Wild Elephant on Track (3,800kg: Quad Electricity Only, Net Locked) [Key 8]"
+          >
+            🐘 8. Elephant (3.8t Shock)
+          </button>
+          <button
+            class="spawn-btn hazard"
+            id="btn-animal-cow-sudden"
+            style="grid-column: span 2;"
+            title="9. Cow Sudden Intrusion (360kg > 150kg: Net Locked Hazard, No Electricity, E-Brake) [Key 9]"
+          >
+            ⚠️ 9. Cow Sudden (360kg > 150kg Net Locked)
+          </button>
+        </div>
+        <div class="kavach-spawner-grid">
+          <button
+            class="spawn-btn clear"
+            id="btn-clear-obstacles"
+            style="grid-column: span 2;"
+            title="Reset & Clear All Track Obstacles"
+          >
+            🔄 Reset & Clear Obstacles
+          </button>
+        </div>
       </div>
 
       <!-- FLOATING DUAL-TIER CONSOLE DOCK & TELEMETRY TICKER -->
@@ -203,6 +308,26 @@
         class="floating-console-container hud-interactive"
         id="floating-console-container"
       >
+        <!-- Tier 0: Scenario Stepper Bar (Apply 1-by-1 Scenarios 1 through 9) -->
+        <div class="scenario-stepper-bar">
+          <span class="scenario-label">SCENARIOS:</span>
+          <button class="scenario-nav-btn" id="btn-scen-prev" title="Previous Scenario [Key []">◀ PREV</button>
+          <button class="scenario-btn active" id="btn-scen-1" data-scenario="1" title="1. Enter on Track: First leg on rail (+32cm), second on ground (0cm) [Key 1]">🚶 1. ENTER</button>
+          <button class="scenario-btn" id="btn-scen-2" data-scenario="2" title="2. Exit to Track: First leg on ground (0cm), second on rail (+32cm) [Key 2]">🏃 2. EXIT</button>
+          <button class="scenario-btn" id="btn-scen-3" data-scenario="3" title="3. Mid in Track: Centered between rails on sleepers [Key 3]">🧍 3. MID</button>
+          <button class="scenario-btn hazard" id="btn-scen-4" data-scenario="4" title="4. Sudden Jaywalker (72kg ≤ 150kg Net Scoop, No Electricity) [Key 4]">🪤 4. SUDDEN</button>
+          <button class="scenario-btn" id="btn-scen-5" data-scenario="5" title="5. Stray Dog Sudden (22kg ≤ 150kg Net Scoop, No Electricity) [Key 5]">🐕 5. DOG</button>
+          <button class="scenario-btn" id="btn-scen-6" data-scenario="6" title="6. Spotted Deer Sudden (48kg ≤ 150kg Net Scoop, No Electricity) [Key 6]">🦌 6. DEER</button>
+          <button class="scenario-btn" id="btn-scen-7" data-scenario="7" title="7. Indian Cow (360kg: 800m-80m Electricity Only, Net Locked) [Key 7]">🐄 7. COW</button>
+          <button class="scenario-btn" id="btn-scen-8" data-scenario="8" title="8. Wild Elephant (3,800kg: Quad Electricity Only, Net Locked) [Key 8]">🐘 8. ELEPHANT</button>
+          <button class="scenario-btn hazard" id="btn-scen-9" data-scenario="9" title="9. Cow Sudden (>150kg: Net Locked Hazard, No Electricity, E-Brake) [Key 9]">⚠️ 9. COW SUDDEN</button>
+          <button class="scenario-nav-btn" id="btn-scen-next" title="Next Scenario [Key ]]">NEXT ▶</button>
+          <div class="scenario-sep"></div>
+          <button class="scenario-action-btn cam" id="btn-scen-cam" title="View Target Head-to-Toe in RX TARGET View">🎥 RX TARGET</button>
+          <button class="scenario-action-btn shock" id="btn-scen-shock" title="Test Non-Lethal Electric Shock Deterrence [Key B]">⚡ E-SHOCK</button>
+          <button class="scenario-action-btn reset" id="btn-scen-replay" title="Replay / Reset Current Scenario [Key X]">🔄 REPLAY</button>
+        </div>
+
         <!-- Tier 1: Viewport Toolbar -->
         <div class="viewport-pill-bar">
           <span class="viewport-label">VIEWPORT:</span>
@@ -469,10 +594,70 @@
           <span class="shortcut-desc">Mute / Unmute Audio</span>
           <span class="kbd-badge">M</span>
         </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 1: Human Enter Track (800m-80m Electricity Only)</span>
+          <span class="kbd-badge">1</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 2: Human Exit Track (800m-80m Electricity Only)</span>
+          <span class="kbd-badge">2</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 3: Human Mid-Track (800m-80m Electricity Only)</span>
+          <span class="kbd-badge">3</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 4: Human Sudden Dash (≤150kg Net Open, No Electricity)</span>
+          <span class="kbd-badge">4</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 5: Stray Dog Sudden (22kg ≤ 150kg Net Open, No Electricity)</span>
+          <span class="kbd-badge">5</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 6: Spotted Deer Sudden (48kg ≤ 150kg Net Open, No Electricity)</span>
+          <span class="kbd-badge">6</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 7: Indian Cow on Track (360kg: 800m-80m Electricity Only)</span>
+          <span class="kbd-badge">7</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 8: Wild Elephant (3,800kg: Quad Electricity Only)</span>
+          <span class="kbd-badge">8</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 9: Cow Sudden Intrusion (360kg > 150kg: Net Locked, E-Brake)</span>
+          <span class="kbd-badge">9</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Step Previous / Next Scenario (1-by-1)</span>
+          <span class="kbd-badge">[ / ]</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Replay Current Scenario (Reset Position & Dash)</span>
+          <span class="kbd-badge">X</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Test Electric Shock Deterrence on Obstacle</span>
+          <span class="kbd-badge">B</span>
+        </div>
       </div>
     </div>
 
+    <!-- Global Error Catcher -->
+    <script>
+      window.addEventListener('error', function (e) {
+        console.error('Simulator Runtime Error:', e.error || e.message);
+        var b = document.getElementById('alert-banner');
+        if (b) {
+          b.style.display = 'block';
+          b.style.background = 'rgba(220, 38, 38, 0.95)';
+          b.innerText = 'Runtime Warning: ' + (e.message || 'Error loading simulator');
+        }
+      });
+    </script>
     <!-- Main Self-Contained Bundle with Cache-Buster -->
-    <script src="bundle.js?v=20261106_v3"></script>
+    <script src="bundle.js?v=20261106_v6"></script>
   </body>
 </html>
