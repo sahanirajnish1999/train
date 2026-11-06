@@ -88,12 +88,8 @@ class SimulatorApp {
       btnSpawnTier2: document.getElementById('btn-spawn-tier2'),
       btnSpawnTier3: document.getElementById('btn-spawn-tier3'),
       btnSpawnTier4: document.getElementById('btn-spawn-tier4'),
-      btnSpawnHuman: document.getElementById('btn-spawn-human'),
-      btnSpawnHumanFlee: document.getElementById('btn-spawn-human-flee'),
-      btnSpawnAnimal: document.getElementById('btn-spawn-animal'),
-      btnSpawnAnimalFlee: document.getElementById('btn-spawn-animal-flee'),
-      btnSpawnBull: document.getElementById('btn-spawn-bull'),
-      btnSpawnBullFlee: document.getElementById('btn-spawn-bull-flee'),
+      btnSpawnDebris: document.getElementById('btn-spawn-debris'),
+      btnSpawnHeavyCargo: document.getElementById('btn-spawn-heavy-cargo'),
       btnSpawnCoachSide: document.getElementById('btn-spawn-coach-side'),
       btnClearCradle: document.getElementById('btn-clear-cradle'),
       // Floating Console Elements
@@ -286,57 +282,37 @@ class SimulatorApp {
       });
     }
 
-    // Weight-Tiered Power Source Spawners (User requirement: 1, 2, 3, 4 Power Sources)
+    // Weight-Tiered Power Source Spawners (1, 2, 3, 4 Power Sources)
     if (this.dom.btnSpawnTier1) {
       this.dom.btnSpawnTier1.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, true, 72, 'Person (<150kg)');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 40, 'Track Debris (40kg)');
       });
     }
     if (this.dom.btnSpawnTier2) {
       this.dom.btnSpawnTier2.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, true, 200, 'Sub-Adult Animal (200kg)');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 200, 'Medium Cargo (200kg)');
       });
     }
     if (this.dom.btnSpawnTier3) {
       this.dom.btnSpawnTier3.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, true, 300, 'Livestock (300kg)');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 300, 'Heavy Cargo (300kg)');
       });
     }
     if (this.dom.btnSpawnTier4) {
       this.dom.btnSpawnTier4.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, true, 480, 'Heavy Bull (480kg)');
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 450, 'Critical Freight (450kg)');
       });
     }
 
-    // AI Kavach Obstacle Spawner Buttons (Directly testing the user's safety requirements)
-    if (this.dom.btnSpawnHumanFlee) {
-      this.dom.btnSpawnHumanFlee.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, true);
+    // Safety Protocol Test Spawners
+    if (this.dom.btnSpawnDebris) {
+      this.dom.btnSpawnDebris.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, false, 40, 'Track Debris (40kg)');
       });
     }
-    if (this.dom.btnSpawnHuman) {
-      this.dom.btnSpawnHuman.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 85, false);
-      });
-    }
-    if (this.dom.btnSpawnAnimalFlee) {
-      this.dom.btnSpawnAnimalFlee.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, true);
-      });
-    }
-    if (this.dom.btnSpawnAnimal) {
-      this.dom.btnSpawnAnimal.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'animal', 85, false);
-      });
-    }
-    if (this.dom.btnSpawnBullFlee) {
-      this.dom.btnSpawnBullFlee.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, true);
-      });
-    }
-    if (this.dom.btnSpawnBull) {
-      this.dom.btnSpawnBull.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'cattle', 85, false);
+    if (this.dom.btnSpawnHeavyCargo) {
+      this.dom.btnSpawnHeavyCargo.addEventListener('click', () => {
+        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, false, 400, 'Heavy Cargo (400kg)');
       });
     }
     if (this.dom.btnSpawnCoachSide) {
@@ -482,7 +458,7 @@ class SimulatorApp {
   fireElectricShockPulse() {
     let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isCleared);
     if (!target) {
-      target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'human', 70, false);
+      target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 70, false, 40, 'Track Debris (40kg)');
     }
     if (target) {
       this.obstacles.triggerDeterrence(target, this.audio, this.train);

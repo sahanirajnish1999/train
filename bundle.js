@@ -34396,18 +34396,18 @@ void main() {
     // ---------------------------------------------------------
     // Active Non-Lethal Deterrence Sound Effects (>150kg Animals)
     // ---------------------------------------------------------
-    // 1. High-Voltage Track Electric Pulse / Arc Crackle (Tailored for Human vs Animal)
-    playElectricShockDischarge(type = "animal", mass = 150) {
+    // 1. High-Voltage Track Electric Pulse / Arc Crackle (Tailored by Mass)
+    playElectricShockDischarge(type = "debris", mass = 150) {
       if (!this.ctx || this.isMuted) return;
       try {
         this.resume();
         const now = this.ctx.currentTime;
-        const isHuman = type === "human";
-        const duration = isHuman ? 0.22 : 0.45;
+        const isLowMass = (mass || 150) < 150;
+        const duration = isLowMass ? 0.22 : 0.45;
         const bufferSize = Math.floor(this.ctx.sampleRate * duration);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
-        const decayRate = isHuman ? 0.05 : 0.12;
+        const decayRate = isLowMass ? 0.05 : 0.12;
         for (let i = 0; i < bufferSize; i++) {
           data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * decayRate));
         }
@@ -34415,24 +34415,24 @@ void main() {
         noiseNode.buffer = buffer;
         const bpf = this.ctx.createBiquadFilter();
         bpf.type = "bandpass";
-        bpf.frequency.setValueAtTime(isHuman ? 4800 : 3200, now);
-        bpf.frequency.exponentialRampToValueAtTime(isHuman ? 2200 : 1400, now + duration * 0.85);
-        bpf.Q.value = isHuman ? 6 : 4;
+        bpf.frequency.setValueAtTime(isLowMass ? 4800 : 3200, now);
+        bpf.frequency.exponentialRampToValueAtTime(isLowMass ? 2200 : 1400, now + duration * 0.85);
+        bpf.Q.value = isLowMass ? 6 : 4;
         const noiseGain = this.ctx.createGain();
-        noiseGain.gain.setValueAtTime(isHuman ? 0.35 : 0.75, now);
+        noiseGain.gain.setValueAtTime(isLowMass ? 0.35 : 0.75, now);
         noiseGain.gain.exponentialRampToValueAtTime(1e-3, now + duration);
         noiseNode.connect(bpf);
         bpf.connect(noiseGain);
         noiseGain.connect(this.masterGain);
         noiseNode.start(now);
-        const freqs = isHuman ? [880, 1760] : [420, 840, 1680];
+        const freqs = isLowMass ? [880, 1760] : [420, 840, 1680];
         freqs.forEach((freq, idx) => {
           const zapOsc = this.ctx.createOscillator();
           const zapGain = this.ctx.createGain();
-          zapOsc.type = isHuman ? "sine" : "sawtooth";
-          zapOsc.frequency.setValueAtTime(freq + Math.random() * (isHuman ? 40 : 120), now);
-          zapOsc.frequency.exponentialRampToValueAtTime(isHuman ? 350 : 180, now + duration * 0.75);
-          zapGain.gain.setValueAtTime((isHuman ? 0.15 : 0.35) / (idx + 1), now);
+          zapOsc.type = isLowMass ? "sine" : "sawtooth";
+          zapOsc.frequency.setValueAtTime(freq + Math.random() * (isLowMass ? 40 : 120), now);
+          zapOsc.frequency.exponentialRampToValueAtTime(isLowMass ? 350 : 180, now + duration * 0.75);
+          zapGain.gain.setValueAtTime((isLowMass ? 0.15 : 0.35) / (idx + 1), now);
           zapGain.gain.exponentialRampToValueAtTime(1e-3, now + duration * 0.85);
           zapOsc.connect(zapGain);
           zapGain.connect(this.masterGain);
@@ -36440,7 +36440,7 @@ void main() {
       ctxApron.font = 'bold 22px "Courier New", monospace';
       ctxApron.fillStyle = "#ffffff";
       ctxApron.textAlign = "center";
-      ctxApron.fillText("\u2726 HUMAN RESCUE CRADLE \u2726", 256, 40);
+      ctxApron.fillText("\u2726 SAFETY RETENTION CRADLE \u2726", 256, 40);
       ctxApron.fillText("MAX 150 KG \u2022 DECELERATION ZONE", 256, 495);
       const apronTex = new CanvasTexture(canvasApron);
       apronTex.wrapS = ClampToEdgeWrapping;
@@ -37227,32 +37227,26 @@ void main() {
       this.beginCaptureSequence(obstacleMesh, obstacleInfo);
     }
     beginCaptureSequence(obstacleMesh, obstacleInfo) {
-      const isHuman = obstacleInfo.type === "human";
-      const isAnimal = obstacleInfo.type === "animal";
       const count = this.collectedList.length;
       const xPattern = [0, -0.34, 0.34, -0.18, 0.18];
-      const targetX = isHuman ? xPattern[count % xPattern.length] : 0;
+      const targetX = xPattern[count % xPattern.length];
       const zOffset = -0.22 + Math.floor(count / 2) * 0.42;
       this.cradleCargoGroup.add(obstacleMesh);
       this.collectedList.push(obstacleInfo);
       this.totalPayloadWeight += obstacleInfo.mass;
-      obstacleMesh.position.set(0, isHuman ? -0.32 : isAnimal ? -0.16 : -0.15, 1.55);
+      obstacleMesh.position.set(0, -0.15, 1.55);
       obstacleMesh.rotation.set(0, 0, 0);
-      const targetPos = new Vector3(
-        targetX,
-        isHuman ? -0.38 : isAnimal ? -0.22 : -0.15,
-        isHuman ? zOffset - 0.05 : isAnimal ? zOffset + 0.08 : zOffset
-      );
-      const targetRotX = isHuman ? -0.16 : isAnimal ? -0.25 : 0;
-      const targetRotY = isHuman ? count % 2 === 1 ? -0.14 : 0.14 : 0;
-      const targetRotZ = isAnimal ? 0.12 : isHuman ? count % 2 === 1 ? 0.05 : -0.05 : 0;
+      const targetPos = new Vector3(targetX, -0.15, zOffset);
+      const targetRotX = 0;
+      const targetRotY = count % 2 === 1 ? -0.14 : 0.14;
+      const targetRotZ = 0;
       const animItem = {
         mesh: obstacleMesh,
         info: obstacleInfo,
         time: 0,
         duration: 0.75,
-        // simulation seconds (stretches realistically in slow-motion)
-        startPos: new Vector3(0, isHuman ? -0.32 : isAnimal ? -0.16 : -0.15, 1.55),
+        // simulation seconds
+        startPos: new Vector3(0, -0.15, 1.55),
         targetPos,
         targetRotX,
         targetRotY,
@@ -37385,51 +37379,6 @@ void main() {
           cap.mesh.rotation.x = MathUtils.lerp(0, cap.targetRotX, rotS);
           cap.mesh.rotation.y = MathUtils.lerp(0, cap.targetRotY || 0, rotS);
           cap.mesh.rotation.z = MathUtils.lerp(0, cap.targetRotZ, rotS);
-          const ud = cap.userData;
-          if (ud.type === "human") {
-            if (ud.torsoGroup) {
-              ud.torsoGroup.rotation.x = MathUtils.lerp(0, -0.38, rotS);
-            }
-            if (ud.legL) ud.legL.rotation.x = MathUtils.lerp(0, 1.25, rotS);
-            if (ud.legR) ud.legR.rotation.x = MathUtils.lerp(0, 1.15, rotS);
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = MathUtils.lerp(0, -1.65, rotS);
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = MathUtils.lerp(0, -1.55, rotS);
-            if (ud.armL) {
-              ud.armL.rotation.x = MathUtils.lerp(0, -0.45, rotS);
-              ud.armL.rotation.y = MathUtils.lerp(0, 0.15, rotS);
-              ud.armL.rotation.z = MathUtils.lerp(0, -0.48, rotS);
-            }
-            if (ud.armR) {
-              ud.armR.rotation.x = MathUtils.lerp(0, -0.4, rotS);
-              ud.armR.rotation.y = MathUtils.lerp(0, -0.12, rotS);
-              ud.armR.rotation.z = MathUtils.lerp(0, 0.45, rotS);
-            }
-            if (ud.forearmL) ud.forearmL.rotation.x = MathUtils.lerp(-0.22, -1.12, rotS);
-            if (ud.forearmR) ud.forearmR.rotation.x = MathUtils.lerp(-0.22, -1.08, rotS);
-            if (ud.headGroup) ud.headGroup.rotation.x = MathUtils.lerp(0, -0.25, rotS);
-          } else if (ud.type === "animal") {
-            if (ud.legs) {
-              ud.legs.forEach((leg) => {
-                const grp = leg.group || leg;
-                grp.rotation.x = MathUtils.lerp(0, 0.55, rotS);
-                if (leg.kneeGroup) {
-                  leg.kneeGroup.rotation.x = MathUtils.lerp(0, leg.isFront ? -1.8 : 1.7, rotS);
-                }
-              });
-            }
-            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
-              ud.trunkSegments[0].rotation.x = MathUtils.lerp(-0.42, -0.3, rotS);
-              ud.trunkSegments[1].rotation.x = MathUtils.lerp(-0.36, -0.25, rotS);
-              ud.trunkSegments[2].rotation.x = MathUtils.lerp(-0.28, -0.15, rotS);
-              ud.trunkSegments[3].rotation.x = MathUtils.lerp(0.7, 0.55, rotS);
-              ud.trunkSegments[4].rotation.x = MathUtils.lerp(0.75, 0.65, rotS);
-            }
-            if (ud.earL) ud.earL.rotation.y = MathUtils.lerp(-0.45, -0.25, rotS);
-            if (ud.earR) ud.earR.rotation.y = MathUtils.lerp(0.45, 0.25, rotS);
-            if (ud.headGroup) {
-              ud.headGroup.rotation.x = MathUtils.lerp(0, -0.15, rotS);
-            }
-          }
           if (p > 0.4 && p < 0.65) {
             this.cradlePayloadSag = -0.16 * Math.sin((p - 0.4) / 0.25 * Math.PI);
           }
@@ -37441,91 +37390,8 @@ void main() {
             cap.mesh.rotation.z = cap.targetRotZ;
           }
         } else {
-          const ud = cap.userData;
-          const t = this.aeroTime;
-          if (ud.type === "human") {
-            if (ud.faceData) {
-              const blinkCycle = t * 0.32 % 1;
-              let blinkFactor = 0;
-              if (blinkCycle < 0.04) {
-                blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
-              }
-              if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
-                ud.faceData.drawFace(blinkFactor);
-                ud.faceData.tex.needsUpdate = true;
-                ud.faceData.lastBlink = blinkFactor;
-              }
-            }
-            const breath = Math.sin(t * 2.8);
-            const deepReliefSigh = Math.pow(Math.max(0, Math.sin(t * 0.45)), 4) * 0.08;
-            if (ud.torsoGroup) {
-              const exp = 0.038 * breath + deepReliefSigh;
-              ud.torsoGroup.scale.set(1 + exp, 1 + exp * 0.6, 1 + exp);
-              ud.torsoGroup.rotation.x = -0.38 + 0.025 * breath;
-            }
-            if (ud.headGroup) {
-              const lookUp = -0.28 + 0.06 * Math.sin(t * 1.6);
-              const lookYaw = 0.28 * Math.sin(t * 0.7) + 0.12 * Math.sin(t * 1.8);
-              const nod = 0.03 * Math.sin(t * 3.2);
-              ud.headGroup.rotation.set(lookUp + nod, lookYaw, 0.04 * Math.sin(t * 0.9));
-            }
-            if (ud.armL && ud.forearmL) {
-              ud.armL.rotation.set(-0.45 + 0.03 * Math.sin(t * 2), 0.15, -0.48 + 0.04 * Math.cos(t * 1.7));
-              ud.forearmL.rotation.x = -1.12 + 0.07 * Math.sin(t * 2.3);
-            }
-            if (ud.armR && ud.forearmR) {
-              ud.armR.rotation.set(-0.4 + 0.03 * Math.cos(t * 1.9), -0.12, 0.45 + 0.04 * Math.sin(t * 2.1));
-              ud.forearmR.rotation.x = -1.08 + 0.06 * Math.cos(t * 2.2);
-            }
-            const railBump = 0.03 * Math.sin(t * 22) * vNorm;
-            if (ud.legL) ud.legL.rotation.x = 1.25 + 0.02 * Math.sin(t * 1.5);
-            if (ud.legR) ud.legR.rotation.x = 1.15 + 0.02 * Math.cos(t * 1.4);
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -1.65 + railBump;
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -1.55 + railBump;
-            cap.mesh.rotation.z = 0.025 * Math.sin(t * 3.2) * vNorm;
-            cap.mesh.rotation.x = cap.targetRotX + 0.018 * Math.cos(t * 3.8) * vNorm;
-          } else if (ud.type === "animal") {
-            if (ud.faceData) {
-              const blinkCycle = t * 0.25 % 1;
-              let blinkFactor = 0;
-              if (blinkCycle < 0.05) {
-                blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
-              }
-              if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
-                ud.faceData.drawFace(blinkFactor);
-                ud.faceData.tex.needsUpdate = true;
-                ud.faceData.lastBlink = blinkFactor;
-              }
-            }
-            const breathAnim = Math.sin(t * 2.8);
-            if (ud.body) {
-              ud.body.scale.set(1.05 + 0.03 * breathAnim, 1.18 + 0.025 * breathAnim, 1);
-            }
-            if (ud.headGroup) {
-              ud.headGroup.rotation.y = Math.sin(t * 1.2) * 0.22;
-              ud.headGroup.rotation.x = -0.12 + Math.sin(t * 2) * 0.05;
-            }
-            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
-              const curlWave = Math.sin(t * 2);
-              ud.trunkSegments[0].rotation.x = -0.3 + 0.05 * curlWave;
-              ud.trunkSegments[1].rotation.x = -0.25 + 0.04 * curlWave;
-              ud.trunkSegments[2].rotation.x = -0.15 + 0.03 * curlWave;
-              ud.trunkSegments[3].rotation.x = 0.55 + 0.06 * curlWave;
-              ud.trunkSegments[4].rotation.x = 0.65 + 0.08 * curlWave;
-            }
-            if (ud.earL) ud.earL.rotation.y = -0.3 + 0.08 * Math.sin(t * 1.8);
-            if (ud.earR) ud.earR.rotation.y = 0.3 - 0.08 * Math.sin(t * 1.8);
-            if (ud.tail) {
-              ud.tail.rotation.z = Math.sin(t * 3.5) * 0.45;
-              ud.tail.rotation.x = 0.35 + Math.abs(Math.sin(t * 1.8)) * 0.2;
-            }
-            if (ud.legs) {
-              ud.legs.forEach((leg) => {
-                const grp = leg.group || leg;
-                grp.rotation.x = 0.55;
-              });
-            }
-          }
+          cap.mesh.rotation.z = 0.025 * Math.sin(this.aeroTime * 3.2) * vNorm;
+          cap.mesh.rotation.x = cap.targetRotX + 0.018 * Math.cos(this.aeroTime * 3.8) * vNorm;
         }
       }
       if (this.lidarBeam) {
@@ -39782,13 +39648,14 @@ void main() {
           shortTitle: "TRACK ELECTRIC SHOCK",
           badge: "E-SHOCK PULSE",
           color: "#38bdf8",
-          detail: "Discharges non-lethal pulsed electrical gradient across track rails and forward contact sweepers (compliant with IEC 60335-2-76 / RDSO). Prompts immediate flight off track without burns or physical injury."
+          detail: "Discharges non-lethal pulsed electrical gradient across track rails and forward contact sweepers (compliant with IEC 60335-2-76 / RDSO). Prompts immediate clearance off track without burns or physical injury."
         }
       };
       this.fxGroup = new Group();
       this.scene.add(this.fxGroup);
       this.activeFX = null;
       this.fxTimer = 0;
+      this.activePowerSourceIndices = null;
       this.telemetry = {
         targetDetected: false,
         type: null,
@@ -39809,93 +39676,11 @@ void main() {
       };
       this.animTime = 0;
       this.materials = {
-        // Modern Stylized Human Character Materials (Exact match to media_1793819995371_c74a70f7.png)
-        humanSkinPeach: new MeshStandardMaterial({ color: 16566183, roughness: 0.62 }),
-        // Warm peach skin tone
-        humanSkinShadow: new MeshStandardMaterial({ color: 15445387, roughness: 0.68 }),
-        humanBlush: new MeshStandardMaterial({ color: 16020150, roughness: 0.55, transparent: true, opacity: 0.85 }),
-        // Rosy blush cheeks
-        humanHairGinger: new MeshStandardMaterial({ color: 14243627, roughness: 0.78 }),
-        // Auburn / ginger swept quiff hair
-        humanEyesWhite: new MeshBasicMaterial({ color: 16777215 }),
-        humanEyesIris: new MeshStandardMaterial({ color: 1976635, roughness: 0.2 }),
-        // Deep dark friendly cartoon pupil
-        humanEyeReflex: new MeshBasicMaterial({ color: 16777215 }),
-        // Specular catchlight dot
-        humanBrow: new MeshStandardMaterial({ color: 2565930, roughness: 0.7 }),
-        // Arched brows
-        humanSmile: new MeshStandardMaterial({ color: 10105874, roughness: 0.6 }),
-        // Sweet curved mouth
-        humanPoloCream: new MeshStandardMaterial({ color: 16051940, roughness: 0.72 }),
-        // Beige / cream polo shirt
-        humanPoloCollar: new MeshStandardMaterial({ color: 16777215, roughness: 0.55 }),
-        // Crisp white folded collar
-        humanPantsBrown: new MeshStandardMaterial({ color: 7883314, roughness: 0.75 }),
-        // Tailored warm brown chinos
-        humanShoesDark: new MeshStandardMaterial({ color: 2039587, roughness: 0.65 }),
-        // Dark casual loafers
-        // Indian Elephant Materials (Exact match to media_1793820037213_e448b2e7.jpg)
-        elephantSkin: new MeshStandardMaterial({ color: 6319995, roughness: 0.7 }),
-        // Natural slate grey-blue body skin
-        elephantSkinDark: new MeshStandardMaterial({ color: 4543068, roughness: 0.75 }),
-        // Dark contour accents & creases
-        elephantEarInner: new MeshStandardMaterial({ color: 5662064, roughness: 0.78 }),
-        // Ear contour / inner face
-        elephantTusk: new MeshStandardMaterial({ color: 16775909, roughness: 0.28, metalness: 0.05 }),
-        // Smooth ivory tusks
-        elephantTuskTip: new MeshStandardMaterial({ color: 16638023, roughness: 0.32 }),
-        // Warm golden tusk tip
-        elephantNails: new MeshStandardMaterial({ color: 16707722, roughness: 0.38 }),
-        // Cute yellow toenails per foot
-        elephantEyeWhite: new MeshBasicMaterial({ color: 16317180 }),
-        // Big cartoon white sclera
-        elephantEyePupil: new MeshStandardMaterial({ color: 1579035, roughness: 0.15 }),
-        // Deep dark cartoon pupil
-        elephantEyeCatchlight: new MeshBasicMaterial({ color: 16777215 }),
-        // Eye specular highlight
-        elephantSmile: new MeshStandardMaterial({ color: 1976635, roughness: 0.5 }),
-        // Curved smile line
-        elephantTailBrush: new MeshStandardMaterial({ color: 2241085, roughness: 0.85 }),
-        // Dark brush tuft
-        // Legacy Trackman / Industrial Materials
-        humanSkin: new MeshStandardMaterial({ color: 12417876, roughness: 0.72 }),
-        humanShirt: new MeshStandardMaterial({ color: 1976635, roughness: 0.75 }),
-        humanVest: new MeshStandardMaterial({ color: 16733440, roughness: 0.45 }),
-        humanVestTrim: new MeshStandardMaterial({ color: 988970, roughness: 0.6 }),
-        humanReflective: new MeshStandardMaterial({ color: 16777215, roughness: 0.15, metalness: 0.5 }),
-        humanPants: new MeshStandardMaterial({ color: 1981023, roughness: 0.75 }),
-        humanBoots: new MeshStandardMaterial({ color: 3022871, roughness: 0.52 }),
-        bootSole: new MeshStandardMaterial({ color: 1118741, roughness: 0.95 }),
-        humanBelt: new MeshStandardMaterial({ color: 1841431, roughness: 0.75 }),
-        leatherGlove: new MeshStandardMaterial({ color: 4731426, roughness: 0.65 }),
-        helmetYellow: new MeshStandardMaterial({ color: 16096779, roughness: 0.22, metalness: 0.1 }),
-        radioPlastic: new MeshStandardMaterial({ color: 1579035, roughness: 0.35 }),
-        darkHousing: new MeshStandardMaterial({ color: 1976635, roughness: 0.35 }),
-        glassLens: new MeshPhysicalMaterial({ color: 3718648, roughness: 0.05, transmission: 0.85, thickness: 0.1 }),
-        brass: new MeshStandardMaterial({ color: 14251782, roughness: 0.25, metalness: 0.88 }),
-        // Wildlife / Spotted Deer / Calf Materials
-        animalFur: new MeshStandardMaterial({ color: 12082457, roughness: 0.74 }),
-        animalFurDark: new MeshStandardMaterial({ color: 8139786, roughness: 0.78 }),
-        animalUnderbelly: new MeshStandardMaterial({ color: 16643810, roughness: 0.82 }),
-        animalSpot: new MeshStandardMaterial({ color: 16777215, roughness: 0.88 }),
-        animalMuzzle: new MeshStandardMaterial({ color: 1841431, roughness: 0.35 }),
-        animalEyeWhite: new MeshBasicMaterial({ color: 14870768 }),
-        animalEye: new MeshStandardMaterial({ color: 592139, roughness: 0.08, metalness: 0.1 }),
-        animalEyeReflex: new MeshBasicMaterial({ color: 16777215 }),
-        animalEarInner: new MeshStandardMaterial({ color: 14656404, roughness: 0.85 }),
-        animalAntler: new MeshStandardMaterial({ color: 14074532, roughness: 0.45 }),
-        animalHoof: new MeshStandardMaterial({ color: 1579035, roughness: 0.75 }),
-        // Dark cloven hooves
-        // Heavy Cattle & Debris Materials
-        cattleHide: new MeshStandardMaterial({ color: 9735038, roughness: 0.72 }),
-        // Authentic Indian Desi Zebu Dun Hide
-        cattleDark: new MeshStandardMaterial({ color: 2565930, roughness: 0.65 }),
-        cattleHorn: new MeshStandardMaterial({ color: 15987958, roughness: 0.35, metalness: 0.08 }),
-        cattleEye: new MeshBasicMaterial({ color: 592139 }),
         woodCrate: new MeshStandardMaterial({ color: 7877903, roughness: 0.85 }),
         // Weathered Railway Teak Wood
         industrialSteel: new MeshStandardMaterial({ color: 9741240, roughness: 0.25, metalness: 0.88 }),
-        hazardYellow: new MeshStandardMaterial({ color: 15381256, roughness: 0.35 })
+        hazardYellow: new MeshStandardMaterial({ color: 15381256, roughness: 0.35 }),
+        brass: new MeshStandardMaterial({ color: 14251782, roughness: 0.25, metalness: 0.88 })
       };
       this.initDefaultObstacles();
     }
@@ -39903,1120 +39688,8 @@ void main() {
       this.train = train;
     }
     // ------------------------------------------------------------------
-    // 3D Model Builders for Human, Animal, Heavy Cattle, Debris
+    // Track Obstacle Model Builder: Industrial Cargo Crate / Tool Chest
     // ------------------------------------------------------------------
-    // ------------------------------------------------------------------
-    // Canvas Texture Generators for Living Expressive Facial Features
-    // (Prevents disconnected geometric primitives, clipping, and z-fighting)
-    // ------------------------------------------------------------------
-    createHumanFaceTexture() {
-      if (typeof document === "undefined") return null;
-      const canvas = document.createElement("canvas");
-      canvas.width = 1024;
-      canvas.height = 1024;
-      const ctx = canvas.getContext("2d");
-      const drawFace = (blinkFactor = 0) => {
-        ctx.clearRect(0, 0, 1024, 1024);
-        ctx.fillStyle = "#fcd5ba";
-        ctx.fillRect(0, 0, 1024, 1024);
-        const hairGrad = ctx.createLinearGradient(0, 180, 0, 320);
-        hairGrad.addColorStop(0, "#d9572b");
-        hairGrad.addColorStop(0.85, "#d9572b");
-        hairGrad.addColorStop(1, "rgba(217, 87, 43, 0)");
-        ctx.fillStyle = hairGrad;
-        ctx.fillRect(0, 0, 1024, 320);
-        ctx.fillStyle = "#d9572b";
-        ctx.fillRect(0, 0, 160, 1024);
-        ctx.fillRect(864, 0, 160, 1024);
-        [-1, 1].forEach((side) => {
-          const cx = 512 + side * 115;
-          const cy = 540;
-          const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 85);
-          grad.addColorStop(0, "rgba(244, 114, 182, 0.85)");
-          grad.addColorStop(0.5, "rgba(251, 113, 133, 0.40)");
-          grad.addColorStop(1, "rgba(252, 213, 186, 0)");
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(cx, cy, 85, 0, Math.PI * 2);
-          ctx.fill();
-        });
-        [-1, 1].forEach((side) => {
-          const ex = 512 + side * 75;
-          const ey = 460;
-          const ew = 28;
-          const eh = 38;
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#1c1917";
-          ctx.beginPath();
-          ctx.ellipse(ex + side * 3, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.arc(ex + side * 3 + 8, ey - 10, 8.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(ex + side * 3 - 8, ey + 10, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-          if (blinkFactor > 0.02) {
-            ctx.fillStyle = "#fcd5ba";
-            ctx.beginPath();
-            const lidHeight = eh * 2 * blinkFactor;
-            ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
-            ctx.fill();
-            ctx.strokeStyle = "#27272a";
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(ex - ew, ey - eh + lidHeight);
-            ctx.lineTo(ex + ew, ey - eh + lidHeight);
-            ctx.stroke();
-          }
-          ctx.strokeStyle = "#27272a";
-          ctx.lineWidth = 8;
-          ctx.lineCap = "round";
-          ctx.beginPath();
-          ctx.moveTo(ex - ew * 1.15, ey - eh - 16);
-          ctx.quadraticCurveTo(ex, ey - eh - 32, ex + ew * 1.15, ey - eh - 14);
-          ctx.stroke();
-        });
-        ctx.strokeStyle = "#e09f7a";
-        ctx.lineWidth = 5;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.arc(512, 515, 14, 0.2 * Math.PI, 0.8 * Math.PI);
-        ctx.stroke();
-        ctx.strokeStyle = "#9a3412";
-        ctx.lineWidth = 7;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.arc(512, 565, 36, 0.15 * Math.PI, 0.85 * Math.PI);
-        ctx.stroke();
-      };
-      drawFace(0);
-      const tex = new CanvasTexture(canvas);
-      return { tex, canvas, ctx, drawFace };
-    }
-    createElephantFaceTexture() {
-      if (typeof document === "undefined") return null;
-      const canvas = document.createElement("canvas");
-      canvas.width = 1024;
-      canvas.height = 1024;
-      const ctx = canvas.getContext("2d");
-      const drawFace = (blinkFactor = 0) => {
-        ctx.clearRect(0, 0, 1024, 1024);
-        ctx.fillStyle = "#567b8d";
-        ctx.fillRect(0, 0, 1024, 1024);
-        [-1, 1].forEach((side) => {
-          const ex = 512 + side * 125;
-          const ey = 425;
-          const ew = 48;
-          const eh = 64;
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#18181b";
-          ctx.beginPath();
-          ctx.ellipse(ex + side * 5, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.arc(ex + side * 5 + 12, ey - 15, 12, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(ex + side * 5 - 12, ey + 15, 6.5, 0, Math.PI * 2);
-          ctx.fill();
-          if (blinkFactor > 0.02) {
-            ctx.fillStyle = "#567b8d";
-            ctx.beginPath();
-            const lidHeight = eh * 2 * blinkFactor;
-            ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
-            ctx.fill();
-            ctx.strokeStyle = "#2d4554";
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.moveTo(ex - ew, ey - eh + lidHeight);
-            ctx.lineTo(ex + ew, ey - eh + lidHeight);
-            ctx.stroke();
-          }
-          ctx.strokeStyle = "#1e293b";
-          ctx.lineWidth = 9;
-          ctx.lineCap = "round";
-          ctx.beginPath();
-          ctx.moveTo(ex - ew * 1.1, ey - eh - 18);
-          ctx.quadraticCurveTo(ex, ey - eh - 36, ex + ew * 1.1, ey - eh - 16);
-          ctx.stroke();
-        });
-        [-1, 1].forEach((side) => {
-          ctx.strokeStyle = "#2d4554";
-          ctx.lineWidth = 7;
-          ctx.lineCap = "round";
-          ctx.beginPath();
-          ctx.arc(512 + side * 95, 560, 34, (side > 0 ? 0.8 : 0) * Math.PI, (side > 0 ? 1.4 : 0.6) * Math.PI);
-          ctx.stroke();
-        });
-        ctx.strokeStyle = "#3d5c6b";
-        ctx.lineWidth = 6;
-        ctx.lineCap = "round";
-        [490, 525, 560].forEach((wy) => {
-          ctx.beginPath();
-          ctx.arc(512, wy, 48, 0.2 * Math.PI, 0.8 * Math.PI);
-          ctx.stroke();
-        });
-      };
-      drawFace(0);
-      const tex = new CanvasTexture(canvas);
-      return { tex, canvas, ctx, drawFace };
-    }
-    // Parametric tapered tube geometry with closed rounded caps (Ideal for hair locks, horns, tusks)
-    createTaperedTubeGeometry(curve, tubularSegments = 16, rStart = 0.024, rEnd = 3e-3, radialSegments = 8, cap = true) {
-      const points = curve.getPoints(tubularSegments);
-      const frames = curve.computeFrenetFrames(tubularSegments, false);
-      const positions = [];
-      const uvs = [];
-      const indices = [];
-      for (let i = 0; i <= tubularSegments; i++) {
-        const t = i / tubularSegments;
-        const r = rStart * (1 - t) + rEnd * t;
-        const p = points[i];
-        const N = frames.normals[i];
-        const B = frames.binormals[i];
-        for (let j = 0; j <= radialSegments; j++) {
-          const theta = j / radialSegments * Math.PI * 2;
-          const sin = Math.sin(theta);
-          const cos = -Math.cos(theta);
-          const vx = p.x + r * (cos * N.x + sin * B.x);
-          const vy = p.y + r * (cos * N.y + sin * B.y);
-          const vz = p.z + r * (cos * N.z + sin * B.z);
-          positions.push(vx, vy, vz);
-          uvs.push(j / radialSegments, t);
-        }
-      }
-      for (let i = 0; i < tubularSegments; i++) {
-        for (let j = 0; j < radialSegments; j++) {
-          const a = i * (radialSegments + 1) + j;
-          const b = (i + 1) * (radialSegments + 1) + j;
-          const c = (i + 1) * (radialSegments + 1) + (j + 1);
-          const d = i * (radialSegments + 1) + (j + 1);
-          indices.push(a, b, d);
-          indices.push(b, c, d);
-        }
-      }
-      if (cap) {
-        const startIdx = positions.length / 3;
-        const pStart = points[0];
-        positions.push(pStart.x, pStart.y, pStart.z);
-        uvs.push(0.5, 0);
-        for (let j = 0; j < radialSegments; j++) {
-          indices.push(startIdx, j + 1, j);
-        }
-        const endIdx = positions.length / 3;
-        const pEnd = points[tubularSegments];
-        positions.push(pEnd.x, pEnd.y, pEnd.z);
-        uvs.push(0.5, 1);
-        const lastRing = tubularSegments * (radialSegments + 1);
-        for (let j = 0; j < radialSegments; j++) {
-          indices.push(endIdx, lastRing + j, lastRing + j + 1);
-        }
-      }
-      const geo = new BufferGeometry();
-      geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
-      geo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
-      return geo;
-    }
-    // 1. Modern Stylized Human Character (Mass: 72 kg <= 150 kg -> SCOOPABLE)
-    // Exact anatomical & aesthetic match to media_1793819995371_c74a70f7.png:
-    // Auburn/ginger swept-crest quiff hair, warm peach skin, blushing rosy cheeks, friendly eyes with catchlights,
-    // cream short-sleeve polo shirt with crisp white collar, warm brown chinos, and dark casual loafers
-    buildHumanMesh() {
-      const group = new Group();
-      group.name = "stylizedHuman";
-      const faceData = this.createHumanFaceTexture();
-      const pelvis = new Mesh(
-        new CylinderGeometry(0.15, 0.138, 0.16, 24),
-        this.materials.humanPantsBrown
-      );
-      pelvis.position.y = 0.88;
-      pelvis.scale.set(1.04, 1, 0.78);
-      pelvis.castShadow = true;
-      group.add(pelvis);
-      const belt = new Mesh(
-        new CylinderGeometry(0.153, 0.151, 0.035, 24),
-        new MeshStandardMaterial({ color: 4073251, roughness: 0.6 })
-      );
-      belt.position.set(0, 0.945, 0);
-      belt.scale.set(1.05, 1, 0.79);
-      group.add(belt);
-      const buckle = new Mesh(
-        new BoxGeometry(0.032, 0.03, 0.012),
-        new MeshStandardMaterial({ color: 14870768, metalness: 0.85, roughness: 0.25 })
-      );
-      buckle.position.set(0, 0.945, 0.122);
-      group.add(buckle);
-      const torsoGroup = new Group();
-      torsoGroup.position.set(0, 0.94, 0);
-      const chest = new Mesh(
-        new CylinderGeometry(0.185, 0.16, 0.24, 24),
-        this.materials.humanPoloCream
-      );
-      chest.position.y = 0.28;
-      chest.scale.set(1.08, 1, 0.76);
-      chest.castShadow = true;
-      torsoGroup.add(chest);
-      const waist = new Mesh(
-        new CylinderGeometry(0.16, 0.146, 0.18, 24),
-        this.materials.humanPoloCream
-      );
-      waist.position.y = 0.1;
-      waist.scale.set(1.04, 1, 0.76);
-      waist.castShadow = true;
-      torsoGroup.add(waist);
-      const hem = new Mesh(
-        new CylinderGeometry(0.154, 0.158, 0.045, 24),
-        this.materials.humanPoloCream
-      );
-      hem.position.y = 0.01;
-      hem.scale.set(1.05, 1, 0.78);
-      torsoGroup.add(hem);
-      [-0.18, 0.18].forEach((sx) => {
-        const deltoid = new Mesh(
-          new SphereGeometry(0.07, 18, 14),
-          this.materials.humanPoloCream
-        );
-        deltoid.position.set(sx, 0.33, 0);
-        deltoid.scale.set(1, 0.85, 0.95);
-        torsoGroup.add(deltoid);
-      });
-      const neck = new Mesh(
-        new CylinderGeometry(0.046, 0.052, 0.12, 18),
-        this.materials.humanSkinPeach
-      );
-      neck.position.y = 0.42;
-      torsoGroup.add(neck);
-      const collarBand = new Mesh(
-        new CylinderGeometry(0.058, 0.07, 0.045, 20),
-        this.materials.humanPoloCollar
-      );
-      collarBand.position.y = 0.39;
-      torsoGroup.add(collarBand);
-      [-1, 1].forEach((side) => {
-        const lapel = new Mesh(
-          new BoxGeometry(0.065, 0.09, 0.012),
-          this.materials.humanPoloCollar
-        );
-        lapel.position.set(side * 0.046, 0.36, 0.078);
-        lapel.rotation.set(-0.35, side * 0.28, side * -0.36);
-        torsoGroup.add(lapel);
-      });
-      const placket = new Mesh(
-        new BoxGeometry(0.024, 0.14, 0.012),
-        this.materials.humanPoloCollar
-      );
-      placket.position.set(0, 0.26, 0.114);
-      torsoGroup.add(placket);
-      [0.3, 0.24].forEach((by) => {
-        const button = new Mesh(
-          new CylinderGeometry(5e-3, 5e-3, 6e-3, 8).rotateX(Math.PI / 2),
-          new MeshStandardMaterial({ color: 15857145, roughness: 0.3 })
-        );
-        button.position.set(0, by, 0.121);
-        torsoGroup.add(button);
-      });
-      const headGroup = new Group();
-      headGroup.position.set(0, 0.5, 0.01);
-      const cranium = new Mesh(
-        new SphereGeometry(0.122, 28, 22),
-        this.materials.humanSkinPeach
-      );
-      cranium.scale.set(0.92, 1.05, 0.96);
-      cranium.castShadow = true;
-      headGroup.add(cranium);
-      const chin = new Mesh(
-        new SphereGeometry(0.066, 18, 14),
-        this.materials.humanSkinPeach
-      );
-      chin.position.set(0, -0.065, 0.038);
-      chin.scale.set(1.1, 0.88, 1.08);
-      headGroup.add(chin);
-      [-1, 1].forEach((side) => {
-        const eyeGroup = new Group();
-        eyeGroup.position.set(side * 0.045, 0.014, 0.108);
-        eyeGroup.rotation.y = side * 0.15;
-        const sclera = new Mesh(
-          new SphereGeometry(0.026, 16, 12),
-          this.materials.humanEyesWhite
-        );
-        sclera.scale.set(0.95, 1.25, 0.4);
-        eyeGroup.add(sclera);
-        const iris = new Mesh(
-          new SphereGeometry(0.017, 14, 10),
-          new MeshStandardMaterial({ color: 4528643, roughness: 0.2 })
-        );
-        iris.position.set(side * 2e-3, 0, 9e-3);
-        iris.scale.set(0.92, 1.15, 0.3);
-        eyeGroup.add(iris);
-        const pupil = new Mesh(
-          new SphereGeometry(0.01, 12, 8),
-          this.materials.humanEyesIris
-        );
-        pupil.position.set(side * 2e-3, 0, 0.014);
-        pupil.scale.set(0.85, 1.1, 0.25);
-        eyeGroup.add(pupil);
-        const hl1 = new Mesh(new SphereGeometry(45e-4, 8, 8), this.materials.humanEyeReflex);
-        hl1.position.set(side * 4e-3, 7e-3, 0.016);
-        eyeGroup.add(hl1);
-        const hl2 = new Mesh(new SphereGeometry(25e-4, 8, 8), this.materials.humanEyeReflex);
-        hl2.position.set(side * -4e-3, -5e-3, 0.016);
-        eyeGroup.add(hl2);
-        const brow = new Mesh(
-          new CylinderGeometry(5e-3, 3e-3, 0.052, 8).rotateZ(Math.PI / 2),
-          new MeshStandardMaterial({ color: 8138002, roughness: 0.75 })
-        );
-        brow.position.set(0, 0.038, 6e-3);
-        brow.rotation.z = side * -0.15;
-        brow.rotation.x = -0.25;
-        eyeGroup.add(brow);
-        headGroup.add(eyeGroup);
-      });
-      const nose = new Mesh(
-        new SphereGeometry(0.015, 12, 10),
-        this.materials.humanSkinPeach
-      );
-      nose.position.set(0, -0.014, 0.126);
-      nose.scale.set(0.9, 0.75, 1.1);
-      headGroup.add(nose);
-      const smile = new Mesh(
-        new TorusGeometry(0.025, 35e-4, 8, 16, Math.PI * 0.65),
-        this.materials.humanSmile
-      );
-      smile.position.set(0, -0.046, 0.114);
-      smile.rotation.set(0.2, 0, Math.PI * 1.18);
-      headGroup.add(smile);
-      [-1, 1].forEach((side) => {
-        const blush = new Mesh(
-          new SphereGeometry(0.022, 10, 8),
-          this.materials.humanBlush
-        );
-        blush.position.set(side * 0.072, -0.02, 0.096);
-        blush.scale.set(1, 0.65, 0.25);
-        headGroup.add(blush);
-      });
-      [-1, 1].forEach((side) => {
-        const ear = new Mesh(
-          new SphereGeometry(0.026, 14, 10),
-          this.materials.humanSkinPeach
-        );
-        ear.scale.set(0.35, 1.15, 0.75);
-        ear.position.set(side * 0.115, -8e-3, -5e-3);
-        ear.rotation.y = side * 0.18;
-        headGroup.add(ear);
-      });
-      const hairCap = new Mesh(
-        new SphereGeometry(0.126, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
-        this.materials.humanHairGinger
-      );
-      hairCap.position.set(0, 0.015, -0.012);
-      hairCap.scale.set(0.95, 1.06, 1.02);
-      headGroup.add(hairCap);
-      const quiffCurve = new CatmullRomCurve3([
-        new Vector3(-0.05, 0.12, 0.06),
-        new Vector3(-0.01, 0.155, 0.02),
-        new Vector3(0.03, 0.15, -0.04),
-        new Vector3(0.06, 0.12, -0.08)
-      ]);
-      const quiffGeo = this.createTaperedTubeGeometry(quiffCurve, 16, 0.032, 4e-3, 10, true);
-      const quiff = new Mesh(quiffGeo, this.materials.humanHairGinger);
-      headGroup.add(quiff);
-      const crestFlickCurve = new CatmullRomCurve3([
-        new Vector3(-0.02, 0.13, 0.05),
-        new Vector3(0.02, 0.165, 0.01),
-        new Vector3(0.05, 0.155, -0.03)
-      ]);
-      const crestFlickGeo = this.createTaperedTubeGeometry(crestFlickCurve, 14, 0.024, 3e-3, 8, true);
-      const crestFlick = new Mesh(crestFlickGeo, this.materials.humanHairGinger);
-      headGroup.add(crestFlick);
-      const bang1Curve = new CatmullRomCurve3([
-        new Vector3(-0.08, 0.11, 0.07),
-        new Vector3(-0.02, 0.1, 0.11),
-        new Vector3(0.05, 0.075, 0.118),
-        new Vector3(0.09, 0.025, 0.095)
-      ]);
-      const bang1Geo = this.createTaperedTubeGeometry(bang1Curve, 16, 0.026, 3e-3, 10, true);
-      const bang1 = new Mesh(bang1Geo, this.materials.humanHairGinger);
-      headGroup.add(bang1);
-      const bang2Curve = new CatmullRomCurve3([
-        new Vector3(-0.06, 0.13, 0.06),
-        new Vector3(-0.025, 0.09, 0.11),
-        new Vector3(0.02, 0.045, 0.115)
-      ]);
-      const bang2Geo = this.createTaperedTubeGeometry(bang2Curve, 14, 0.02, 3e-3, 8, true);
-      const bang2 = new Mesh(bang2Geo, this.materials.humanHairGinger);
-      headGroup.add(bang2);
-      const bang3Curve = new CatmullRomCurve3([
-        new Vector3(-0.08, 0.09, 0.075),
-        new Vector3(-0.065, 0.05, 0.1),
-        new Vector3(-0.045, 0.01, 0.105)
-      ]);
-      const bang3Geo = this.createTaperedTubeGeometry(bang3Curve, 12, 0.016, 3e-3, 8, true);
-      const bang3 = new Mesh(bang3Geo, this.materials.humanHairGinger);
-      headGroup.add(bang3);
-      [-1, 1].forEach((side) => {
-        const sideburn = new Mesh(
-          new CylinderGeometry(0.01, 4e-3, 0.055, 8),
-          this.materials.humanHairGinger
-        );
-        sideburn.position.set(side * 0.108, 0.015, 0.02);
-        sideburn.rotation.x = -0.15;
-        headGroup.add(sideburn);
-      });
-      torsoGroup.add(headGroup);
-      [-1, 1].forEach((side) => {
-        const armGroup = new Group();
-        armGroup.position.set(side * 0.17, 0.33, 0);
-        const sleeve = new Mesh(
-          new CylinderGeometry(0.066, 0.054, 0.15, 18),
-          this.materials.humanPoloCream
-        );
-        sleeve.position.set(side * 8e-3, -0.07, 0);
-        sleeve.rotation.z = side * -0.06;
-        armGroup.add(sleeve);
-        const sleeveCuff = new Mesh(
-          new CylinderGeometry(0.056, 0.056, 0.02, 18),
-          this.materials.humanPoloCream
-        );
-        sleeveCuff.position.set(side * 0.014, -0.14, 0);
-        armGroup.add(sleeveCuff);
-        const bareBicep = new Mesh(
-          new CylinderGeometry(0.048, 0.042, 0.14, 16),
-          this.materials.humanSkinPeach
-        );
-        bareBicep.position.set(side * 0.014, -0.15, 0);
-        armGroup.add(bareBicep);
-        const forearmGroup = new Group();
-        forearmGroup.position.set(side * 0.014, -0.22, 5e-3);
-        const elbow = new Mesh(
-          new SphereGeometry(0.043, 14, 10),
-          this.materials.humanSkinPeach
-        );
-        forearmGroup.add(elbow);
-        const forearm = new Mesh(
-          new CylinderGeometry(0.042, 0.034, 0.22, 16),
-          this.materials.humanSkinPeach
-        );
-        forearm.position.set(0, -0.11, 8e-3);
-        forearm.rotation.x = -0.08;
-        forearmGroup.add(forearm);
-        const handGroup = new Group();
-        handGroup.position.set(0, -0.22, 0.015);
-        const wrist = new Mesh(
-          new SphereGeometry(0.033, 12, 10),
-          this.materials.humanSkinPeach
-        );
-        handGroup.add(wrist);
-        const palm = new Mesh(
-          new BoxGeometry(0.042, 0.065, 0.028),
-          this.materials.humanSkinPeach
-        );
-        palm.position.set(0, -0.032, 0);
-        handGroup.add(palm);
-        const thumb = new Mesh(
-          new CylinderGeometry(0.011, 9e-3, 0.036, 8),
-          this.materials.humanSkinPeach
-        );
-        thumb.position.set(-side * 0.022, -0.022, 0.012);
-        thumb.rotation.set(-0.35, 0, -side * 0.45);
-        handGroup.add(thumb);
-        [-0.014, -5e-3, 5e-3, 0.014].forEach((fx) => {
-          const finger = new Mesh(
-            new CylinderGeometry(9e-3, 7e-3, 0.042, 8),
-            this.materials.humanSkinPeach
-          );
-          finger.position.set(fx, -0.075, 3e-3);
-          finger.rotation.x = 0.2;
-          handGroup.add(finger);
-        });
-        forearmGroup.add(handGroup);
-        armGroup.add(forearmGroup);
-        torsoGroup.add(armGroup);
-        if (side === -1) {
-          group.userData.armL = armGroup;
-          group.userData.forearmL = forearmGroup;
-        } else {
-          group.userData.armR = armGroup;
-          group.userData.forearmR = forearmGroup;
-        }
-      });
-      group.add(torsoGroup);
-      [-1, 1].forEach((side) => {
-        const legGroup = new Group();
-        legGroup.position.set(side * 0.074, 0.86, 0);
-        const hip = new Mesh(
-          new SphereGeometry(0.068, 16, 12),
-          this.materials.humanPantsBrown
-        );
-        legGroup.add(hip);
-        const thigh = new Mesh(
-          new CylinderGeometry(0.068, 0.056, 0.4, 20),
-          this.materials.humanPantsBrown
-        );
-        thigh.position.set(0, -0.2, 5e-3);
-        thigh.rotation.x = 0.02;
-        legGroup.add(thigh);
-        const knee = new Mesh(
-          new SphereGeometry(0.056, 16, 12),
-          this.materials.humanPantsBrown
-        );
-        knee.position.set(0, -0.4, 0.012);
-        legGroup.add(knee);
-        const lowerLegGroup = new Group();
-        lowerLegGroup.position.set(0, -0.4, 0.012);
-        const calf = new Mesh(
-          new CylinderGeometry(0.056, 0.048, 0.38, 20),
-          this.materials.humanPantsBrown
-        );
-        calf.position.set(0, -0.19, -6e-3);
-        lowerLegGroup.add(calf);
-        const cuff = new Mesh(
-          new CylinderGeometry(0.052, 0.052, 0.025, 20),
-          this.materials.humanPantsBrown
-        );
-        cuff.position.set(0, -0.37, -6e-3);
-        lowerLegGroup.add(cuff);
-        const shoeGroup = new Group();
-        shoeGroup.position.set(0, -0.41, 0.035);
-        const shoeBody = new Mesh(
-          new BoxGeometry(0.074, 0.065, 0.17),
-          this.materials.humanShoesDark
-        );
-        shoeGroup.add(shoeBody);
-        const sole = new Mesh(
-          new BoxGeometry(0.078, 0.022, 0.175),
-          new MeshStandardMaterial({ color: 16317180, roughness: 0.35 })
-        );
-        sole.position.y = -0.032;
-        shoeGroup.add(sole);
-        const toeCap = new Mesh(
-          new SphereGeometry(0.036, 12, 10),
-          new MeshStandardMaterial({ color: 16317180, roughness: 0.35 })
-        );
-        toeCap.position.set(0, -0.012, 0.075);
-        toeCap.scale.set(1, 0.65, 0.85);
-        shoeGroup.add(toeCap);
-        lowerLegGroup.add(shoeGroup);
-        legGroup.add(lowerLegGroup);
-        group.add(legGroup);
-        if (side === -1) {
-          group.userData.legL = legGroup;
-          group.userData.lowerLegL = lowerLegGroup;
-        } else {
-          group.userData.legR = legGroup;
-          group.userData.lowerLegR = lowerLegGroup;
-        }
-      });
-      group.userData.type = "human";
-      group.userData.torsoGroup = torsoGroup;
-      group.userData.headGroup = headGroup;
-      group.userData.faceData = faceData;
-      return group;
-    }
-    // Seamless organic elephant body geometry generator (No flat cylinder cuts, continuous natural curves)
-    createElephantBodyGeometry() {
-      const rings = 24;
-      const segments = 24;
-      const profile = [
-        [0.62, 0.68, 1e-3, 1e-3],
-        // Closed front cap meeting neck
-        [0.58, 0.7, 0.2, 0.22],
-        // Neck junction
-        [0.5, 0.73, 0.35, 0.38],
-        // Front brisket
-        [0.38, 0.8, 0.45, 0.49],
-        // High shoulder withers hump
-        [0.25, 0.79, 0.48, 0.52],
-        // Shoulder crest
-        [0.12, 0.76, 0.5, 0.54],
-        // Mid-back dip
-        [0, 0.75, 0.51, 0.56],
-        // Deep belly center
-        [-0.14, 0.77, 0.5, 0.54],
-        // Lumbar rise
-        [-0.28, 0.79, 0.48, 0.52],
-        // Pelvic haunch peak
-        [-0.42, 0.74, 0.42, 0.46],
-        // Rump slope
-        [-0.54, 0.69, 0.3, 0.33],
-        // Tail root base
-        [-0.62, 0.65, 0.12, 0.14],
-        // Rear haunch curve
-        [-0.65, 0.63, 1e-3, 1e-3]
-        // Closed rear cap
-      ];
-      const positions = [];
-      const uvs = [];
-      const indices = [];
-      for (let i = 0; i <= rings; i++) {
-        const t = i / rings;
-        const pIdx = t * (profile.length - 1);
-        const i0 = Math.floor(pIdx);
-        const i1 = Math.min(profile.length - 1, i0 + 1);
-        const blend = pIdx - i0;
-        const z = profile[i0][0] * (1 - blend) + profile[i1][0] * blend;
-        const y = profile[i0][1] * (1 - blend) + profile[i1][1] * blend;
-        const rx = profile[i0][2] * (1 - blend) + profile[i1][2] * blend;
-        const ry = profile[i0][3] * (1 - blend) + profile[i1][3] * blend;
-        for (let j = 0; j <= segments; j++) {
-          const theta = j / segments * Math.PI * 2;
-          const x = Math.cos(theta) * rx;
-          const vertY = y + Math.sin(theta) * ry;
-          positions.push(x, vertY, z);
-          uvs.push(j / segments, t);
-        }
-      }
-      for (let i = 0; i < rings; i++) {
-        for (let j = 0; j < segments; j++) {
-          const a = i * (segments + 1) + j;
-          const b = (i + 1) * (segments + 1) + j;
-          const c = (i + 1) * (segments + 1) + (j + 1);
-          const d = i * (segments + 1) + (j + 1);
-          indices.push(a, b, d);
-          indices.push(b, c, d);
-        }
-      }
-      const geo = new BufferGeometry();
-      geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
-      geo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
-      return geo;
-    }
-    // 2. Indian Elephant (Mass: 110 kg <= 150 kg -> SCOOPABLE IN RESCUE NET)
-    // Exact anatomical & artistic match to media_1793820037213_e448b2e7.jpg:
-    // Plump rounded seamless body, twin cranial domes, expressive 3D Pixar eyes,
-    // articulated curling trunk, upward curved ivory tusks, flapping leaf ears,
-    // 4 sturdy pillar legs with rounded foot pads & cute toenails, and tufted tail.
-    buildAnimalMesh() {
-      const group = new Group();
-      group.name = "indianElephant";
-      const elephantFaceData = this.createElephantFaceTexture();
-      const bodyGeo = this.createElephantBodyGeometry();
-      const body = new Mesh(bodyGeo, this.materials.elephantSkin);
-      body.castShadow = true;
-      group.add(body);
-      const headGroup = new Group();
-      headGroup.position.set(0, 0.78, 0.58);
-      [-1, 1].forEach((side) => {
-        const dome = new Mesh(
-          new SphereGeometry(0.16, 20, 16),
-          this.materials.elephantSkin
-        );
-        dome.position.set(side * 0.11, 0.14, -0.04);
-        dome.scale.set(1, 1.15, 0.95);
-        headGroup.add(dome);
-      });
-      const forehead = new Mesh(
-        new SphereGeometry(0.24, 24, 18),
-        this.materials.elephantSkin
-      );
-      forehead.position.set(0, 0.04, 0.02);
-      forehead.scale.set(1.05, 1.12, 1.02);
-      forehead.castShadow = true;
-      headGroup.add(forehead);
-      [-1, 1].forEach((side) => {
-        const eyeGroup = new Group();
-        eyeGroup.position.set(side * 0.17, 0.08, 0.15);
-        eyeGroup.rotation.y = side * 0.42;
-        const sclera = new Mesh(
-          new SphereGeometry(0.052, 16, 12),
-          this.materials.elephantEyeWhite
-        );
-        sclera.scale.set(0.85, 1.15, 0.45);
-        eyeGroup.add(sclera);
-        const pupil = new Mesh(
-          new SphereGeometry(0.038, 14, 10),
-          this.materials.elephantEyePupil
-        );
-        pupil.position.set(side * 5e-3, -2e-3, 0.018);
-        pupil.scale.set(0.82, 1.08, 0.35);
-        eyeGroup.add(pupil);
-        const h1 = new Mesh(new SphereGeometry(0.01, 8, 8), this.materials.elephantEyeCatchlight);
-        h1.position.set(side * 0.012, 0.016, 0.03);
-        eyeGroup.add(h1);
-        const h2 = new Mesh(new SphereGeometry(5e-3, 8, 8), this.materials.elephantEyeCatchlight);
-        h2.position.set(side * -8e-3, -0.01, 0.03);
-        eyeGroup.add(h2);
-        const eyelid = new Mesh(
-          new SphereGeometry(0.054, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.45),
-          this.materials.elephantSkin
-        );
-        eyelid.position.set(0, 8e-3, 2e-3);
-        eyelid.scale.set(0.88, 1.18, 0.48);
-        eyeGroup.add(eyelid);
-        headGroup.add(eyeGroup);
-      });
-      const earL = new Group();
-      earL.position.set(-0.2, 0.06, -0.04);
-      const earShapeL = new Shape();
-      earShapeL.moveTo(0, 0.05);
-      earShapeL.bezierCurveTo(-0.1, 0.24, -0.3, 0.22, -0.36, 0.08);
-      earShapeL.bezierCurveTo(-0.42, -0.06, -0.38, -0.22, -0.26, -0.32);
-      earShapeL.bezierCurveTo(-0.14, -0.42, -0.06, -0.3, 0, -0.18);
-      earShapeL.closePath();
-      const earMeshL = new Mesh(
-        new ExtrudeGeometry(earShapeL, {
-          depth: 0.025,
-          bevelEnabled: true,
-          bevelThickness: 0.015,
-          bevelSize: 0.012,
-          bevelSegments: 3
-        }),
-        this.materials.elephantSkin
-      );
-      earL.add(earMeshL);
-      const innerEarL = new Mesh(
-        new ExtrudeGeometry(earShapeL, { depth: 5e-3, bevelEnabled: false }),
-        this.materials.elephantEarInner
-      );
-      innerEarL.scale.set(0.82, 0.82, 1);
-      innerEarL.position.set(-0.02, 0, 0.026);
-      earL.add(innerEarL);
-      const earR = new Group();
-      earR.position.set(0.2, 0.06, -0.04);
-      const earShapeR = new Shape();
-      earShapeR.moveTo(0, 0.05);
-      earShapeR.bezierCurveTo(0.1, 0.24, 0.3, 0.22, 0.36, 0.08);
-      earShapeR.bezierCurveTo(0.42, -0.06, 0.38, -0.22, 0.26, -0.32);
-      earShapeR.bezierCurveTo(0.14, -0.42, 0.06, -0.3, 0, -0.18);
-      earShapeR.closePath();
-      const earMeshR = new Mesh(
-        new ExtrudeGeometry(earShapeR, {
-          depth: 0.025,
-          bevelEnabled: true,
-          bevelThickness: 0.015,
-          bevelSize: 0.012,
-          bevelSegments: 3
-        }),
-        this.materials.elephantSkin
-      );
-      earR.add(earMeshR);
-      const innerEarR = new Mesh(
-        new ExtrudeGeometry(earShapeR, { depth: 5e-3, bevelEnabled: false }),
-        this.materials.elephantEarInner
-      );
-      innerEarR.scale.set(0.82, 0.82, 1);
-      innerEarR.position.set(0.02, 0, 0.026);
-      earR.add(innerEarR);
-      earL.rotation.set(-0.15, -0.45, -0.1);
-      earR.rotation.set(-0.15, 0.45, 0.1);
-      headGroup.add(earL);
-      headGroup.add(earR);
-      [-1, 1].forEach((side) => {
-        const tuskCurve = new CatmullRomCurve3([
-          new Vector3(side * 0.09, -0.1, 0.18),
-          new Vector3(side * 0.14, -0.2, 0.32),
-          new Vector3(side * 0.18, -0.16, 0.46),
-          new Vector3(side * 0.2, -0.08, 0.56)
-        ]);
-        const tuskGeo = new TubeGeometry(tuskCurve, 18, 0.028, 12, false);
-        const tuskMesh = new Mesh(tuskGeo, this.materials.elephantTusk);
-        headGroup.add(tuskMesh);
-        const tuskTip = new Mesh(
-          new SphereGeometry(0.02, 10, 8),
-          this.materials.elephantTuskTip
-        );
-        tuskTip.position.set(side * 0.2, -0.08, 0.56);
-        headGroup.add(tuskTip);
-      });
-      const trunkSegments = [];
-      const trunkRoot = new Group();
-      trunkRoot.position.set(0, -0.05, 0.25);
-      trunkRoot.rotation.x = -0.42;
-      const m0 = new Mesh(
-        new CylinderGeometry(0.102, 0.088, 0.16, 18),
-        this.materials.elephantSkin
-      );
-      m0.position.y = -0.08;
-      trunkRoot.add(m0);
-      const trunkSeg1 = new Group();
-      trunkSeg1.position.set(0, -0.15, 0);
-      trunkSeg1.rotation.x = -0.36;
-      const m1 = new Mesh(
-        new CylinderGeometry(0.088, 0.074, 0.16, 18),
-        this.materials.elephantSkin
-      );
-      m1.position.y = -0.08;
-      trunkSeg1.add(m1);
-      const trunkSeg2 = new Group();
-      trunkSeg2.position.set(0, -0.15, 0);
-      trunkSeg2.rotation.x = -0.28;
-      const m2 = new Mesh(
-        new CylinderGeometry(0.074, 0.062, 0.16, 18),
-        this.materials.elephantSkin
-      );
-      m2.position.y = -0.08;
-      trunkSeg2.add(m2);
-      const trunkSeg3 = new Group();
-      trunkSeg3.position.set(0, -0.14, 0);
-      trunkSeg3.rotation.x = 0.7;
-      const m3 = new Mesh(
-        new CylinderGeometry(0.062, 0.05, 0.14, 16),
-        this.materials.elephantSkin
-      );
-      m3.position.y = -0.07;
-      trunkSeg3.add(m3);
-      const trunkTip = new Group();
-      trunkTip.position.set(0, -0.13, 0);
-      trunkTip.rotation.x = 0.75;
-      const m4 = new Mesh(
-        new CylinderGeometry(0.05, 0.04, 0.12, 14),
-        this.materials.elephantSkin
-      );
-      m4.position.y = -0.06;
-      trunkTip.add(m4);
-      const tipBulb = new Mesh(
-        new SphereGeometry(0.044, 14, 10),
-        this.materials.elephantSkin
-      );
-      tipBulb.position.set(0, -0.11, 0.025);
-      tipBulb.scale.set(0.9, 0.8, 1.2);
-      trunkTip.add(tipBulb);
-      [-0.012, 0.012].forEach((nx) => {
-        const nostril = new Mesh(
-          new SphereGeometry(9e-3, 8, 8),
-          this.materials.elephantSkinDark
-        );
-        nostril.position.set(nx, -0.11, 0.062);
-        trunkTip.add(nostril);
-      });
-      trunkSeg3.add(trunkTip);
-      trunkSeg2.add(trunkSeg3);
-      trunkSeg1.add(trunkSeg2);
-      trunkRoot.add(trunkSeg1);
-      headGroup.add(trunkRoot);
-      trunkSegments.push(trunkRoot, trunkSeg1, trunkSeg2, trunkSeg3, trunkTip);
-      group.add(headGroup);
-      const legs = [];
-      [
-        { x: -0.25, z: 0.28, isFront: true },
-        { x: 0.25, z: 0.28, isFront: true },
-        { x: -0.25, z: -0.28, isFront: false },
-        { x: 0.25, z: -0.28, isFront: false }
-      ].forEach((pos, idx) => {
-        const legGroup = new Group();
-        legGroup.position.set(pos.x, 0.38, pos.z);
-        const thigh = new Mesh(
-          new CylinderGeometry(0.14, 0.125, 0.24, 18),
-          this.materials.elephantSkin
-        );
-        thigh.position.y = 0.12;
-        thigh.castShadow = true;
-        legGroup.add(thigh);
-        const calf = new Mesh(
-          new CylinderGeometry(0.125, 0.138, 0.26, 18),
-          this.materials.elephantSkin
-        );
-        calf.position.y = -0.13;
-        calf.castShadow = true;
-        legGroup.add(calf);
-        const footPad = new Mesh(
-          new CylinderGeometry(0.14, 0.145, 0.06, 18),
-          this.materials.elephantSkin
-        );
-        footPad.position.y = -0.27;
-        legGroup.add(footPad);
-        for (let tn = 0; tn < 4; tn++) {
-          const nailAngle = (tn - 1.5) * 0.4;
-          const nx = Math.sin(nailAngle) * 0.142;
-          const nz = Math.cos(nailAngle) * 0.142;
-          const toenail = new Mesh(
-            new SphereGeometry(0.02, 10, 8),
-            this.materials.elephantNails
-          );
-          toenail.position.set(nx, -0.27, nz);
-          toenail.scale.set(1, 0.8, 1.2);
-          legGroup.add(toenail);
-        }
-        group.add(legGroup);
-        legs.push(legGroup);
-      });
-      const tail = new Group();
-      tail.position.set(0, 0.68, -0.56);
-      const tailCurve = new CatmullRomCurve3([
-        new Vector3(0, 0, 0),
-        new Vector3(0, -0.16, -0.06),
-        new Vector3(0, -0.32, -0.08),
-        new Vector3(0, -0.42, -0.06)
-      ]);
-      const tailGeo = new TubeGeometry(tailCurve, 12, 0.018, 8, false);
-      const tailCord = new Mesh(tailGeo, this.materials.elephantSkin);
-      tail.add(tailCord);
-      const tailTuft = new Mesh(
-        new ConeGeometry(0.04, 0.12, 10),
-        this.materials.elephantTailBrush
-      );
-      tailTuft.position.set(0, -0.46, -0.05);
-      tailTuft.rotation.x = 0.25;
-      tail.add(tailTuft);
-      group.add(tail);
-      group.userData = {
-        type: "animal",
-        body,
-        chest: body,
-        rump: body,
-        headGroup,
-        faceData: elephantFaceData,
-        trunkSegments,
-        earL,
-        earR,
-        legs,
-        tail
-      };
-      return group;
-    }
-    // 3. Heavy Cattle / Stray Indian Zebu Bull (Mass: 480 kg > 150 kg -> OVERWEIGHT HAZARD)
-    // Features prominent Indian Zebu dorsal hump, pendulous throat dewlap, curved horns, and cloven hooves
-    buildHeavyCattleMesh() {
-      const group = new Group();
-      group.name = "desiCattleZebu";
-      const barrel = new Mesh(new CylinderGeometry(0.48, 0.44, 1.35, 14).rotateX(Math.PI / 2), this.materials.cattleHide);
-      barrel.position.set(0, 1.05, 0);
-      barrel.scale.set(0.95, 1.15, 1);
-      barrel.castShadow = true;
-      group.add(barrel);
-      const haunches = new Mesh(new SphereGeometry(0.46, 14, 12), this.materials.cattleHide);
-      haunches.position.set(0, 1.08, -0.62);
-      haunches.scale.set(0.92, 1.08, 0.95);
-      group.add(haunches);
-      const shoulders = new Mesh(new SphereGeometry(0.48, 14, 12), this.materials.cattleHide);
-      shoulders.position.set(0, 1.08, 0.58);
-      shoulders.scale.set(0.96, 1.12, 0.95);
-      group.add(shoulders);
-      const hump = new Mesh(new SphereGeometry(0.28, 14, 12), this.materials.cattleHide);
-      hump.position.set(0, 1.52, 0.42);
-      hump.scale.set(0.72, 1.15, 1.35);
-      hump.castShadow = true;
-      group.add(hump);
-      const neck = new Mesh(new CylinderGeometry(0.24, 0.36, 0.65, 12), this.materials.cattleHide);
-      neck.position.set(0, 1.25, 0.95);
-      neck.rotation.x = -0.55;
-      neck.castShadow = true;
-      group.add(neck);
-      const dewlap = new Mesh(new BoxGeometry(0.06, 0.38, 0.55), this.materials.cattleHide);
-      dewlap.position.set(0, 0.92, 0.98);
-      dewlap.rotation.x = -0.45;
-      group.add(dewlap);
-      const headGroup = new Group();
-      headGroup.position.set(0, 1.35, 1.32);
-      headGroup.rotation.x = 0.25;
-      const cranium = new Mesh(new BoxGeometry(0.34, 0.32, 0.38), this.materials.cattleHide);
-      cranium.position.set(0, 0.05, 0);
-      headGroup.add(cranium);
-      const muzzle = new Mesh(new BoxGeometry(0.26, 0.22, 0.32), this.materials.cattleHide);
-      muzzle.position.set(0, -0.06, 0.25);
-      headGroup.add(muzzle);
-      const nosePad = new Mesh(new BoxGeometry(0.25, 0.12, 0.08), this.materials.cattleDark);
-      nosePad.position.set(0, -0.08, 0.41);
-      headGroup.add(nosePad);
-      [-0.055, 0.055].forEach((nx) => {
-        const nostril = new Mesh(new CylinderGeometry(0.018, 0.018, 0.04, 8).rotateX(Math.PI / 2), this.materials.cattleDark);
-        nostril.position.set(nx, -0.07, 0.45);
-        headGroup.add(nostril);
-      });
-      [-0.17, 0.17].forEach((side) => {
-        const eye = new Mesh(new SphereGeometry(0.032, 10, 8), this.materials.cattleEye);
-        eye.position.set(side, 0.08, 0.08);
-        headGroup.add(eye);
-      });
-      const cattleEars = [];
-      [-1, 1].forEach((side) => {
-        const ear = new Mesh(new ConeGeometry(0.07, 0.32, 8), this.materials.cattleHide);
-        ear.position.set(side * 0.22, 0.05, -0.05);
-        ear.rotation.z = side * -1.15;
-        ear.rotation.x = -0.3;
-        ear.scale.set(1, 1, 0.35);
-        headGroup.add(ear);
-        cattleEars.push(ear);
-      });
-      [-1, 1].forEach((side) => {
-        const hornCurvePts = [
-          new Vector3(side * 0.12, 0.18, -0.05),
-          new Vector3(side * 0.28, 0.38, -0.08),
-          new Vector3(side * 0.32, 0.58, 0.02),
-          new Vector3(side * 0.24, 0.68, 0.12)
-        ];
-        const hornCurve = new CatmullRomCurve3(hornCurvePts);
-        const hornGeo = new TubeGeometry(hornCurve, 12, 0.042, 8, false);
-        const horn = new Mesh(hornGeo, this.materials.cattleHorn);
-        headGroup.add(horn);
-        const hornTip = new Mesh(new ConeGeometry(0.028, 0.1, 8), this.materials.cattleDark);
-        hornTip.position.copy(hornCurvePts[3]);
-        hornTip.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), new Vector3(-side * 0.4, 0.8, 0.4).normalize());
-        headGroup.add(hornTip);
-      });
-      group.add(headGroup);
-      const cattleLegs = [];
-      [
-        { x: -0.28, z: 0.52, isFront: true },
-        { x: 0.28, z: 0.52, isFront: true },
-        { x: -0.26, z: -0.55, isFront: false },
-        { x: 0.26, z: -0.55, isFront: false }
-      ].forEach((leg) => {
-        const legGroup = new Group();
-        legGroup.position.set(leg.x, 0.95, leg.z);
-        const upperRadius = leg.isFront ? 0.11 : 0.13;
-        const upperLeg = new Mesh(new CylinderGeometry(upperRadius, 0.085, 0.45, 10), this.materials.cattleHide);
-        upperLeg.position.y = -0.22;
-        legGroup.add(upperLeg);
-        const kneeGroup = new Group();
-        kneeGroup.position.set(0, -0.45, leg.isFront ? 0.01 : -0.03);
-        const knee = new Mesh(new SphereGeometry(0.082, 10, 8), this.materials.cattleHide);
-        kneeGroup.add(knee);
-        const lowerLeg = new Mesh(new CylinderGeometry(0.075, 0.065, 0.38, 10), this.materials.cattleHide);
-        lowerLeg.position.y = -0.19;
-        kneeGroup.add(lowerLeg);
-        const pastern = new Mesh(new CylinderGeometry(0.062, 0.075, 0.08, 10), this.materials.cattleDark);
-        pastern.position.set(0, -0.4, 0.01);
-        kneeGroup.add(pastern);
-        [-0.024, 0.024].forEach((hx) => {
-          const hoofClaw = new Mesh(new BoxGeometry(0.044, 0.065, 0.1), this.materials.cattleDark);
-          hoofClaw.position.set(hx, -0.45, 0.02);
-          kneeGroup.add(hoofClaw);
-        });
-        legGroup.add(kneeGroup);
-        cattleLegs.push({ group: legGroup, kneeGroup, isFront: leg.isFront });
-        group.add(legGroup);
-      });
-      const tailPts = [
-        new Vector3(0, 1.1, -0.88),
-        new Vector3(0.02, 0.85, -0.92),
-        new Vector3(-0.02, 0.6, -0.9),
-        new Vector3(0, 0.42, -0.86)
-      ];
-      const tailCurve = new CatmullRomCurve3(tailPts);
-      const tailMesh = new Mesh(new TubeGeometry(tailCurve, 10, 0.024, 6, false), this.materials.cattleHide);
-      group.add(tailMesh);
-      const tailTuft = new Mesh(new ConeGeometry(0.055, 0.18, 8), this.materials.cattleDark);
-      tailTuft.position.set(0, 0.32, -0.85);
-      tailTuft.rotation.x = 0.2;
-      group.add(tailTuft);
-      group.userData = {
-        type: "cow",
-        barrel,
-        haunches,
-        dewlap,
-        neck,
-        headGroup,
-        legs: cattleLegs,
-        tail: tailMesh,
-        ears: cattleEars
-      };
-      return group;
-    }
-    // 4. Industrial Railway Maintenance Tool Chest / Track Obstacle (Mass: 40 kg <= 150 kg -> SCOOPABLE)
-    // Heavy timber gang chest with galvanized steel angles, rivets, padlock, and hazard stripes
     buildDebrisMesh() {
       const group = new Group();
       group.name = "trackCargoDebris";
@@ -41056,37 +39729,10 @@ void main() {
     // ------------------------------------------------------------------
     // Spawn and Positioning Logic
     // ------------------------------------------------------------------
-    spawnObstacle(type, trackProgress, moveOffTrack = null, lateralOffset = 0, customMass = null, customName = null) {
-      let mesh, name, mass;
-      switch (type) {
-        case "human":
-          mesh = this.buildHumanMesh();
-          name = "Human (Trackside Pedestrian)";
-          mass = 72;
-          break;
-        case "animal":
-          mesh = this.buildAnimalMesh();
-          name = "Wildlife (Indian Elephant)";
-          mass = 110;
-          break;
-        case "cattle":
-          mesh = this.buildHeavyCattleMesh();
-          name = "Heavy Cattle (Stray Bull)";
-          mass = 480;
-          break;
-        case "debris":
-        default:
-          mesh = this.buildDebrisMesh();
-          name = "Track Debris (Cargo Crate)";
-          mass = 40;
-          break;
-      }
-      if (customMass !== null && customMass !== void 0) {
-        mass = customMass;
-      }
-      if (customName !== null && customName !== void 0) {
-        name = customName;
-      }
+    spawnObstacle(type = "debris", trackProgress = 0, moveOffTrack = null, lateralOffset = 0, customMass = null, customName = null) {
+      const mesh = this.buildDebrisMesh();
+      const name = customName || "Track Debris (Cargo Crate)";
+      const mass = customMass !== null && customMass !== void 0 ? customMass : 40;
       const transform = this.track.getTrackTransform(trackProgress, 0);
       mesh.position.copy(transform.position);
       if (lateralOffset !== 0 && transform.normal) {
@@ -41095,7 +39741,7 @@ void main() {
       mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
       const obstacleObj = {
         id: this.nextId++,
-        type,
+        type: "debris",
         name,
         mass,
         mesh,
@@ -41111,29 +39757,26 @@ void main() {
         isSideRepelled: false,
         sideRepelStartTime: 0,
         sideRepelDir: null,
-        moveOffTrackOnShock: moveOffTrack !== null ? moveOffTrack : type === "cattle"
+        moveOffTrackOnShock: moveOffTrack !== null ? moveOffTrack : false
       };
       this.scene.add(mesh);
       this.obstacles.push(obstacleObj);
       return obstacleObj;
     }
-    // Initial scenic obstacles along the route
+    // Initial track obstacles: completely clear (humans & animals removed)
     initDefaultObstacles() {
-      this.spawnObstacle("human", 0.045, false);
-      this.spawnObstacle("animal", 0.12, true);
-      this.spawnObstacle("human", 0.28, true);
-      this.spawnObstacle("cattle", 0.45, true);
-      this.spawnObstacle("animal", 0.6, false);
-      this.spawnObstacle("cattle", 0.85, false);
-      this.spawnObstacle("human", 0.18, true, 2.4);
+      while (this.obstacles.length > 0) {
+        const obs = this.obstacles.pop();
+        if (obs.mesh) this.scene.remove(obs.mesh);
+      }
     }
     // Spawn immediately ahead of the train on demand (via HUD test buttons)
-    spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
+    spawnAheadOfTrain(trainProgress, trackLength, type = "debris", distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
       const deltaProgress = distanceMeters / trackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      return this.spawnObstacle(type, targetProgress, moveOffTrack, 0, customMass, customName);
+      return this.spawnObstacle("debris", targetProgress, moveOffTrack, 0, customMass, customName);
     }
-    // Spawn person or animal directly beside one of the train coaches within 2-3m perimeter
+    // Spawn obstacle beside one of the train coaches within 2-3m perimeter
     spawnBesideCoach(trainProgress, trackLength, coachIndex = 1, lateralOffset = 2.4) {
       const locoLen = 20.5;
       const coachLen = 23.5;
@@ -41141,7 +39784,7 @@ void main() {
       const distBack = locoLen / 2 + couplerGap + coachLen / 2 + coachIndex * (coachLen + couplerGap);
       const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
       const coachProgress = (trainProgress - distBack / actualTrackLength + 1) % 1;
-      return this.spawnObstacle("human", coachProgress, true, lateralOffset);
+      return this.spawnObstacle("debris", coachProgress, true, lateralOffset, 30, "Track Debris (Coach Flank)");
     }
     // ------------------------------------------------------------------
     // Active Non-Lethal Electric Shock Protocol (Track Clearance)
@@ -41164,11 +39807,11 @@ void main() {
       };
     }
     // ------------------------------------------------------------------
-    // Weight-Tiered Subject-Tailored Electric Shock Specifications
-    // Rule 1: Under 150 kg -> ONLY 1 power source (at preferred ground angle)
-    // Rule 2: 150 kg to 250 kg -> 2 power sources (bilateral sweep)
-    // Rule 3: 250 kg to 350 kg -> 3 power sources (tri-channel focal beam)
-    // Rule 4: 350 kg and above -> All 4 power sources (quad full-power)
+    // Weight-Tiered Electric Shock Specifications (1 to 4 Power Sources)
+    // Rule 1: Under 150 kg -> ONLY 1 power source (Down-Left preferred ground angle)
+    // Rule 2: 150 kg to 250 kg -> 2 power sources (Down-Left + Down-Right)
+    // Rule 3: 250 kg to 350 kg -> 3 power sources (Top-Left + Top-Right + Down-Left)
+    // Rule 4: 350 kg and above -> All 4 power sources (Quad full-power)
     // ------------------------------------------------------------------
     getTailoredShockSpecs(obs) {
       if (!obs) {
@@ -41179,79 +39822,71 @@ void main() {
           voltage: "2.0 kV",
           current: "1.2 mA",
           energy: "0.04 J",
-          typeLabel: "HUMAN SAFE",
-          badge: "1x POWER SOURCE [2.0 kV / 1.2 mA]",
+          typeLabel: "LIGHT HAZARD (<150KG)",
+          badge: "1x POWER SOURCE: 2.0 kV / 1.2 mA",
           desc: "Single power source at preferred ground angle"
         };
       }
-      const mass = obs.mass !== void 0 ? obs.mass : 72;
-      const isHuman = obs.type === "human";
+      const mass = obs.mass !== void 0 ? obs.mass : 40;
       if (mass < 150) {
-        const voltage = isHuman ? "2.0 kV" : "5.5 kV";
-        const current = isHuman ? "1.2 mA" : "2.8 mA";
-        const energy = isHuman ? "0.04 J" : "0.80 J";
         return {
           tier: 1,
           powerSourcesCount: 1,
           activeIndices: [2],
-          // Down-Left (Preferred ground sweep angle)
           activeLabels: ["Down-Left (Preferred Ground Angle)"],
-          voltage,
-          current,
-          energy,
-          compliance: isHuman ? "IEC 60479-1 (Safe Sensory Perception)" : "RDSO Wildlife Protocol",
-          typeLabel: isHuman ? "HUMAN (PERSON)" : "ANIMAL (WILDLIFE CALF)",
-          badge: `1x POWER SOURCE: ${voltage} / ${current}`,
-          color: isHuman ? "#38bdf8" : "#f59e0b",
-          desc: `Under 150 kg (${mass} kg): 1 power source active (Down-Left at preferred ground angle) for mild startle reflex.`
+          voltage: "2.0 kV",
+          current: "1.2 mA",
+          energy: "0.04 J",
+          compliance: "IEC 60479-1 / RDSO Protocol",
+          typeLabel: "LIGHT HAZARD (<150KG)",
+          badge: "1x POWER SOURCE: 2.0 kV / 1.2 mA",
+          color: "#38bdf8",
+          desc: `Under 150 kg (${mass} kg): 1 power source active (Down-Left preferred ground angle).`
         };
       } else if (mass >= 150 && mass < 250) {
         return {
           tier: 2,
           powerSourcesCount: 2,
           activeIndices: [2, 3],
-          // Down-Left + Down-Right (Dual bilateral ground sweep)
           activeLabels: ["Down-Left", "Down-Right"],
           voltage: "6.0 kV",
           current: "3.0 mA",
           energy: "0.95 J",
-          compliance: "IEC 60335-2-76 / RDSO Animal Deterrence",
-          typeLabel: "ANIMAL (MEDIUM HAZARD 150-250KG)",
+          compliance: "IEC 60335-2-76 / RDSO Track Deterrence",
+          typeLabel: "MEDIUM HAZARD (150-250KG)",
           badge: "2x POWER SOURCES: 6.0 kV / 3.0 mA",
           color: "#f97316",
-          desc: `150-250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep) to prompt immediate flight.`
+          desc: `150-250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep).`
         };
       } else if (mass >= 250 && mass < 350) {
         return {
           tier: 3,
           powerSourcesCount: 3,
           activeIndices: [0, 1, 2],
-          // Top-Left + Top-Right + Down-Left
           activeLabels: ["Top-Left", "Top-Right", "Down-Left"],
           voltage: "7.2 kV",
           current: "3.5 mA",
           energy: "1.25 J",
-          compliance: "RDSO Livestock Safety Tier 3",
-          typeLabel: "ANIMAL (SUB-ADULT CATTLE 250-350KG)",
+          compliance: "RDSO Safety Tier 3",
+          typeLabel: "HEAVY HAZARD (250-350KG)",
           badge: "3x POWER SOURCES: 7.2 kV / 3.5 mA",
           color: "#e11d48",
-          desc: `250-350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam) to compel animal off track.`
+          desc: `250-350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam).`
         };
       } else {
         return {
           tier: 4,
           powerSourcesCount: 4,
           activeIndices: [0, 1, 2, 3],
-          // All 4 emitters
           activeLabels: ["Top-Left", "Top-Right", "Down-Left", "Down-Right"],
           voltage: "7.8 kV",
           current: "3.8 mA",
           energy: "1.40 J",
           compliance: "RDSO Tech Circular 129 / IEC 60335-2-76",
-          typeLabel: "ANIMAL (HEAVY BULL \u2265350KG)",
+          typeLabel: "CRITICAL HAZARD (\u2265350KG)",
           badge: "4x POWER SOURCES: 7.8 kV / 3.8 mA",
           color: "#ec4899",
-          desc: `350 kg and above (${mass} kg): All 4 power sources active (Quad full-power convergence) for heavy cattle deterrence.`
+          desc: `350 kg and above (${mass} kg): All 4 power sources active (Quad full-power convergence).`
         };
       }
     }
@@ -41267,11 +39902,10 @@ void main() {
       obs.isCleared = false;
       this.fxTimer = 1.2;
       if (audio) {
-        audio.playElectricShockDischarge(obs.type, obs.mass);
+        audio.playElectricShockDischarge("debris", obs.mass);
       }
       this.spawnDeterrenceFX(obs, this.train);
     }
-    // Alias for backward compatibility
     triggerAnimalDeterrence(obs, audio, train = null) {
       return this.triggerDeterrence(obs, audio, train);
     }
@@ -41283,27 +39917,16 @@ void main() {
         this.fxGroup.remove(c);
       }
       const obsPos = obs.mesh.position.clone();
-      const isHuman = obs.type === "human";
+      const tailored = this.getTailoredShockSpecs(obs);
+      const activeIndices = tailored.activeIndices || [0, 1, 2, 3];
+      this.activePowerSourceIndices = activeIndices;
       const emitters = activeTrain && activeTrain.getShockEmitterWorldPositions ? activeTrain.getShockEmitterWorldPositions() : null;
-      const sparkColor = isHuman ? 10875900 : 3718648;
-      const targetOffsets = isHuman ? [
-        new Vector3(-0.1, 1.25, 0.04),
-        // Top-Left -> Left shoulder
-        new Vector3(0.1, 1.25, 0.04),
-        // Top-Right -> Right shoulder
-        new Vector3(-0.14, 0.12, 0.02),
-        // Down-Left -> Left foot / ankle
-        new Vector3(0.14, 0.12, 0.02)
-        // Down-Right -> Right foot / ankle
-      ] : [
-        new Vector3(-0.45, 1.35, -0.2),
-        // Top-Left -> Upper left flank / spine
-        new Vector3(0.45, 1.35, -0.2),
-        // Top-Right -> Upper right flank / spine
-        new Vector3(-0.42, 0.22, 0.4),
-        // Down-Left -> Left forehoof
-        new Vector3(0.42, 0.22, 0.4)
-        // Down-Right -> Right forehoof
+      const sparkColor = 3718648;
+      const targetOffsets = [
+        new Vector3(-0.25, 0.35, 0),
+        new Vector3(0.25, 0.35, 0),
+        new Vector3(-0.25, 0.12, 0),
+        new Vector3(0.25, 0.12, 0)
       ];
       const fallbackFront = obsPos.clone().sub(
         this.track.getTrackTransform(obs.progress, 0).tangent.clone().normalize().multiplyScalar(obs.forwardMeters || 60)
@@ -41314,9 +39937,6 @@ void main() {
         new Vector3(-1.35, 0.95, 0),
         new Vector3(1.35, 0.95, 0)
       ];
-      const tailored = this.getTailoredShockSpecs(obs);
-      const activeIndices = tailored.activeIndices || [0, 1, 2, 3];
-      this.activePowerSourceIndices = activeIndices;
       const segs = 16;
       for (let k = 0; k < activeIndices.length; k++) {
         const i = activeIndices[k];
@@ -41326,7 +39946,7 @@ void main() {
         const p2 = obsPos.clone().add(targetOffset);
         const pts = [];
         const dist = p1.distanceTo(p2);
-        const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * (isHuman ? 0.75 : 1);
+        const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015));
         for (let s = 0; s <= segs; s++) {
           const t = s / segs;
           const p = p1.clone().lerp(p2, t);
@@ -41342,7 +39962,7 @@ void main() {
         const mat = new LineBasicMaterial({
           color: sparkColor,
           transparent: true,
-          opacity: isHuman ? 0.9 : 1,
+          opacity: 0.95,
           linewidth: 2
         });
         const line = new Line(geo, mat);
@@ -41353,40 +39973,34 @@ void main() {
           fallbackOrigin: fallbackFront.clone().add(fallbackOffsets[i]),
           obs,
           targetOffset,
-          isHuman,
           segs
         };
         this.fxGroup.add(line);
         if (emitter && emitter.tip) {
-          const nozzleFlare = new PointLight(sparkColor, isHuman ? 2.5 : 4.5, 8);
+          const nozzleFlare = new PointLight(sparkColor, 4, 8);
           emitter.tip.getWorldPosition(nozzleFlare.position);
           nozzleFlare.userData = { isNozzleFlare: true, emitterTip: emitter.tip };
           this.fxGroup.add(nozzleFlare);
         }
       }
       const lightPowerMult = activeIndices.length / 4;
-      const sparkLight = new PointLight(
-        sparkColor,
-        (isHuman ? 4.5 : 9) * (0.5 + 0.5 * lightPowerMult),
-        isHuman ? 20 : 32
-      );
-      sparkLight.position.copy(obsPos.clone().add(new Vector3(0, isHuman ? 0.8 : 1, 0)));
+      const sparkLight = new PointLight(sparkColor, 7 * (0.5 + 0.5 * lightPowerMult), 25);
+      sparkLight.position.copy(obsPos.clone().add(new Vector3(0, 0.4, 0)));
       this.fxGroup.add(sparkLight);
-      const sparkCount = Math.round((isHuman ? 18 : 36) * (0.4 + 0.6 * lightPowerMult));
+      const sparkCount = Math.round(24 * (0.4 + 0.6 * lightPowerMult));
       const sparkGeo = new BufferGeometry();
       const sPos = [];
-      const spread = isHuman ? 0.5 : 1.2;
       for (let s = 0; s < sparkCount; s++) {
         sPos.push(
-          obsPos.x + (Math.random() - 0.5) * spread,
-          obsPos.y + Math.random() * (isHuman ? 0.6 : 1.2),
-          obsPos.z + (Math.random() - 0.5) * spread
+          obsPos.x + (Math.random() - 0.5) * 0.8,
+          obsPos.y + Math.random() * 0.6,
+          obsPos.z + (Math.random() - 0.5) * 0.8
         );
       }
       sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
       const sparkMat = new PointsMaterial({
         color: 14742270,
-        size: isHuman ? 0.06 : 0.1,
+        size: 0.08,
         transparent: true,
         opacity: 0.95
       });
@@ -41420,7 +40034,7 @@ void main() {
             const arr = posAttr.array;
             const segs = ud.segs || 16;
             const dist = tempStart.distanceTo(tempEnd);
-            const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * (ud.isHuman ? 0.75 : 1) * progress;
+            const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * progress;
             for (let i = 0; i <= segs; i++) {
               const t = i / segs;
               const p = tempStart.clone().lerp(tempEnd, t);
@@ -41435,7 +40049,7 @@ void main() {
               arr[i * 3 + 2] = p.z;
             }
             posAttr.needsUpdate = true;
-            child.material.opacity = (ud.isHuman ? 0.85 : 0.98) * progress;
+            child.material.opacity = 0.95 * progress;
           } else if (child.isPointLight) {
             if (child.userData.isNozzleFlare && child.userData.emitterTip) {
               child.userData.emitterTip.getWorldPosition(child.position);
@@ -41469,16 +40083,13 @@ void main() {
     }
     // ------------------------------------------------------------------
     // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
-    // Installed along sides of passenger coaches; delivers electric shock
-    // if someone gets within 2-3 meters of the passing train.
     // ------------------------------------------------------------------
     spawnCoachSideShockFX(obs, nearest) {
       const emitter = nearest.emitter;
       const emitterPos = nearest.worldPos;
       const obsPos = obs.mesh.position.clone();
-      const isHuman = obs.type === "human";
-      const sparkColor = isHuman ? 10875900 : 3718648;
-      const targetOffset = new Vector3(0, isHuman ? 1.15 : 0.95, 0);
+      const sparkColor = 3718648;
+      const targetOffset = new Vector3(0, 0.25, 0);
       const p1 = emitterPos.clone();
       const p2 = obsPos.clone().add(targetOffset);
       const segs = 14;
@@ -41510,7 +40121,6 @@ void main() {
         emitterTip: emitter.tip,
         obs,
         targetOffset,
-        isHuman,
         segs
       };
       this.fxGroup.add(line);
@@ -41522,24 +40132,6 @@ void main() {
       targetLight.position.copy(p2);
       targetLight.userData = { isSideTargetLight: true, obs, targetOffset };
       this.fxGroup.add(targetLight);
-      const sparkCount = 20;
-      const sparkGeo = new BufferGeometry();
-      const sPos = [];
-      for (let s = 0; s < sparkCount; s++) {
-        sPos.push(
-          p2.x + (Math.random() - 0.5) * 0.45,
-          p2.y + (Math.random() - 0.5) * 0.45,
-          p2.z + (Math.random() - 0.5) * 0.45
-        );
-      }
-      sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
-      const sparkMat = new PointsMaterial({
-        color: 14742270,
-        size: 0.08,
-        transparent: true,
-        opacity: 0.95
-      });
-      this.fxGroup.add(new Points(sparkGeo, sparkMat));
       this.fxTimer = 0.85;
     }
     checkCoachSideProximity(train, audio) {
@@ -41570,7 +40162,7 @@ void main() {
               train.pulseCoachSideEmitters(nearest.emitter.coachIndex, nearest.emitter.side, 1);
             }
             if (audio) {
-              audio.playElectricShockDischarge(obs.type, obs.mass);
+              audio.playElectricShockDischarge("debris", obs.mass);
             }
             const coachNum = nearest.emitter.coachIndex + 1;
             const sideName = nearest.emitter.side.toUpperCase();
@@ -41583,481 +40175,31 @@ void main() {
       }
     }
     // ------------------------------------------------------------------
-    // Living On-Track Obstacle Animation Loop
-    // Simulates breathing, head scanning, contrapposto weight-shifts,
-    // grazing, tail swishes, ear twitches, and startled train-avoidance panic
+    // Obstacle Animation / Movement Loop
     // ------------------------------------------------------------------
     animateLivingObstacles(dt, trainSpeedMs) {
       this.animTime += dt;
-      const t = this.animTime;
       this.obstacles.forEach((obs) => {
-        if (obs.isCollected || !obs.mesh || !obs.mesh.userData) return;
-        const ud = obs.mesh.userData;
-        const dist = obs.forwardMeters !== void 0 ? obs.forwardMeters : 100;
-        const isTrainClose = dist < 95;
-        const isUrgent = dist < 50;
-        if (ud.type === "human") {
-          const seed = obs.id * 2.3;
-          const localT = t + seed;
-          if (ud.faceData) {
-            const blinkCycle = localT * 0.32 % 1;
-            let blinkFactor = 0;
-            if (blinkCycle < 0.04) {
-              blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
-            }
-            if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
-              ud.faceData.drawFace(blinkFactor);
-              ud.faceData.tex.needsUpdate = true;
-              ud.faceData.lastBlink = blinkFactor;
-            }
-          } else if (ud.eyelids && ud.eyelids.length > 0) {
-            const blinkCycle = localT * 0.32 % 1;
-            let blinkScale = 0.05;
-            if (blinkCycle < 0.04) {
-              blinkScale = 0.5 + 0.5 * Math.cos((blinkCycle / 0.04 - 0.5) * 2 * Math.PI);
-            }
-            ud.eyelids.forEach((el) => {
-              el.scale.y = blinkScale;
-            });
+        if (obs.isCollected || !obs.mesh) return;
+        if (obs.isSideRepelled && obs.sideRepelDir) {
+          const repelT = this.animTime - obs.sideRepelStartTime;
+          obs.mesh.position.add(obs.sideRepelDir.clone().multiplyScalar(4 * dt));
+          if (repelT > 1.4) {
+            obs.isSideRepelled = false;
+            obs.isCleared = true;
           }
-          if (obs.isSideRepelled && obs.sideRepelDir) {
-            const repelT = this.animTime - obs.sideRepelStartTime;
-            obs.mesh.position.add(obs.sideRepelDir.clone().multiplyScalar(4 * dt));
-            if (repelT < 0.4) {
-              obs.mesh.position.y += Math.sin(repelT / 0.4 * Math.PI) * 0.18;
-              if (ud.headGroup) ud.headGroup.rotation.x = -0.35;
-              if (ud.armL) ud.armL.rotation.set(-1.1, 0, -0.6);
-              if (ud.armR) ud.armR.rotation.set(-1.1, 0, 0.6);
-            } else {
-              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), obs.sideRepelDir);
-              const runCycle = this.animTime * 14 % (Math.PI * 2);
-              if (ud.armL) ud.armL.rotation.x = Math.sin(runCycle) * 0.9;
-              if (ud.armR) ud.armR.rotation.x = -Math.sin(runCycle) * 0.9;
-              if (ud.legL) ud.legL.rotation.x = -Math.sin(runCycle) * 1.1;
-              if (ud.legR) ud.legR.rotation.x = Math.sin(runCycle) * 1.1;
-            }
-            if (repelT > 1.4) {
-              obs.isSideRepelled = false;
-              obs.isCleared = true;
-            }
-          }
-          if (obs.isDeterred) {
-            const fleeT = this.animTime - obs.fleeStartTime;
-            const fleeDir = obs.fleeDirection || 1;
-            const transform = this.track.getTrackTransform(obs.progress, 0);
-            const tangent = transform.tangent.clone().normalize();
-            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
-            if (obs.moveOffTrackOnShock) {
-              const fleeDist = Math.min(5.5, fleeT * 4.2);
-              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.25, fleeDist * 0.06));
-              obs.mesh.position.copy(lateralPos);
-              if (fleeDist >= 2.5) {
-                obs.isCleared = true;
-              }
-              if (fleeT < 0.35) {
-                obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.22;
-                if (ud.headGroup) ud.headGroup.rotation.x = -0.3;
-                if (ud.armL) ud.armL.rotation.set(-0.8, 0, -0.6);
-                if (ud.armR) ud.armR.rotation.set(-0.8, 0, 0.6);
-              } else if (fleeT < 2.5) {
-                const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
-                const runCycle = (fleeT - 0.35) * 14;
-                if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
-                if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0, -Math.sin(runCycle) * 1.1);
-                if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
-                if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0, Math.sin(runCycle) * 1.1);
-                if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
-                if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
-                if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.22;
-                if (ud.headGroup) ud.headGroup.rotation.x = 0.1;
-              } else {
-                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
-                if (ud.headGroup) {
-                  ud.headGroup.rotation.y = -fleeDir * 0.8;
-                  ud.headGroup.rotation.x = -0.1;
-                }
-                if (ud.armL) ud.armL.rotation.set(0.1, 0, -0.15);
-                if (ud.armR) ud.armR.rotation.set(0.1, 0, 0.15);
-                if (ud.legL) ud.legL.rotation.set(0, 0, 0);
-                if (ud.legR) ud.legR.rotation.set(0, 0, 0);
-                if (ud.lowerLegL) ud.lowerLegL.rotation.set(0, 0, 0);
-                if (ud.lowerLegR) ud.lowerLegR.rotation.set(0, 0, 0);
-              }
-            } else {
-              obs.isCleared = false;
-              const basePos = transform.position.clone();
-              if (fleeT < 0.35) {
-                basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.18;
-              }
-              obs.mesh.position.copy(basePos);
-              const shiver = Math.sin(localT * 25) * 0.04;
-              if (ud.headGroup) {
-                ud.headGroup.rotation.set(-0.25 + shiver, Math.sin(localT * 8) * 0.08, 0);
-              }
-              if (ud.torsoGroup) {
-                ud.torsoGroup.rotation.x = -0.15 + shiver;
-                ud.torsoGroup.rotation.z = Math.sin(localT * 12) * 0.03;
-              }
-              if (ud.armL) {
-                ud.armL.rotation.set(-0.75 + Math.sin(localT * 14) * 0.1, 0, -0.25);
-              }
-              if (ud.forearmL) ud.forearmL.rotation.x = -1.2;
-              if (ud.armR) {
-                ud.armR.rotation.set(-0.65 + Math.sin(localT * 8) * 0.08, 0, 0.25);
-              }
-              if (ud.forearmR) ud.forearmR.rotation.x = -1.1;
-              if (ud.legL) ud.legL.rotation.x = 0.38 + shiver * 0.5;
-              if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.65;
-              if (ud.legR) ud.legR.rotation.x = 0.3 - shiver * 0.5;
-              if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.55;
-            }
-          } else if (!isTrainClose) {
-            const breath = Math.sin(localT * 2.2);
-            if (ud.torsoGroup) {
-              ud.torsoGroup.scale.set(1 + 0.018 * breath, 1 + 0.01 * breath, 1 + 0.018 * breath);
-              const weightShift = Math.sin(localT * 0.4);
-              ud.torsoGroup.rotation.z = weightShift * 0.035;
-              ud.torsoGroup.rotation.y = Math.sin(localT * 0.3) * 0.08;
-              ud.torsoGroup.rotation.x = 0.03 + Math.sin(localT * 0.5) * 0.02;
-            }
-            if (ud.headGroup) {
-              const headPitch = 0.1 + Math.sin(localT * 0.6) * 0.16;
-              const headYaw = Math.sin(localT * 0.35) * 0.25 + Math.sin(localT * 0.9) * 0.1;
-              const headTilt = Math.sin(localT * 0.4) * 0.05;
-              ud.headGroup.rotation.set(headPitch, headYaw, headTilt);
-            }
-            if (ud.armL) {
-              ud.armL.rotation.x = 0.05 + Math.sin(localT * 0.8) * 0.06;
-              ud.armL.rotation.z = -0.12 - Math.cos(localT * 0.4) * 0.04;
-            }
-            if (ud.forearmL) {
-              ud.forearmL.rotation.x = -0.22 + Math.sin(localT * 0.8) * 0.05;
-            }
-            if (ud.armR) {
-              ud.armR.rotation.x = 0.05 - Math.sin(localT * 0.7) * 0.06;
-              ud.armR.rotation.z = 0.12 + Math.cos(localT * 0.4) * 0.04;
-            }
-            if (ud.forearmR) {
-              ud.forearmR.rotation.x = -0.2 - Math.sin(localT * 0.7) * 0.05;
-            }
-            const legShift = Math.sin(localT * 0.4);
-            if (ud.legL) {
-              ud.legL.rotation.x = 0.02 + legShift * 0.03;
-              ud.legL.rotation.z = legShift * 0.02;
-            }
-            if (ud.lowerLegL) {
-              ud.lowerLegL.rotation.x = -Math.max(0, legShift * 0.06);
-            }
-            if (ud.legR) {
-              ud.legR.rotation.x = 0.02 - legShift * 0.03;
-              ud.legR.rotation.z = legShift * 0.02;
-            }
-            if (ud.lowerLegR) {
-              ud.lowerLegR.rotation.x = -Math.max(0, -legShift * 0.06);
-            }
-          } else {
-            const panicLerp = isUrgent ? 1 : Math.min(1, (95 - dist) / 45);
-            if (ud.headGroup) {
-              ud.headGroup.rotation.x = MathUtils.lerp(0.1, -0.25, panicLerp);
-              ud.headGroup.rotation.y = MathUtils.lerp(0, Math.sin(localT * 12) * 0.08, panicLerp);
-              ud.headGroup.rotation.z = 0;
-            }
-            if (ud.torsoGroup) {
-              ud.torsoGroup.rotation.x = MathUtils.lerp(0.03, -0.22, panicLerp);
-              ud.torsoGroup.rotation.z = 0;
-              const fastBreath = Math.sin(localT * 8) * 0.05;
-              ud.torsoGroup.scale.set(1 + fastBreath, 1 + fastBreath * 0.5, 1 + fastBreath);
-            }
-            if (ud.armL) {
-              const waveX = MathUtils.lerp(0.05, -0.85 + Math.sin(localT * 12) * 0.15, panicLerp);
-              const waveZ = MathUtils.lerp(-0.12, -0.35 + Math.cos(localT * 12) * 0.1, panicLerp);
-              ud.armL.rotation.set(waveX, 0, waveZ);
-            }
-            if (ud.forearmL) {
-              ud.forearmL.rotation.x = MathUtils.lerp(-0.22, -1.25, panicLerp);
-            }
-            if (ud.armR) {
-              const defX = MathUtils.lerp(0.05, -0.7 + Math.sin(localT * 6) * 0.08, panicLerp);
-              const defZ = MathUtils.lerp(0.12, 0.3, panicLerp);
-              ud.armR.rotation.set(defX, 0, defZ);
-            }
-            if (ud.forearmR) {
-              ud.forearmR.rotation.x = MathUtils.lerp(-0.2, -1.15, panicLerp);
-            }
-            if (ud.legL) ud.legL.rotation.x = MathUtils.lerp(0.02, 0.38, panicLerp);
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = MathUtils.lerp(0, -0.65, panicLerp);
-            if (ud.legR) ud.legR.rotation.x = MathUtils.lerp(0.02, 0.28, panicLerp);
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = MathUtils.lerp(0, -0.55, panicLerp);
-          }
-        } else if (ud.type === "animal") {
-          const seed = obs.id * 3.1;
-          const localT = t + seed;
-          if (ud.faceData) {
-            const blinkCycle = localT * 0.25 % 1;
-            let blinkFactor = 0;
-            if (blinkCycle < 0.05) {
-              blinkFactor = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
-            }
-            if (ud.faceData.lastBlink === void 0 || Math.abs(ud.faceData.lastBlink - blinkFactor) > 0.05 || blinkFactor === 0 && ud.faceData.lastBlink !== 0) {
-              ud.faceData.drawFace(blinkFactor);
-              ud.faceData.tex.needsUpdate = true;
-              ud.faceData.lastBlink = blinkFactor;
-            }
-          } else if (ud.eyelids && ud.eyelids.length > 0) {
-            const blinkCycle = localT * 0.25 % 1;
-            let blinkScale = 0.05;
-            if (blinkCycle < 0.05) {
-              blinkScale = 0.5 + 0.5 * Math.cos((blinkCycle / 0.05 - 0.5) * 2 * Math.PI);
-            }
-            ud.eyelids.forEach((el) => {
-              el.scale.y = blinkScale;
-            });
-          }
-          const breath = Math.sin(localT * 1.8);
-          if (ud.body) {
-            ud.body.scale.set(1 + 0.018 * breath, 1 + 0.018 * breath, 1 + 0.012 * breath);
-          }
-          const earFlap = Math.sin(localT * 2.2);
-          if (!isTrainClose) {
-            if (ud.earL) {
-              ud.earL.rotation.y = -0.45 + earFlap * 0.16;
-            }
-            if (ud.earR) {
-              ud.earR.rotation.y = 0.45 - earFlap * 0.16;
-            }
-          }
-          if (ud.tail) {
-            ud.tail.rotation.z = Math.sin(localT * 3.5) * 0.45;
-            ud.tail.rotation.x = 0.3 + Math.abs(Math.sin(localT * 1.6)) * 0.2;
-          }
-          if (obs.isDeterred) {
-            const fleeT = this.animTime - obs.fleeStartTime;
-            const fleeDir = obs.fleeDirection || 1;
-            const transform = this.track.getTrackTransform(obs.progress, 0);
-            const tangent = transform.tangent.clone().normalize();
-            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
-            if (obs.moveOffTrackOnShock) {
-              const fleeDist = Math.min(6, fleeT * 3.2);
-              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.25, fleeDist * 0.06));
-              obs.mesh.position.copy(lateralPos);
-              if (fleeDist >= 2.8) {
-                obs.isCleared = true;
-              }
-              if (fleeT < 0.4) {
-                obs.mesh.position.y += Math.sin(fleeT / 0.4 * Math.PI) * 0.2;
-                if (ud.headGroup) ud.headGroup.rotation.x = -0.4;
-                if (ud.earL) ud.earL.rotation.y = 0.5;
-                if (ud.earR) ud.earR.rotation.y = -0.5;
-              } else if (fleeT < 3.2) {
-                const trotHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), trotHeading);
-                const trotCycle = (fleeT - 0.4) * 8;
-                if (ud.legs && ud.legs.length >= 4) {
-                  ud.legs[0].rotation.x = Math.sin(trotCycle) * 0.45;
-                  ud.legs[1].rotation.x = -Math.sin(trotCycle) * 0.45;
-                  ud.legs[2].rotation.x = -Math.sin(trotCycle + 0.4) * 0.4;
-                  ud.legs[3].rotation.x = Math.sin(trotCycle + 0.4) * 0.4;
-                }
-                if (ud.headGroup) ud.headGroup.rotation.x = -0.15 + Math.sin(trotCycle) * 0.12;
-                if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
-                  ud.trunkSegments[0].rotation.x = -0.6;
-                  ud.trunkSegments[1].rotation.x = -0.4;
-                }
-              } else {
-                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
-                if (ud.headGroup) {
-                  ud.headGroup.rotation.y = -fleeDir * 0.7;
-                  ud.headGroup.rotation.x = 0.05;
-                }
-              }
-            } else {
-              obs.isCleared = false;
-              const basePos = transform.position.clone();
-              if (fleeT < 0.4) {
-                basePos.y += Math.sin(fleeT / 0.4 * Math.PI) * 0.18;
-              }
-              obs.mesh.position.copy(basePos);
-              if (ud.headGroup) {
-                ud.headGroup.rotation.x = -0.38 + Math.sin(localT * 15) * 0.05;
-                ud.headGroup.rotation.y = Math.sin(localT * 8) * 0.08;
-              }
-              if (ud.earL) ud.earL.rotation.y = 0.45;
-              if (ud.earR) ud.earR.rotation.y = -0.45;
-              if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
-                ud.trunkSegments[0].rotation.x = -0.85;
-                ud.trunkSegments[1].rotation.x = -0.7;
-                ud.trunkSegments[2].rotation.x = -0.55;
-                ud.trunkSegments[3].rotation.x = -0.25;
-                ud.trunkSegments[4].rotation.x = -0.35;
-              }
-              if (ud.legs) {
-                const shudder = Math.sin(localT * 20) * 0.02;
-                ud.legs.forEach((leg) => {
-                  leg.rotation.z = shudder;
-                });
-              }
-            }
-          } else if (!isTrainClose) {
-            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
-              const trunkWaveTime = localT * 2;
-              ud.trunkSegments[0].rotation.x = -0.42 + Math.sin(trunkWaveTime) * 0.08;
-              ud.trunkSegments[0].rotation.y = Math.cos(trunkWaveTime * 0.7) * 0.1;
-              ud.trunkSegments[1].rotation.x = -0.36 + Math.sin(trunkWaveTime - 0.5) * 0.1;
-              ud.trunkSegments[1].rotation.y = Math.cos(trunkWaveTime * 0.7 - 0.3) * 0.08;
-              ud.trunkSegments[2].rotation.x = -0.28 + Math.sin(trunkWaveTime - 1) * 0.12;
-              ud.trunkSegments[2].rotation.z = Math.sin(trunkWaveTime * 0.8) * 0.1;
-              ud.trunkSegments[3].rotation.x = 0.7 + Math.sin(trunkWaveTime - 1.5) * 0.15;
-              ud.trunkSegments[4].rotation.x = 0.75 + Math.sin(trunkWaveTime - 2) * 0.18;
-            }
-            if (ud.headGroup) {
-              const headPitch = 0.05 + Math.sin(localT * 1.2) * 0.06;
-              const headYaw = Math.sin(localT * 0.6) * 0.15;
-              ud.headGroup.rotation.set(headPitch, headYaw, 0);
-            }
-            if (ud.legs) {
-              const legShift = Math.sin(localT * 0.8) * 0.03;
-              ud.legs.forEach((leg, idx) => {
-                leg.rotation.x = idx % 2 === 0 ? legShift : -legShift;
-              });
-            }
-          } else {
-            const alarmLerp = isUrgent ? 1 : Math.min(1, (95 - dist) / 45);
-            if (ud.headGroup) {
-              ud.headGroup.rotation.x = MathUtils.lerp(0.05, -0.35, alarmLerp);
-              ud.headGroup.rotation.y = MathUtils.lerp(0, Math.sin(localT * 10) * 0.08, alarmLerp);
-            }
-            if (ud.earL) {
-              ud.earL.rotation.y = MathUtils.lerp(-0.45, 0.4, alarmLerp);
-            }
-            if (ud.earR) {
-              ud.earR.rotation.y = MathUtils.lerp(0.45, -0.4, alarmLerp);
-            }
-            if (ud.trunkSegments && ud.trunkSegments.length >= 5) {
-              ud.trunkSegments[0].rotation.x = MathUtils.lerp(-0.42, -0.85, alarmLerp);
-              ud.trunkSegments[1].rotation.x = MathUtils.lerp(-0.36, -0.7, alarmLerp);
-              ud.trunkSegments[2].rotation.x = MathUtils.lerp(-0.28, -0.55, alarmLerp);
-              ud.trunkSegments[3].rotation.x = MathUtils.lerp(0.7, -0.25, alarmLerp);
-              ud.trunkSegments[4].rotation.x = MathUtils.lerp(0.75, -0.35, alarmLerp);
-            }
-            if (ud.legs) {
-              ud.legs.forEach((leg, idx) => {
-                leg.rotation.x = (idx < 2 ? -0.1 : 0.08) * alarmLerp;
-              });
-            }
-          }
-        } else if (ud.type === "cow" || ud.type === "cattle") {
-          const localT = t + obs.id * 1.6;
-          const breath = Math.sin(localT * 1.8);
-          if (ud.barrel) {
-            ud.barrel.scale.set(0.95 + 0.02 * breath, 1.15 + 0.02 * breath, 1);
-          }
-          if (obs.isDeterred) {
-            const fleeT = this.animTime - obs.fleeStartTime;
-            const fleeDir = obs.fleeDirection || 1;
-            const transform = this.track.getTrackTransform(obs.progress, 0);
-            const tangent = transform.tangent.clone().normalize();
-            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
-            if (obs.moveOffTrackOnShock) {
-              const fleeDist = Math.min(6.5, fleeT * 3.5);
-              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.3, fleeDist * 0.08));
-              obs.mesh.position.copy(lateralPos);
-              if (fleeDist >= 2.6) {
-                obs.isCleared = true;
-              }
-              if (fleeT < 0.35) {
-                obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.24;
-                if (ud.headGroup) ud.headGroup.rotation.x = -0.45;
-                if (ud.tail) ud.tail.rotation.x = 0.95;
-                if (ud.ears) ud.ears.forEach((ear) => {
-                  ear.rotation.x = 0.6;
-                });
-              } else if (fleeT < 3.2) {
-                const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
-                const gallopFreq = 7.5 * Math.PI;
-                const gallopCycle = (fleeT - 0.35) * gallopFreq;
-                if (ud.legs && ud.legs.length === 4) {
-                  ud.legs[0].group.rotation.x = Math.sin(gallopCycle) * 0.6;
-                  ud.legs[1].group.rotation.x = -Math.sin(gallopCycle) * 0.6;
-                  ud.legs[2].group.rotation.x = -Math.sin(gallopCycle + 0.3) * 0.55;
-                  ud.legs[3].group.rotation.x = Math.sin(gallopCycle + 0.3) * 0.55;
-                  ud.legs.forEach((leg) => {
-                    if (leg.kneeGroup) {
-                      leg.kneeGroup.rotation.x = Math.max(0, -leg.group.rotation.x * 0.9);
-                    }
-                  });
-                }
-                if (ud.headGroup) {
-                  ud.headGroup.rotation.x = -0.15 + Math.sin(gallopCycle * 2) * 0.22;
-                  ud.headGroup.rotation.y = Math.sin(gallopCycle) * 0.12;
-                }
-                if (ud.dewlap) {
-                  ud.dewlap.rotation.z = Math.sin(gallopCycle) * 0.45;
-                }
-                if (ud.tail) {
-                  ud.tail.rotation.x = 0.85;
-                  ud.tail.rotation.z = Math.sin(gallopCycle) * 0.4;
-                }
-              } else {
-                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
-                if (ud.headGroup) {
-                  ud.headGroup.rotation.y = -fleeDir * 0.75;
-                  ud.headGroup.rotation.x = -0.1;
-                }
-                if (ud.legs) {
-                  ud.legs.forEach((leg) => {
-                    leg.group.rotation.x = 0;
-                    if (leg.kneeGroup) leg.kneeGroup.rotation.x = 0;
-                  });
-                }
-                if (ud.tail) {
-                  ud.tail.rotation.z = Math.sin(localT * 3) * 0.4;
-                }
-              }
-            } else {
-              obs.isCleared = false;
-              const basePos = transform.position.clone();
-              if (fleeT < 0.35) {
-                basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.2;
-              }
-              obs.mesh.position.copy(basePos);
-              if (ud.headGroup) {
-                ud.headGroup.rotation.x = -0.4 + Math.sin(localT * 16) * 0.06;
-                ud.headGroup.rotation.y = Math.sin(localT * 8) * 0.12;
-              }
-            }
-          } else {
-            if (ud.tail) {
-              ud.tail.rotation.z = Math.sin(localT * 3.2) * 0.6 + Math.sin(localT * 7.5) * 0.2;
-              ud.tail.rotation.x = 0.15 + Math.abs(Math.sin(localT * 1.6)) * 0.25;
-            }
-            if (ud.legs) {
-              const cowShift = Math.sin(localT * 0.6) * 0.03;
-              ud.legs.forEach((leg, idx) => {
-                leg.group.rotation.x = idx % 2 === 0 ? cowShift : -cowShift;
-              });
-            }
-            if (ud.headGroup) {
-              const chew = Math.sin(localT * 4.5) * 0.05;
-              const headYaw = Math.sin(localT * 0.4) * 0.22;
-              const headPitch = isTrainClose ? -0.38 : 0.12 + Math.sin(localT * 0.5) * 0.22;
-              ud.headGroup.rotation.set(headPitch + chew, headYaw, 0);
-            }
-            if (ud.dewlap) {
-              ud.dewlap.rotation.z = Math.sin(localT * 2) * 0.18;
-            }
-            if (ud.ears) {
-              ud.ears.forEach((ear, idx) => {
-                ear.rotation.z = (idx === 0 ? -1.15 : 1.15) + Math.sin(localT * 4 + idx * 3) * 0.18;
-              });
-            }
+        }
+        if (obs.isDeterred && obs.moveOffTrackOnShock) {
+          const fleeT = this.animTime - obs.fleeStartTime;
+          const fleeDir = obs.fleeDirection || 1;
+          const transform = this.track.getTrackTransform(obs.progress, 0);
+          const tangent = transform.tangent.clone().normalize();
+          const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+          const fleeDist = Math.min(5.5, fleeT * 4.2);
+          const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+          obs.mesh.position.copy(lateralPos);
+          if (fleeDist >= 2.5) {
+            obs.isCleared = true;
           }
         }
       });
@@ -42075,11 +40217,12 @@ void main() {
       const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
       this.obstacles.forEach((obs) => {
         if (obs.isCollected) return;
-        let diff = obs.progress - trainProgress;
-        if (diff < 0) diff += 1;
-        const forwardMeters = diff * actualTrackLength;
+        let forwardProgress = obs.progress - trainProgress;
+        if (forwardProgress < -0.5) forwardProgress += 1;
+        if (forwardProgress > 0.5) forwardProgress -= 1;
+        const forwardMeters = forwardProgress * actualTrackLength;
         obs.forwardMeters = forwardMeters;
-        if (forwardMeters < minForwardDist && forwardMeters <= 1e3) {
+        if (forwardMeters > 0 && forwardMeters <= 1e3 && forwardMeters < minForwardDist) {
           minForwardDist = forwardMeters;
           closestObstacle = obs;
         }
@@ -42263,12 +40406,8 @@ void main() {
         btnSpawnTier2: document.getElementById("btn-spawn-tier2"),
         btnSpawnTier3: document.getElementById("btn-spawn-tier3"),
         btnSpawnTier4: document.getElementById("btn-spawn-tier4"),
-        btnSpawnHuman: document.getElementById("btn-spawn-human"),
-        btnSpawnHumanFlee: document.getElementById("btn-spawn-human-flee"),
-        btnSpawnAnimal: document.getElementById("btn-spawn-animal"),
-        btnSpawnAnimalFlee: document.getElementById("btn-spawn-animal-flee"),
-        btnSpawnBull: document.getElementById("btn-spawn-bull"),
-        btnSpawnBullFlee: document.getElementById("btn-spawn-bull-flee"),
+        btnSpawnDebris: document.getElementById("btn-spawn-debris"),
+        btnSpawnHeavyCargo: document.getElementById("btn-spawn-heavy-cargo"),
         btnSpawnCoachSide: document.getElementById("btn-spawn-coach-side"),
         btnClearCradle: document.getElementById("btn-clear-cradle"),
         // Floating Console Elements
@@ -42437,52 +40576,32 @@ void main() {
       }
       if (this.dom.btnSpawnTier1) {
         this.dom.btnSpawnTier1.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, true, 72, "Person (<150kg)");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 40, "Track Debris (40kg)");
         });
       }
       if (this.dom.btnSpawnTier2) {
         this.dom.btnSpawnTier2.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, true, 200, "Sub-Adult Animal (200kg)");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 200, "Medium Cargo (200kg)");
         });
       }
       if (this.dom.btnSpawnTier3) {
         this.dom.btnSpawnTier3.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, true, 300, "Livestock (300kg)");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 300, "Heavy Cargo (300kg)");
         });
       }
       if (this.dom.btnSpawnTier4) {
         this.dom.btnSpawnTier4.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, true, 480, "Heavy Bull (480kg)");
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 450, "Critical Freight (450kg)");
         });
       }
-      if (this.dom.btnSpawnHumanFlee) {
-        this.dom.btnSpawnHumanFlee.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, true);
+      if (this.dom.btnSpawnDebris) {
+        this.dom.btnSpawnDebris.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, false, 40, "Track Debris (40kg)");
         });
       }
-      if (this.dom.btnSpawnHuman) {
-        this.dom.btnSpawnHuman.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 85, false);
-        });
-      }
-      if (this.dom.btnSpawnAnimalFlee) {
-        this.dom.btnSpawnAnimalFlee.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, true);
-        });
-      }
-      if (this.dom.btnSpawnAnimal) {
-        this.dom.btnSpawnAnimal.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "animal", 85, false);
-        });
-      }
-      if (this.dom.btnSpawnBullFlee) {
-        this.dom.btnSpawnBullFlee.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, true);
-        });
-      }
-      if (this.dom.btnSpawnBull) {
-        this.dom.btnSpawnBull.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "cattle", 85, false);
+      if (this.dom.btnSpawnHeavyCargo) {
+        this.dom.btnSpawnHeavyCargo.addEventListener("click", () => {
+          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, false, 400, "Heavy Cargo (400kg)");
         });
       }
       if (this.dom.btnSpawnCoachSide) {
@@ -42600,7 +40719,7 @@ void main() {
     fireElectricShockPulse() {
       let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isCleared);
       if (!target) {
-        target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "human", 70, false);
+        target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 70, false, 40, "Track Debris (40kg)");
       }
       if (target) {
         this.obstacles.triggerDeterrence(target, this.audio, this.train);
