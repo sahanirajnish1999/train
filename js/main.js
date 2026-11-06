@@ -84,14 +84,6 @@ class SimulatorApp {
       kavachAction: document.getElementById('kavach-action'),
       kavachPayloadVal: document.getElementById('kavach-payload-val'),
       kavachPayloadBar: document.getElementById('kavach-payload-bar'),
-      btnSpawnTier1: document.getElementById('btn-spawn-tier1'),
-      btnSpawnTier2: document.getElementById('btn-spawn-tier2'),
-      btnSpawnTier3: document.getElementById('btn-spawn-tier3'),
-      btnSpawnTier4: document.getElementById('btn-spawn-tier4'),
-      btnSpawnDebris: document.getElementById('btn-spawn-debris'),
-      btnSpawnHeavyCargo: document.getElementById('btn-spawn-heavy-cargo'),
-      btnSpawnCoachSide: document.getElementById('btn-spawn-coach-side'),
-      btnClearCradle: document.getElementById('btn-clear-cradle'),
       // Floating Console Elements
       floatingConsole: document.getElementById('floating-console-container'),
       consoleSpeedVal: document.getElementById('console-speed-val'),
@@ -282,50 +274,6 @@ class SimulatorApp {
       });
     }
 
-    // Weight-Tiered Power Source Spawners (1, 2, 3, 4 Power Sources)
-    if (this.dom.btnSpawnTier1) {
-      this.dom.btnSpawnTier1.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 40, 'Track Debris (40kg)');
-      });
-    }
-    if (this.dom.btnSpawnTier2) {
-      this.dom.btnSpawnTier2.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 200, 'Medium Cargo (200kg)');
-      });
-    }
-    if (this.dom.btnSpawnTier3) {
-      this.dom.btnSpawnTier3.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 300, 'Heavy Cargo (300kg)');
-      });
-    }
-    if (this.dom.btnSpawnTier4) {
-      this.dom.btnSpawnTier4.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, true, 450, 'Critical Freight (450kg)');
-      });
-    }
-
-    // Safety Protocol Test Spawners
-    if (this.dom.btnSpawnDebris) {
-      this.dom.btnSpawnDebris.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, false, 40, 'Track Debris (40kg)');
-      });
-    }
-    if (this.dom.btnSpawnHeavyCargo) {
-      this.dom.btnSpawnHeavyCargo.addEventListener('click', () => {
-        this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 85, false, 400, 'Heavy Cargo (400kg)');
-      });
-    }
-    if (this.dom.btnSpawnCoachSide) {
-      this.dom.btnSpawnCoachSide.addEventListener('click', () => {
-        this.obstacles.spawnBesideCoach(this.physics.trackProgress, this.track.totalLength, 1, 2.4);
-      });
-    }
-    if (this.dom.btnClearCradle) {
-      this.dom.btnClearCradle.addEventListener('click', () => {
-        this.obstacles.resetCollected(this.train.captureNet);
-      });
-    }
-
     // Close help modal
     if (this.dom.btnHelp && this.dom.helpModal) {
       this.dom.btnHelp.addEventListener('click', () => this.dom.helpModal.classList.add('open'));
@@ -456,18 +404,20 @@ class SimulatorApp {
   }
 
   fireElectricShockPulse() {
-    let target = this.obstacles.obstacles.find(o => !o.isCollected && !o.isCleared);
-    if (!target) {
-      target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, 'debris', 70, false, 40, 'Track Debris (40kg)');
+    if (this.train && this.train.pulseShockEmitters) {
+      this.train.pulseShockEmitters(1.0);
+      setTimeout(() => {
+        if (this.train && this.train.pulseShockEmitters) this.train.pulseShockEmitters(0);
+      }, 1000);
     }
-    if (target) {
-      this.obstacles.triggerDeterrence(target, this.audio, this.train);
-      if (this.dom.btnConsoleShock) {
-        this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: FIRED';
-        setTimeout(() => {
-          if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: ACTIVE';
-        }, 1200);
-      }
+    if (this.audio) {
+      this.audio.playElectricShockDischarge('shock', 100);
+    }
+    if (this.dom.btnConsoleShock) {
+      this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: FIRED';
+      setTimeout(() => {
+        if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: ACTIVE';
+      }, 1200);
     }
   }
 

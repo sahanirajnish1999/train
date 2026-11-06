@@ -39668,70 +39668,49 @@ void main() {
         action: "STANDBY",
         alertMessage: null,
         alertType: "info",
-        // 'info' | 'deploy' | 'hazard' | 'success'
         collectedCount: 0,
         collectedWeight: 0,
         deterrenceActive: false,
         deterrenceMode: "electric_shock"
       };
       this.animTime = 0;
-      this.materials = {
-        woodCrate: new MeshStandardMaterial({ color: 7877903, roughness: 0.85 }),
-        // Weathered Railway Teak Wood
-        industrialSteel: new MeshStandardMaterial({ color: 9741240, roughness: 0.25, metalness: 0.88 }),
-        hazardYellow: new MeshStandardMaterial({ color: 15381256, roughness: 0.35 }),
-        brass: new MeshStandardMaterial({ color: 14251782, roughness: 0.25, metalness: 0.88 })
-      };
+      this.materials = {};
       this.initDefaultObstacles();
     }
     setTrain(train) {
       this.train = train;
     }
-    // ------------------------------------------------------------------
-    // Track Obstacle Model Builder: Industrial Cargo Crate / Tool Chest
-    // ------------------------------------------------------------------
-    buildDebrisMesh() {
-      const group = new Group();
-      group.name = "trackCargoDebris";
-      const chest = new Mesh(new BoxGeometry(0.85, 0.52, 0.65), this.materials.woodCrate);
-      chest.position.y = 0.26;
-      chest.castShadow = true;
-      group.add(chest);
-      const strapTop = new Mesh(new BoxGeometry(0.87, 0.06, 0.67), this.materials.industrialSteel);
-      strapTop.position.y = 0.48;
-      group.add(strapTop);
-      const strapBot = new Mesh(new BoxGeometry(0.87, 0.06, 0.67), this.materials.industrialSteel);
-      strapBot.position.y = 0.05;
-      group.add(strapBot);
-      const clasp = new Mesh(new BoxGeometry(0.12, 0.18, 0.03), this.materials.industrialSteel);
-      clasp.position.set(0, 0.32, 0.33);
-      group.add(clasp);
-      const padlock = new Mesh(new BoxGeometry(0.06, 0.07, 0.03), this.materials.brass);
-      padlock.position.set(0, 0.25, 0.35);
-      group.add(padlock);
-      const hazardPlate = new Mesh(new BoxGeometry(0.55, 0.09, 0.02), this.materials.hazardYellow);
-      hazardPlate.position.set(0, 0.16, 0.33);
-      group.add(hazardPlate);
-      [-0.435, 0.435].forEach((hx) => {
-        const handlePlate = new Mesh(new BoxGeometry(0.02, 0.1, 0.14), this.materials.industrialSteel);
-        handlePlate.position.set(hx, 0.28, 0);
-        group.add(handlePlate);
-        const ring = new Mesh(new TorusGeometry(0.045, 0.012, 6, 12), this.materials.industrialSteel);
-        ring.position.set(hx + (hx > 0 ? 0.015 : -0.015), 0.26, 0);
-        ring.rotation.y = Math.PI / 2;
-        group.add(ring);
+    // Remove any crate / debris meshes from the scene
+    cleanupSceneObstacles() {
+      const toRemove = [];
+      this.scene.traverse((child) => {
+        if (child.name === "trackCargoDebris" || child.userData && child.userData.type === "crate") {
+          toRemove.push(child);
+        }
       });
-      group.userData = {
-        type: "crate"
-      };
-      return group;
+      toRemove.forEach((obj) => {
+        if (obj.parent) obj.parent.remove(obj);
+        obj.traverse((c) => {
+          if (c.geometry) c.geometry.dispose();
+          if (c.material) {
+            if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
+            else c.material.dispose();
+          }
+        });
+      });
     }
-    // ------------------------------------------------------------------
-    // Spawn and Positioning Logic
-    // ------------------------------------------------------------------
-    spawnObstacle(type = "debris", trackProgress = 0, moveOffTrack = null, lateralOffset = 0, customMass = null, customName = null) {
-      const mesh = this.buildDebrisMesh();
-      const name = customName || "Track Debris (Cargo Crate)";
+    // Initial track obstacles: completely clear (all objects removed from track)
+    initDefaultObstacles() {
+      while (this.obstacles.length > 0) {
+        const obs = this.obstacles.pop();
+        if (obs.mesh && obs.mesh.parent) obs.mesh.parent.remove(obs.mesh);
+      }
+      this.cleanupSceneObstacles();
+    }
+    // Programmatic obstacle target spawner (uses invisible Object3D target so NO visible crate appears on track)
+    spawnObstacle(type = "target", trackProgress = 0, moveOffTrack = null, lateralOffset = 0, customMass = null, customName = null) {
+      const mesh = new Object3D();
+      const name = customName || "Target";
       const mass = customMass !== null && customMass !== void 0 ? customMass : 40;
       const transform = this.track.getTrackTransform(trackProgress, 0);
       mesh.position.copy(transform.position);
@@ -39741,7 +39720,7 @@ void main() {
       mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
       const obstacleObj = {
         id: this.nextId++,
-        type: "debris",
+        type,
         name,
         mass,
         mesh,
@@ -39763,20 +39742,11 @@ void main() {
       this.obstacles.push(obstacleObj);
       return obstacleObj;
     }
-    // Initial track obstacles: completely clear (humans & animals removed)
-    initDefaultObstacles() {
-      while (this.obstacles.length > 0) {
-        const obs = this.obstacles.pop();
-        if (obs.mesh) this.scene.remove(obs.mesh);
-      }
-    }
-    // Spawn immediately ahead of the train on demand (via HUD test buttons)
-    spawnAheadOfTrain(trainProgress, trackLength, type = "debris", distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
+    spawnAheadOfTrain(trainProgress, trackLength, type = "target", distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
       const deltaProgress = distanceMeters / trackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      return this.spawnObstacle("debris", targetProgress, moveOffTrack, 0, customMass, customName);
+      return this.spawnObstacle(type, targetProgress, moveOffTrack, 0, customMass, customName);
     }
-    // Spawn obstacle beside one of the train coaches within 2-3m perimeter
     spawnBesideCoach(trainProgress, trackLength, coachIndex = 1, lateralOffset = 2.4) {
       const locoLen = 20.5;
       const coachLen = 23.5;
@@ -39784,7 +39754,7 @@ void main() {
       const distBack = locoLen / 2 + couplerGap + coachLen / 2 + coachIndex * (coachLen + couplerGap);
       const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
       const coachProgress = (trainProgress - distBack / actualTrackLength + 1) % 1;
-      return this.spawnObstacle("debris", coachProgress, true, lateralOffset, 30, "Track Debris (Coach Flank)");
+      return this.spawnObstacle("target", coachProgress, true, lateralOffset, 30, "Coach Flank Target");
     }
     // ------------------------------------------------------------------
     // Active Non-Lethal Electric Shock Protocol (Track Clearance)
@@ -39808,26 +39778,9 @@ void main() {
     }
     // ------------------------------------------------------------------
     // Weight-Tiered Electric Shock Specifications (1 to 4 Power Sources)
-    // Rule 1: Under 150 kg -> ONLY 1 power source (Down-Left preferred ground angle)
-    // Rule 2: 150 kg to 250 kg -> 2 power sources (Down-Left + Down-Right)
-    // Rule 3: 250 kg to 350 kg -> 3 power sources (Top-Left + Top-Right + Down-Left)
-    // Rule 4: 350 kg and above -> All 4 power sources (Quad full-power)
     // ------------------------------------------------------------------
     getTailoredShockSpecs(obs) {
-      if (!obs) {
-        return {
-          tier: 1,
-          powerSourcesCount: 1,
-          activeIndices: [2],
-          voltage: "2.0 kV",
-          current: "1.2 mA",
-          energy: "0.04 J",
-          typeLabel: "LIGHT HAZARD (<150KG)",
-          badge: "1x POWER SOURCE: 2.0 kV / 1.2 mA",
-          desc: "Single power source at preferred ground angle"
-        };
-      }
-      const mass = obs.mass !== void 0 ? obs.mass : 40;
+      const mass = obs && obs.mass !== void 0 ? obs.mass : 50;
       if (mass < 150) {
         return {
           tier: 1,
@@ -39902,7 +39855,7 @@ void main() {
       obs.isCleared = false;
       this.fxTimer = 1.2;
       if (audio) {
-        audio.playElectricShockDischarge("debris", obs.mass);
+        audio.playElectricShockDischarge("shock", obs.mass);
       }
       this.spawnDeterrenceFX(obs, this.train);
     }
@@ -39910,6 +39863,7 @@ void main() {
       return this.triggerDeterrence(obs, audio, train);
     }
     spawnDeterrenceFX(obs, train = null) {
+      if (!obs || !obs.mesh) return;
       const activeTrain = train || this.train;
       while (this.fxGroup.children.length > 0) {
         const c = this.fxGroup.children[0];
@@ -39983,107 +39937,10 @@ void main() {
           this.fxGroup.add(nozzleFlare);
         }
       }
-      const lightPowerMult = activeIndices.length / 4;
-      const sparkLight = new PointLight(sparkColor, 7 * (0.5 + 0.5 * lightPowerMult), 25);
-      sparkLight.position.copy(obsPos.clone().add(new Vector3(0, 0.4, 0)));
-      this.fxGroup.add(sparkLight);
-      const sparkCount = Math.round(24 * (0.4 + 0.6 * lightPowerMult));
-      const sparkGeo = new BufferGeometry();
-      const sPos = [];
-      for (let s = 0; s < sparkCount; s++) {
-        sPos.push(
-          obsPos.x + (Math.random() - 0.5) * 0.8,
-          obsPos.y + Math.random() * 0.6,
-          obsPos.z + (Math.random() - 0.5) * 0.8
-        );
-      }
-      sparkGeo.setAttribute("position", new Float32BufferAttribute(sPos, 3));
-      const sparkMat = new PointsMaterial({
-        color: 14742270,
-        size: 0.08,
-        transparent: true,
-        opacity: 0.95
-      });
-      this.fxGroup.add(new Points(sparkGeo, sparkMat));
       if (activeTrain && activeTrain.pulseShockEmitters) {
         activeTrain.pulseShockEmitters(1, activeIndices);
       }
     }
-    updateDeterrenceFX(dt) {
-      if (this.fxTimer > 0) {
-        this.fxTimer -= dt;
-        const progress = Math.max(0, this.fxTimer / 1.2);
-        if (this.train && this.train.pulseShockEmitters) {
-          this.train.pulseShockEmitters(progress, this.activePowerSourceIndices);
-        }
-        const tempStart = new Vector3();
-        const tempEnd = new Vector3();
-        this.fxGroup.children.forEach((child) => {
-          if (child.isLine && child.userData.isLightning) {
-            const ud = child.userData;
-            if (ud.emitterTip) {
-              ud.emitterTip.getWorldPosition(tempStart);
-            } else {
-              tempStart.copy(ud.fallbackOrigin);
-            }
-            if (ud.obs && ud.obs.mesh) {
-              ud.obs.mesh.getWorldPosition(tempEnd);
-              tempEnd.add(ud.targetOffset);
-            }
-            const posAttr = child.geometry.attributes.position;
-            const arr = posAttr.array;
-            const segs = ud.segs || 16;
-            const dist = tempStart.distanceTo(tempEnd);
-            const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * progress;
-            for (let i = 0; i <= segs; i++) {
-              const t = i / segs;
-              const p = tempStart.clone().lerp(tempEnd, t);
-              if (i > 0 && i < segs) {
-                const envelope = Math.sin(t * Math.PI);
-                p.x += (Math.random() - 0.5) * jitterAmp * envelope;
-                p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
-                p.z += (Math.random() - 0.5) * jitterAmp * envelope;
-              }
-              arr[i * 3] = p.x;
-              arr[i * 3 + 1] = p.y;
-              arr[i * 3 + 2] = p.z;
-            }
-            posAttr.needsUpdate = true;
-            child.material.opacity = 0.95 * progress;
-          } else if (child.isPointLight) {
-            if (child.userData.isNozzleFlare && child.userData.emitterTip) {
-              child.userData.emitterTip.getWorldPosition(child.position);
-              child.intensity = (Math.random() > 0.3 ? 4 : 1.5) * progress;
-            } else if (child.userData.isSideNozzleFlare && child.userData.emitterTip) {
-              child.userData.emitterTip.getWorldPosition(child.position);
-              child.intensity = (Math.random() > 0.3 ? 5 : 2) * progress;
-            } else if (child.userData.isSideTargetLight && child.userData.obs && child.userData.obs.mesh) {
-              child.userData.obs.mesh.getWorldPosition(child.position).add(child.userData.targetOffset);
-              child.intensity = (Math.random() > 0.2 ? 6 : 2) * progress;
-            } else {
-              child.intensity = (Math.random() > 0.2 ? 7.5 : 2) * progress;
-            }
-          }
-        });
-        if (this.fxTimer <= 0) {
-          if (this.train && this.train.pulseShockEmitters) {
-            this.train.pulseShockEmitters(0);
-          }
-          if (this.train && this.train.pulseCoachSideEmitters) {
-            this.train.pulseCoachSideEmitters(null, "all", 0);
-          }
-          this.activePowerSourceIndices = null;
-          while (this.fxGroup.children.length > 0) {
-            const c = this.fxGroup.children[0];
-            if (c.geometry) c.geometry.dispose();
-            this.fxGroup.remove(c);
-          }
-        }
-      }
-    }
-    // ------------------------------------------------------------------
-    // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
-    // ------------------------------------------------------------------
     spawnCoachSideShockFX(obs, nearest) {
       const emitter = nearest.emitter;
       const emitterPos = nearest.worldPos;
@@ -40162,7 +40019,7 @@ void main() {
               train.pulseCoachSideEmitters(nearest.emitter.coachIndex, nearest.emitter.side, 1);
             }
             if (audio) {
-              audio.playElectricShockDischarge("debris", obs.mass);
+              audio.playElectricShockDischarge("shock", obs.mass);
             }
             const coachNum = nearest.emitter.coachIndex + 1;
             const sideName = nearest.emitter.side.toUpperCase();
@@ -40174,9 +40031,6 @@ void main() {
         }
       }
     }
-    // ------------------------------------------------------------------
-    // Obstacle Animation / Movement Loop
-    // ------------------------------------------------------------------
     animateLivingObstacles(dt, trainSpeedMs) {
       this.animTime += dt;
       this.obstacles.forEach((obs) => {
@@ -40204,16 +40058,82 @@ void main() {
         }
       });
     }
-    // ------------------------------------------------------------------
-    // Main Detection, AI Decision Matrix & Obstacle Scoop Loop
-    // Enforces: Collect ONLY when Mass <= 150 kg AND Speed <= 150 km/h
-    // Net defaults to CLOSED / STOWED; Opens with animation upon detection
-    // ------------------------------------------------------------------
+    updateDeterrenceFX(dt) {
+      if (this.fxTimer > 0) {
+        this.fxTimer -= dt;
+        const progress = Math.max(0, this.fxTimer / 1.2);
+        if (this.train && this.train.pulseShockEmitters) {
+          this.train.pulseShockEmitters(progress, this.activePowerSourceIndices);
+        }
+        const tempStart = new Vector3();
+        const tempEnd = new Vector3();
+        this.fxGroup.children.forEach((child) => {
+          if (child.isLine && child.userData.isLightning) {
+            const ud = child.userData;
+            if (ud.emitterTip) {
+              ud.emitterTip.getWorldPosition(tempStart);
+            } else {
+              tempStart.copy(ud.fallbackOrigin);
+            }
+            if (ud.obs && ud.obs.mesh) {
+              ud.obs.mesh.getWorldPosition(tempEnd);
+              tempEnd.add(ud.targetOffset);
+            }
+            const posAttr = child.geometry.attributes.position;
+            const arr = posAttr.array;
+            const segs = ud.segs || 16;
+            const dist = tempStart.distanceTo(tempEnd);
+            const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * progress;
+            for (let i = 0; i <= segs; i++) {
+              const t = i / segs;
+              const p = tempStart.clone().lerp(tempEnd, t);
+              if (i > 0 && i < segs) {
+                const envelope = Math.sin(t * Math.PI);
+                p.x += (Math.random() - 0.5) * jitterAmp * envelope;
+                p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
+                p.z += (Math.random() - 0.5) * jitterAmp * envelope;
+              }
+              arr[i * 3] = p.x;
+              arr[i * 3 + 1] = p.y;
+              arr[i * 3 + 2] = p.z;
+            }
+            posAttr.needsUpdate = true;
+            child.material.opacity = 0.95 * progress;
+          } else if (child.isPointLight) {
+            if (child.userData.isNozzleFlare && child.userData.emitterTip) {
+              child.userData.emitterTip.getWorldPosition(child.position);
+              child.intensity = (Math.random() > 0.3 ? 4 : 1.5) * progress;
+            } else if (child.userData.isSideNozzleFlare && child.userData.emitterTip) {
+              child.userData.emitterTip.getWorldPosition(child.position);
+              child.intensity = (Math.random() > 0.3 ? 5 : 2) * progress;
+            } else if (child.userData.isSideTargetLight && child.userData.obs && child.userData.obs.mesh) {
+              child.userData.obs.mesh.getWorldPosition(child.position).add(child.userData.targetOffset);
+              child.intensity = (Math.random() > 0.2 ? 6 : 2) * progress;
+            } else {
+              child.intensity = (Math.random() > 0.2 ? 7.5 : 2) * progress;
+            }
+          }
+        });
+        if (this.fxTimer <= 0) {
+          if (this.train && this.train.pulseShockEmitters) {
+            this.train.pulseShockEmitters(0);
+          }
+          if (this.train && this.train.pulseCoachSideEmitters) {
+            this.train.pulseCoachSideEmitters(null, "all", 0);
+          }
+          this.activePowerSourceIndices = null;
+          while (this.fxGroup.children.length > 0) {
+            const c = this.fxGroup.children[0];
+            if (c.geometry) c.geometry.dispose();
+            this.fxGroup.remove(c);
+          }
+        }
+      }
+    }
     update(dt, trainProgress, trainSpeedMs, captureNet, audio, physics, trackLength, aiSensorAuto = true, train = null) {
       if (train) this.train = train;
       let closestObstacle = null;
       let minForwardDist = Infinity;
-      const speedKmh = trainSpeedMs * 3.6;
       const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
       this.obstacles.forEach((obs) => {
         if (obs.isCollected) return;
@@ -40227,8 +40147,12 @@ void main() {
           closestObstacle = obs;
         }
       });
-      this.animateLivingObstacles(dt, trainSpeedMs);
-      this.updateDeterrenceFX(dt);
+      if (this.obstacles.length > 0) {
+        this.animateLivingObstacles(dt, trainSpeedMs);
+      }
+      if (this.fxTimer > 0) {
+        this.updateDeterrenceFX(dt);
+      }
       this.checkCoachSideProximity(this.train, audio);
       if (closestObstacle && minForwardDist <= 1e3) {
         this.telemetry.targetDetected = true;
@@ -40244,13 +40168,8 @@ void main() {
           this.telemetry.alertType = "deploy";
           this.telemetry.alertMessage = `\u26A1 1KM DETECTION: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG) AT ${Math.round(minForwardDist)}M! ${tailored.powerSourcesCount}X POWER SOURCE(S) FIRING ELECTRIC SHOCK TO MOVE OFF TRACK!`;
         }
-        if (aiSensorAuto && !closestObstacle.isCleared && this.fxTimer <= 0) {
-          this.spawnDeterrenceFX(closestObstacle, this.train);
-          if (audio) audio.playElectricShockDischarge(closestObstacle.type, closestObstacle.mass);
-          this.fxTimer = 1;
-        }
         if (closestObstacle.isCleared) {
-          if (captureNet.isDeployed) {
+          if (captureNet && captureNet.isDeployed) {
             captureNet.setDeployed(false);
           }
           this.telemetry.mass = closestObstacle.mass;
@@ -40258,14 +40177,6 @@ void main() {
           this.telemetry.tailoredSpec = "TARGET MOVED OFF TRACK";
           this.telemetry.action = `\u2705 TARGET MOVED OFF TRACK VIA ELECTRIC SHOCK \u2014 TRACK CLEAR (NO NET NEEDED)`;
           this.telemetry.alertType = "success";
-          this.telemetry.alertMessage = `\u{1F3AF} TRACK CLEAR! ${closestObstacle.name.toUpperCase()} MOVED SAFELY OFF TRACK VIA ELECTRIC SHOCK! ZERO CASUALTIES!`;
-          if (physics && physics.emergencyBrake) {
-            physics.setEmergencyBrake(false);
-          }
-        } else if (closestObstacle.isDeterred && closestObstacle.moveOffTrackOnShock) {
-          this.telemetry.mass = closestObstacle.mass;
-          this.telemetry.action = `\u26A1 ELECTRIC SHOCK DELIVERED \u2014 TARGET MOVING OFF TRACK (${Math.round(minForwardDist)}M)`;
-          this.telemetry.alertType = "deploy";
         } else {
           const isUnder150kg = closestObstacle.mass < 150;
           this.telemetry.mass = closestObstacle.mass;
@@ -40274,34 +40185,33 @@ void main() {
             if (minForwardDist <= 40) {
               this.telemetry.action = `\u{1FAA4} TARGET NOT MOVED (30-40M) \u2014 CAPTURE NET DEPLOYED (${closestObstacle.mass}KG < 150KG)`;
               this.telemetry.alertType = "deploy";
-              if (aiSensorAuto && !captureNet.isDeployed) {
+              if (aiSensorAuto && captureNet && !captureNet.isDeployed) {
                 captureNet.triggerSolenoidDeploy(audio);
                 if (audio) audio.playTargetAcquiredBeep(false);
-                this.telemetry.alertMessage = `\u{1FAA4} TARGET ON TRACK WITHIN 30-40M (${Math.round(minForwardDist)}M)! WEIGHT ${closestObstacle.mass}KG < 150KG: CAPTURE NET AUTOMATICALLY DEPLOYED!`;
               }
               if (minForwardDist <= 14) {
-                this.scene.remove(closestObstacle.mesh);
-                captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+                if (closestObstacle.mesh && closestObstacle.mesh.parent) {
+                  closestObstacle.mesh.parent.remove(closestObstacle.mesh);
+                }
+                if (captureNet) captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
                 closestObstacle.isCollected = true;
                 if (audio) audio.playRescueSuccessChime();
                 this.telemetry.collectedCount++;
                 this.telemetry.collectedWeight += closestObstacle.mass;
                 this.telemetry.action = `\u{1F3AF} SAFELY SECURED IN NET CRADLE (${closestObstacle.mass}KG) \u2014 RESCUE SUCCESS!`;
                 this.telemetry.alertType = "success";
-                this.telemetry.alertMessage = `\u{1F3AF} OBSTACLE SAFELY SECURED: ${closestObstacle.name} (${closestObstacle.mass} kg) in capture net cradle. Zero harm!`;
               }
             } else {
               this.telemetry.action = `\u26A1 E-SHOCK DELIVERED (NOT MOVED) \u2014 WEIGHT ${closestObstacle.mass}KG < 150KG: NET WILL DEPLOY AT 30-40M`;
               this.telemetry.alertType = "deploy";
             }
           } else {
-            if (captureNet.isDeployed) {
+            if (captureNet && captureNet.isDeployed) {
               captureNet.setDeployed(false);
             }
             if (minForwardDist <= 40) {
               this.telemetry.action = `\u26A0\uFE0F TARGET NOT MOVED \u2014 WEIGHT ${closestObstacle.mass}KG \u2265 150KG: NET STOWED (UNDER 150KG ONLY)! EMERGENCY BRAKE ENGAGED`;
               this.telemetry.alertType = "hazard";
-              this.telemetry.alertMessage = `\u26A0\uFE0F OVERWEIGHT HAZARD (${closestObstacle.mass}KG \u2265 150KG)! NET STOWED! EMERGENCY BRAKE ENGAGED!`;
               if (minForwardDist <= 35) {
                 if (physics && !physics.emergencyBrake) {
                   physics.setEmergencyBrake(true);
@@ -40322,19 +40232,18 @@ void main() {
         this.telemetry.name = "NONE (TRACK CLEAR)";
         this.telemetry.distance = null;
         this.telemetry.mass = null;
-        this.telemetry.tailoredSpec = null;
-        this.telemetry.tailoredLabel = null;
+        this.telemetry.tailoredSpec = "STANDBY (1 km)";
+        this.telemetry.tailoredLabel = "CLEAR LINE";
         this.telemetry.canCollect = false;
         this.telemetry.action = "TRACK CLEAR \u2014 ACTIVE SCANNING (1 km LiDAR & Camera)";
         this.telemetry.alertMessage = null;
         this.telemetry.alertType = "info";
-        if (captureNet.isDeployed && captureNet.collectedList.length === 0) {
+        if (captureNet && captureNet.isDeployed && captureNet.collectedList.length === 0) {
           captureNet.setDeployed(false);
         }
       }
       return this.telemetry;
     }
-    // Clear all collected obstacles from the net
     resetCollected(captureNet) {
       if (captureNet) {
         captureNet.clearCradle();
@@ -40402,14 +40311,6 @@ void main() {
         kavachAction: document.getElementById("kavach-action"),
         kavachPayloadVal: document.getElementById("kavach-payload-val"),
         kavachPayloadBar: document.getElementById("kavach-payload-bar"),
-        btnSpawnTier1: document.getElementById("btn-spawn-tier1"),
-        btnSpawnTier2: document.getElementById("btn-spawn-tier2"),
-        btnSpawnTier3: document.getElementById("btn-spawn-tier3"),
-        btnSpawnTier4: document.getElementById("btn-spawn-tier4"),
-        btnSpawnDebris: document.getElementById("btn-spawn-debris"),
-        btnSpawnHeavyCargo: document.getElementById("btn-spawn-heavy-cargo"),
-        btnSpawnCoachSide: document.getElementById("btn-spawn-coach-side"),
-        btnClearCradle: document.getElementById("btn-clear-cradle"),
         // Floating Console Elements
         floatingConsole: document.getElementById("floating-console-container"),
         consoleSpeedVal: document.getElementById("console-speed-val"),
@@ -40574,46 +40475,6 @@ void main() {
           this.cycleWeather();
         });
       }
-      if (this.dom.btnSpawnTier1) {
-        this.dom.btnSpawnTier1.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 40, "Track Debris (40kg)");
-        });
-      }
-      if (this.dom.btnSpawnTier2) {
-        this.dom.btnSpawnTier2.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 200, "Medium Cargo (200kg)");
-        });
-      }
-      if (this.dom.btnSpawnTier3) {
-        this.dom.btnSpawnTier3.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 300, "Heavy Cargo (300kg)");
-        });
-      }
-      if (this.dom.btnSpawnTier4) {
-        this.dom.btnSpawnTier4.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, true, 450, "Critical Freight (450kg)");
-        });
-      }
-      if (this.dom.btnSpawnDebris) {
-        this.dom.btnSpawnDebris.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, false, 40, "Track Debris (40kg)");
-        });
-      }
-      if (this.dom.btnSpawnHeavyCargo) {
-        this.dom.btnSpawnHeavyCargo.addEventListener("click", () => {
-          this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 85, false, 400, "Heavy Cargo (400kg)");
-        });
-      }
-      if (this.dom.btnSpawnCoachSide) {
-        this.dom.btnSpawnCoachSide.addEventListener("click", () => {
-          this.obstacles.spawnBesideCoach(this.physics.trackProgress, this.track.totalLength, 1, 2.4);
-        });
-      }
-      if (this.dom.btnClearCradle) {
-        this.dom.btnClearCradle.addEventListener("click", () => {
-          this.obstacles.resetCollected(this.train.captureNet);
-        });
-      }
       if (this.dom.btnHelp && this.dom.helpModal) {
         this.dom.btnHelp.addEventListener("click", () => this.dom.helpModal.classList.add("open"));
         this.dom.btnCloseHelp.addEventListener("click", () => this.dom.helpModal.classList.remove("open"));
@@ -40717,18 +40578,20 @@ void main() {
       }
     }
     fireElectricShockPulse() {
-      let target = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isCleared);
-      if (!target) {
-        target = this.obstacles.spawnAheadOfTrain(this.physics.trackProgress, this.track.totalLength, "debris", 70, false, 40, "Track Debris (40kg)");
+      if (this.train && this.train.pulseShockEmitters) {
+        this.train.pulseShockEmitters(1);
+        setTimeout(() => {
+          if (this.train && this.train.pulseShockEmitters) this.train.pulseShockEmitters(0);
+        }, 1e3);
       }
-      if (target) {
-        this.obstacles.triggerDeterrence(target, this.audio, this.train);
-        if (this.dom.btnConsoleShock) {
-          this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: FIRED";
-          setTimeout(() => {
-            if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: ACTIVE";
-          }, 1200);
-        }
+      if (this.audio) {
+        this.audio.playElectricShockDischarge("shock", 100);
+      }
+      if (this.dom.btnConsoleShock) {
+        this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: FIRED";
+        setTimeout(() => {
+          if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: ACTIVE";
+        }, 1200);
       }
     }
     toggleCaptureNet() {
