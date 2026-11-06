@@ -5,7 +5,7 @@
 // Massive Natural Mountain Ridge, 100% Unbroken Tracks & Zero Disappearing Cars
 // ====================================================================
 
-import * as THREE from 'three';
+import * as THREE from "three";
 
 export class TrackSystem {
   constructor(scene) {
@@ -49,11 +49,11 @@ export class TrackSystem {
   // ---------------------------------------------------------
   generateTextures() {
     // 1. Crushed Granite Stone Ballast Texture
-    const canvasB = document.createElement('canvas');
+    const canvasB = document.createElement("canvas");
     canvasB.width = 512;
     canvasB.height = 512;
-    const ctxB = canvasB.getContext('2d');
-    ctxB.fillStyle = '#474036';
+    const ctxB = canvasB.getContext("2d");
+    ctxB.fillStyle = "#474036";
     ctxB.fillRect(0, 0, 512, 512);
 
     for (let i = 0; i < 4000; i++) {
@@ -73,30 +73,30 @@ export class TrackSystem {
     ballastTex.repeat.set(12, 120);
 
     // 2. Concrete Sleeper Texture
-    const canvasS = document.createElement('canvas');
+    const canvasS = document.createElement("canvas");
     canvasS.width = 256;
     canvasS.height = 64;
-    const ctxS = canvasS.getContext('2d');
-    ctxS.fillStyle = '#8c8880';
+    const ctxS = canvasS.getContext("2d");
+    ctxS.fillStyle = "#8c8880";
     ctxS.fillRect(0, 0, 256, 64);
     for (let i = 0; i < 600; i++) {
       const shade = Math.floor(110 + Math.random() * 60);
       ctxS.fillStyle = `rgba(${shade}, ${shade}, ${shade}, 0.25)`;
       ctxS.fillRect(Math.random() * 256, Math.random() * 64, 3, 2);
     }
-    ctxS.fillStyle = '#222';
+    ctxS.fillStyle = "#222";
     ctxS.fillRect(40, 10, 24, 44);
     ctxS.fillRect(192, 10, 24, 44);
     const sleeperTex = new THREE.CanvasTexture(canvasS);
 
     // 3. Vaulted Tunnel Stone Lining Texture
-    const canvasT = document.createElement('canvas');
+    const canvasT = document.createElement("canvas");
     canvasT.width = 512;
     canvasT.height = 512;
-    const ctxT = canvasT.getContext('2d');
-    ctxT.fillStyle = '#27272a'; // Weathered dark basalt stone
+    const ctxT = canvasT.getContext("2d");
+    ctxT.fillStyle = "#27272a"; // Weathered dark basalt stone
     ctxT.fillRect(0, 0, 512, 512);
-    ctxT.strokeStyle = '#18181b';
+    ctxT.strokeStyle = "#18181b";
     ctxT.lineWidth = 3;
     const rowH = 32;
     for (let y = 0; y < 512; y += rowH) {
@@ -116,7 +116,7 @@ export class TrackSystem {
     for (let i = 0; i < 40; i++) {
       const sx = Math.random() * 512;
       const sw = 15 + Math.random() * 25;
-      ctxT.fillStyle = 'rgba(10, 10, 10, 0.4)';
+      ctxT.fillStyle = "rgba(10, 10, 10, 0.4)";
       ctxT.fillRect(sx, 0, sw, 512);
     }
     const tunnelStoneTex = new THREE.CanvasTexture(canvasT);
@@ -125,14 +125,14 @@ export class TrackSystem {
     tunnelStoneTex.repeat.set(4, 20);
 
     // 4. Portal Dressed Ashlar Stone Masonry Texture
-    const canvasP = document.createElement('canvas');
+    const canvasP = document.createElement("canvas");
     canvasP.width = 512;
     canvasP.height = 512;
-    const ctxP = canvasP.getContext('2d');
-    ctxP.fillStyle = '#64748b'; // Weathered granite grey
+    const ctxP = canvasP.getContext("2d");
+    ctxP.fillStyle = "#64748b"; // Weathered granite grey
     ctxP.fillRect(0, 0, 512, 512);
     // Block courses
-    ctxP.strokeStyle = '#1e293b';
+    ctxP.strokeStyle = "#1e293b";
     ctxP.lineWidth = 4;
     const pRowH = 48;
     for (let y = 0; y < 512; y += pRowH) {
@@ -141,7 +141,7 @@ export class TrackSystem {
       for (let x = offset; x < 512; x += 80) {
         ctxP.strokeRect(x, y, 80, pRowH);
         // Chiseled stone texture shading
-        ctxP.fillStyle = 'rgba(0, 0, 0, 0.08)';
+        ctxP.fillStyle = "rgba(0, 0, 0, 0.08)";
         ctxP.fillRect(x + 4, y + 4, 72, pRowH - 8);
       }
     }
@@ -151,44 +151,48 @@ export class TrackSystem {
     portalMasonryTex.repeat.set(4, 4);
 
     // 5. Authentic Indian Railways Tunnel Signboard
-    const canvasSign = document.createElement('canvas');
+    const canvasSign = document.createElement("canvas");
     canvasSign.width = 1024;
     canvasSign.height = 256;
-    const ctxSign = canvasSign.getContext('2d');
+    const ctxSign = canvasSign.getContext("2d");
     // Mustard yellow enamel background
-    ctxSign.fillStyle = '#facc15';
+    ctxSign.fillStyle = "#facc15";
     ctxSign.fillRect(0, 0, 1024, 256);
     // Black border
     ctxSign.lineWidth = 12;
-    ctxSign.strokeStyle = '#000';
+    ctxSign.strokeStyle = "#000";
     ctxSign.strokeRect(6, 6, 1012, 244);
     // Inner pinstripe
     ctxSign.lineWidth = 3;
     ctxSign.strokeRect(18, 18, 988, 220);
 
-    ctxSign.fillStyle = '#000';
-    ctxSign.textAlign = 'center';
-    ctxSign.font = 'bold 28px sans-serif';
-    ctxSign.fillText('मध्य रेल  •  CENTRAL RAILWAY', 512, 56);
+    ctxSign.fillStyle = "#000";
+    ctxSign.textAlign = "center";
+    ctxSign.font = "bold 28px sans-serif";
+    ctxSign.fillText("मध्य रेल  •  CENTRAL RAILWAY", 512, 56);
 
-    ctxSign.font = 'bold 54px sans-serif';
-    ctxSign.fillText('सुरंग सं. ०४  |  TUNNEL NO. 04', 512, 134);
+    ctxSign.font = "bold 54px sans-serif";
+    ctxSign.fillText("सुरंग सं. ०४  |  TUNNEL NO. 04", 512, 134);
 
-    ctxSign.font = 'bold 28px sans-serif';
-    ctxSign.fillText('लंबाई : 466 मी.  |  LENGTH : 466 M  •  घाट खंड (GHAT SECTION)', 512, 198);
+    ctxSign.font = "bold 28px sans-serif";
+    ctxSign.fillText(
+      "लंबाई : 466 मी.  |  LENGTH : 466 M  •  घाट खंड (GHAT SECTION)",
+      512,
+      198,
+    );
 
     const portalSignTex = new THREE.CanvasTexture(canvasSign);
 
     // 6. Iconic Red & White Portal Arch Hazard Stripes
-    const canvasArch = document.createElement('canvas');
+    const canvasArch = document.createElement("canvas");
     canvasArch.width = 512;
     canvasArch.height = 64;
-    const ctxArch = canvasArch.getContext('2d');
+    const ctxArch = canvasArch.getContext("2d");
     const stripeW = 32;
     for (let x = 0; x < 512; x += stripeW * 2) {
-      ctxArch.fillStyle = '#dc2626'; // Indian Railways Crimson Red
+      ctxArch.fillStyle = "#dc2626"; // Indian Railways Crimson Red
       ctxArch.fillRect(x, 0, stripeW, 64);
-      ctxArch.fillStyle = '#f8fafc'; // Crisp White
+      ctxArch.fillStyle = "#f8fafc"; // Crisp White
       ctxArch.fillRect(x + stripeW, 0, stripeW, 64);
     }
     const archStripeTex = new THREE.CanvasTexture(canvasArch);
@@ -196,12 +200,12 @@ export class TrackSystem {
     archStripeTex.repeat.set(16, 1);
 
     // 7. Mountain Rock Strata & Foliage Texture (Natural Western Ghats Basalt)
-    const canvasRock = document.createElement('canvas');
+    const canvasRock = document.createElement("canvas");
     canvasRock.width = 512;
     canvasRock.height = 512;
-    const ctxRock = canvasRock.getContext('2d');
+    const ctxRock = canvasRock.getContext("2d");
     // Rich earthy warm stone base
-    ctxRock.fillStyle = '#524a42';
+    ctxRock.fillStyle = "#524a42";
     ctxRock.fillRect(0, 0, 512, 512);
     // Horizontal sedimentary rock strata
     for (let y = 0; y < 512; y += 14) {
@@ -213,7 +217,7 @@ export class TrackSystem {
     for (let i = 0; i < 260; i++) {
       const rx = Math.random() * 512;
       const ry = Math.random() * 512;
-      ctxRock.fillStyle = 'rgba(40, 115, 45, 0.55)';
+      ctxRock.fillStyle = "rgba(40, 115, 45, 0.55)";
       ctxRock.beginPath();
       ctxRock.arc(rx, ry, 10 + Math.random() * 22, 0, Math.PI * 2);
       ctxRock.fill();
@@ -221,7 +225,7 @@ export class TrackSystem {
     // Deep fissure shadows
     for (let i = 0; i < 25; i++) {
       const fx = Math.random() * 512;
-      ctxRock.strokeStyle = 'rgba(25, 20, 15, 0.4)';
+      ctxRock.strokeStyle = "rgba(25, 20, 15, 0.4)";
       ctxRock.lineWidth = 2 + Math.random() * 3;
       ctxRock.beginPath();
       ctxRock.moveTo(fx, 0);
@@ -234,46 +238,50 @@ export class TrackSystem {
     mountainRockTex.repeat.set(8, 8);
 
     // 8. Authentic Indian Railways Station Bilingual Enamel Board
-    const canvasStBoard = document.createElement('canvas');
+    const canvasStBoard = document.createElement("canvas");
     canvasStBoard.width = 1024;
     canvasStBoard.height = 384;
-    const ctxStB = canvasStBoard.getContext('2d');
-    ctxStB.fillStyle = '#facc15'; // Vivid mustard yellow enamel
+    const ctxStB = canvasStBoard.getContext("2d");
+    ctxStB.fillStyle = "#facc15"; // Vivid mustard yellow enamel
     ctxStB.fillRect(0, 0, 1024, 384);
     // Double black border
     ctxStB.lineWidth = 14;
-    ctxStB.strokeStyle = '#000';
+    ctxStB.strokeStyle = "#000";
     ctxStB.strokeRect(7, 7, 1010, 370);
     ctxStB.lineWidth = 4;
     ctxStB.strokeRect(20, 20, 984, 344);
 
-    ctxStB.fillStyle = '#000';
-    ctxStB.textAlign = 'center';
-    ctxStB.font = 'bold 30px sans-serif';
-    ctxStB.fillText('पश्चिम रेलवे  •  WESTERN RAILWAY', 512, 60);
+    ctxStB.fillStyle = "#000";
+    ctxStB.textAlign = "center";
+    ctxStB.font = "bold 30px sans-serif";
+    ctxStB.fillText("पश्चिम रेलवे  •  WESTERN RAILWAY", 512, 60);
 
-    ctxStB.font = 'bold 64px sans-serif';
-    ctxStB.fillText('रतलाम जंक्शन', 512, 145);
+    ctxStB.font = "bold 64px sans-serif";
+    ctxStB.fillText("रतलाम जंक्शन", 512, 145);
 
-    ctxStB.font = 'bold 56px sans-serif';
-    ctxStB.fillText('RATLAM JN.', 512, 225);
+    ctxStB.font = "bold 56px sans-serif";
+    ctxStB.fillText("RATLAM JN.", 512, 225);
 
-    ctxStB.font = 'bold 44px sans-serif';
-    ctxStB.fillText('رتلام جنکشن', 512, 295);
+    ctxStB.font = "bold 44px sans-serif";
+    ctxStB.fillText("رتلام جنکشن", 512, 295);
 
-    ctxStB.font = 'bold 24px sans-serif';
-    ctxStB.fillText('समुद्र तल से ऊंचाई : ४९३.२६ मी.  •  HEIGHT ABOVE MEAN SEA LEVEL : 493.26 M', 512, 345);
+    ctxStB.font = "bold 24px sans-serif";
+    ctxStB.fillText(
+      "समुद्र तल से ऊंचाई : ४९३.२६ मी.  •  HEIGHT ABOVE MEAN SEA LEVEL : 493.26 M",
+      512,
+      345,
+    );
     const stationBoardTex = new THREE.CanvasTexture(canvasStBoard);
 
     // 9. Station Main Building Brick & Sandstone Facade Texture
-    const canvasBldg = document.createElement('canvas');
+    const canvasBldg = document.createElement("canvas");
     canvasBldg.width = 512;
     canvasBldg.height = 512;
-    const ctxBldg = canvasBldg.getContext('2d');
-    ctxBldg.fillStyle = '#991b1b'; // Deep Terracotta Red Brick
+    const ctxBldg = canvasBldg.getContext("2d");
+    ctxBldg.fillStyle = "#991b1b"; // Deep Terracotta Red Brick
     ctxBldg.fillRect(0, 0, 512, 512);
     // Brick courses
-    ctxBldg.strokeStyle = '#7f1d1d';
+    ctxBldg.strokeStyle = "#7f1d1d";
     ctxBldg.lineWidth = 2;
     for (let y = 0; y < 512; y += 16) {
       ctxBldg.beginPath();
@@ -289,11 +297,11 @@ export class TrackSystem {
       }
     }
     // Cream Sandstone decorative bands
-    ctxBldg.fillStyle = '#fef3c7';
+    ctxBldg.fillStyle = "#fef3c7";
     ctxBldg.fillRect(0, 110, 512, 28);
     ctxBldg.fillRect(0, 360, 512, 28);
     // Arched windows
-    ctxBldg.fillStyle = '#0f172a';
+    ctxBldg.fillStyle = "#0f172a";
     for (let x = 32; x < 512; x += 80) {
       ctxBldg.fillRect(x, 170, 48, 70);
       ctxBldg.beginPath();
@@ -306,24 +314,24 @@ export class TrackSystem {
     stationBuildingTex.repeat.set(4, 2);
 
     // 10. Platform Concrete Paver Texture with Tactile Yellow Safety Strip
-    const canvasPaving = document.createElement('canvas');
+    const canvasPaving = document.createElement("canvas");
     canvasPaving.width = 256;
     canvasPaving.height = 256;
-    const ctxPaving = canvasPaving.getContext('2d');
-    ctxPaving.fillStyle = '#94a3b8'; // Slate grey platform surface
+    const ctxPaving = canvasPaving.getContext("2d");
+    ctxPaving.fillStyle = "#94a3b8"; // Slate grey platform surface
     ctxPaving.fillRect(0, 0, 256, 256);
     // Paver grid
-    ctxPaving.strokeStyle = '#64748b';
+    ctxPaving.strokeStyle = "#64748b";
     ctxPaving.lineWidth = 2;
     for (let i = 0; i < 256; i += 32) {
       ctxPaving.strokeRect(i, 0, 32, 256);
       ctxPaving.strokeRect(0, i, 256, 32);
     }
     // Tactile warning border band along track edge
-    ctxPaving.fillStyle = '#facc15';
+    ctxPaving.fillStyle = "#facc15";
     ctxPaving.fillRect(0, 0, 48, 256);
     // White safety margin line
-    ctxPaving.fillStyle = '#ffffff';
+    ctxPaving.fillStyle = "#ffffff";
     ctxPaving.fillRect(52, 0, 12, 256);
     const platformPaverTex = new THREE.CanvasTexture(canvasPaving);
     platformPaverTex.wrapS = THREE.RepeatWrapping;
@@ -331,19 +339,19 @@ export class TrackSystem {
     platformPaverTex.repeat.set(2, 40);
 
     // 11. Station Round Clock Dial Texture
-    const canvasClock = document.createElement('canvas');
+    const canvasClock = document.createElement("canvas");
     canvasClock.width = 256;
     canvasClock.height = 256;
-    const ctxClock = canvasClock.getContext('2d');
-    ctxClock.fillStyle = '#f8fafc';
+    const ctxClock = canvasClock.getContext("2d");
+    ctxClock.fillStyle = "#f8fafc";
     ctxClock.beginPath();
     ctxClock.arc(128, 128, 120, 0, Math.PI * 2);
     ctxClock.fill();
     ctxClock.lineWidth = 8;
-    ctxClock.strokeStyle = '#1e293b';
+    ctxClock.strokeStyle = "#1e293b";
     ctxClock.stroke();
     // Clock hour marks
-    ctxClock.fillStyle = '#0f172a';
+    ctxClock.fillStyle = "#0f172a";
     for (let a = 0; a < 12; a++) {
       const angle = (a / 12) * Math.PI * 2;
       const x1 = 128 + Math.sin(angle) * 96;
@@ -354,7 +362,7 @@ export class TrackSystem {
     }
     // Hour & minute hands (10:10 classic display)
     ctxClock.lineWidth = 6;
-    ctxClock.strokeStyle = '#0f172a';
+    ctxClock.strokeStyle = "#0f172a";
     ctxClock.beginPath();
     ctxClock.moveTo(128, 128);
     ctxClock.lineTo(80, 75);
@@ -367,24 +375,24 @@ export class TrackSystem {
     const stationClockTex = new THREE.CanvasTexture(canvasClock);
 
     // 12. Electronic Train Departure Board Texture
-    const canvasDep = document.createElement('canvas');
+    const canvasDep = document.createElement("canvas");
     canvasDep.width = 512;
     canvasDep.height = 128;
-    const ctxDep = canvasDep.getContext('2d');
-    ctxDep.fillStyle = '#020617';
+    const ctxDep = canvasDep.getContext("2d");
+    ctxDep.fillStyle = "#020617";
     ctxDep.fillRect(0, 0, 512, 128);
-    ctxDep.strokeStyle = '#38bdf8';
+    ctxDep.strokeStyle = "#38bdf8";
     ctxDep.lineWidth = 3;
     ctxDep.strokeRect(3, 3, 506, 122);
-    ctxDep.fillStyle = '#38bdf8';
-    ctxDep.font = 'bold 18px monospace';
-    ctxDep.fillText('RATLAM JUNCTION • CENTRAL DISPLAY', 16, 26);
-    ctxDep.fillStyle = '#facc15';
-    ctxDep.font = 'bold 22px monospace';
-    ctxDep.fillText('12301 RAJDHANI EXP  PF 1  ON TIME', 16, 62);
-    ctxDep.fillStyle = '#4ade80';
-    ctxDep.font = 'bold 20px monospace';
-    ctxDep.fillText('12952 SUPERFAST EXP PF 2  EXPECTED 10:15', 16, 96);
+    ctxDep.fillStyle = "#38bdf8";
+    ctxDep.font = "bold 18px monospace";
+    ctxDep.fillText("RATLAM JUNCTION • CENTRAL DISPLAY", 16, 26);
+    ctxDep.fillStyle = "#facc15";
+    ctxDep.font = "bold 22px monospace";
+    ctxDep.fillText("12301 RAJDHANI EXP  PF 1  ON TIME", 16, 62);
+    ctxDep.fillStyle = "#4ade80";
+    ctxDep.font = "bold 20px monospace";
+    ctxDep.fillText("12952 SUPERFAST EXP PF 2  EXPECTED 10:15", 16, 96);
     const trainInfoTex = new THREE.CanvasTexture(canvasDep);
 
     return {
@@ -399,7 +407,7 @@ export class TrackSystem {
       stationBuildingTex,
       platformPaverTex,
       stationClockTex,
-      trainInfoTex
+      trainInfoTex,
     };
   }
 
@@ -409,20 +417,25 @@ export class TrackSystem {
   initTrackPath() {
     const waypoints = [
       new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, 0, 700),          // High speed straightaway
-      new THREE.Vector3(140, 0, 1100),       // Deep Mountain Pass Approach
-      new THREE.Vector3(420, 0, 1350),       // Inside Scenic Mountain Tunnel
-      new THREE.Vector3(780, 0, 1200),       // Emerging into valley
-      new THREE.Vector3(980, 0, 800),        // Rural crossing section
-      new THREE.Vector3(1050, 0, 200),       // Long eastern straight
+      new THREE.Vector3(0, 0, 700), // High speed straightaway
+      new THREE.Vector3(140, 0, 1100), // Deep Mountain Pass Approach
+      new THREE.Vector3(420, 0, 1350), // Inside Scenic Mountain Tunnel
+      new THREE.Vector3(780, 0, 1200), // Emerging into valley
+      new THREE.Vector3(980, 0, 800), // Rural crossing section
+      new THREE.Vector3(1050, 0, 200), // Long eastern straight
       new THREE.Vector3(950, 0, -400),
       new THREE.Vector3(700, 0, -850),
-      new THREE.Vector3(300, 0, -950),       // Approach to Station
-      new THREE.Vector3(-150, 0, -700),      // Station straight
-      new THREE.Vector3(-200, 0, -300)       // Return loop
+      new THREE.Vector3(300, 0, -950), // Approach to Station
+      new THREE.Vector3(-150, 0, -700), // Station straight
+      new THREE.Vector3(-200, 0, -300), // Return loop
     ];
 
-    this.curve = new THREE.CatmullRomCurve3(waypoints, true, 'centripetal', 0.25);
+    this.curve = new THREE.CatmullRomCurve3(
+      waypoints,
+      true,
+      "centripetal",
+      0.25,
+    );
     this.totalLength = this.curve.getLength();
   }
 
@@ -436,7 +449,7 @@ export class TrackSystem {
     const groundMat = new THREE.MeshStandardMaterial({
       color: 0x2e5522, // Natural lush Indian rural green
       roughness: 0.94,
-      metalness: 0.02
+      metalness: 0.02,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.position.y = -0.2; // Cleanly below the ballast
@@ -460,12 +473,12 @@ export class TrackSystem {
 
     const profile = [
       { x: -6.8, y: -0.15 }, // Outer toe left (flush with ground)
-      { x: -4.8, y: 0.18 },  // Shoulder left
-      { x: -2.1, y: 0.18 },  // Under Track 1
-      { x: 0.0,  y: 0.16 },  // Six-foot drainage center
-      { x: 2.1,  y: 0.18 },  // Under Track 2
-      { x: 4.8,  y: 0.18 },  // Shoulder right
-      { x: 6.8,  y: -0.15 }  // Outer toe right (flush with ground)
+      { x: -4.8, y: 0.18 }, // Shoulder left
+      { x: -2.1, y: 0.18 }, // Under Track 1
+      { x: 0.0, y: 0.16 }, // Six-foot drainage center
+      { x: 2.1, y: 0.18 }, // Under Track 2
+      { x: 4.8, y: 0.18 }, // Shoulder right
+      { x: 6.8, y: -0.15 }, // Outer toe right (flush with ground)
     ];
 
     const up = new THREE.Vector3(0, 1, 0);
@@ -493,15 +506,18 @@ export class TrackSystem {
       }
     }
 
-    ballastGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    ballastGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    ballastGeo.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3),
+    );
+    ballastGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
     ballastGeo.setIndex(indices);
     ballastGeo.computeVertexNormals();
 
     const ballastMat = new THREE.MeshStandardMaterial({
       map: this.textures.ballastTex,
       roughness: 0.95,
-      metalness: 0.05
+      metalness: 0.05,
     });
 
     const ballastMesh = new THREE.Mesh(ballastGeo, ballastMat);
@@ -519,17 +535,21 @@ export class TrackSystem {
     const sleeperMat = new THREE.MeshStandardMaterial({
       map: this.textures.sleeperTex,
       roughness: 0.8,
-      metalness: 0.1
+      metalness: 0.1,
     });
 
     const railMat = new THREE.MeshStandardMaterial({
       color: 0x9ca3af,
       roughness: 0.12,
-      metalness: 0.92
+      metalness: 0.92,
     });
 
     const sleeperGeo = new THREE.BoxGeometry(2.65, 0.22, 0.28);
-    const instancedSleepers = new THREE.InstancedMesh(sleeperGeo, sleeperMat, divisions * 2);
+    const instancedSleepers = new THREE.InstancedMesh(
+      sleeperGeo,
+      sleeperMat,
+      divisions * 2,
+    );
     instancedSleepers.castShadow = true;
     instancedSleepers.receiveShadow = true;
     instancedSleepers.frustumCulled = false; // CRITICAL: Prevents Three.js from culling all sleepers when origin leaves screen!
@@ -551,26 +571,50 @@ export class TrackSystem {
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
       // Track 1
-      const t1Center = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2));
+      const t1Center = pt
+        .clone()
+        .add(normal.clone().multiplyScalar(-this.trackOffset / 2));
       dummy.position.copy(t1Center);
-      dummy.position.y += 0.20;
+      dummy.position.y += 0.2;
       dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
       dummy.updateMatrix();
       instancedSleepers.setMatrixAt(instanceIdx++, dummy.matrix);
 
-      t1RailL.push(t1Center.clone().add(normal.clone().multiplyScalar(-railHalfGauge)).setY(t1Center.y + this.railHeight));
-      t1RailR.push(t1Center.clone().add(normal.clone().multiplyScalar(railHalfGauge)).setY(t1Center.y + this.railHeight));
+      t1RailL.push(
+        t1Center
+          .clone()
+          .add(normal.clone().multiplyScalar(-railHalfGauge))
+          .setY(t1Center.y + this.railHeight),
+      );
+      t1RailR.push(
+        t1Center
+          .clone()
+          .add(normal.clone().multiplyScalar(railHalfGauge))
+          .setY(t1Center.y + this.railHeight),
+      );
 
       // Track 2
-      const t2Center = pt.clone().add(normal.clone().multiplyScalar(this.trackOffset / 2));
+      const t2Center = pt
+        .clone()
+        .add(normal.clone().multiplyScalar(this.trackOffset / 2));
       dummy.position.copy(t2Center);
-      dummy.position.y += 0.20;
+      dummy.position.y += 0.2;
       dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
       dummy.updateMatrix();
       instancedSleepers.setMatrixAt(instanceIdx++, dummy.matrix);
 
-      t2RailL.push(t2Center.clone().add(normal.clone().multiplyScalar(-railHalfGauge)).setY(t2Center.y + this.railHeight));
-      t2RailR.push(t2Center.clone().add(normal.clone().multiplyScalar(railHalfGauge)).setY(t2Center.y + this.railHeight));
+      t2RailL.push(
+        t2Center
+          .clone()
+          .add(normal.clone().multiplyScalar(-railHalfGauge))
+          .setY(t2Center.y + this.railHeight),
+      );
+      t2RailR.push(
+        t2Center
+          .clone()
+          .add(normal.clone().multiplyScalar(railHalfGauge))
+          .setY(t2Center.y + this.railHeight),
+      );
     }
 
     instancedSleepers.instanceMatrix.needsUpdate = true;
@@ -596,9 +640,20 @@ export class TrackSystem {
   // Overhead Catenary (OHE 25 kV AC)
   // ---------------------------------------------------------
   buildOHECatenary() {
-    const oheMastMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.6 });
-    const wireMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.2, metalness: 0.9 });
-    const insMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.3 });
+    const oheMastMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      roughness: 0.4,
+      metalness: 0.6,
+    });
+    const wireMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706,
+      roughness: 0.2,
+      metalness: 0.9,
+    });
+    const insMat = new THREE.MeshStandardMaterial({
+      color: 0x78350f,
+      roughness: 0.3,
+    });
 
     const mastSpacing = 48;
     const mastCount = Math.floor(this.totalLength / mastSpacing);
@@ -615,25 +670,39 @@ export class TrackSystem {
       const tangent = this.curve.getTangentAt(u).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
-      const inTunnel = (u >= this.tunnelStart && u <= this.tunnelEnd);
+      const inTunnel = u >= this.tunnelStart && u <= this.tunnelEnd;
 
       if (!inTunnel) {
         const mastGroup = new THREE.Group();
-        const mastPos = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
+        const mastPos = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
         mastGroup.position.copy(mastPos);
-        mastGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        mastGroup.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          tangent,
+        );
 
-        const pole = new THREE.Mesh(new THREE.BoxGeometry(0.18, 7.2, 0.18), oheMastMat);
+        const pole = new THREE.Mesh(
+          new THREE.BoxGeometry(0.18, 7.2, 0.18),
+          oheMastMat,
+        );
         pole.position.y = 3.6;
         pole.castShadow = true;
         mastGroup.add(pole);
 
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1), oheMastMat);
+        const arm = new THREE.Mesh(
+          new THREE.BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1),
+          oheMastMat,
+        );
         arm.position.set((this.trackOffset + 3.4) / 2 - 0.2, 6.2, 0);
         mastGroup.add(arm);
 
-        [2.6, 2.6 + this.trackOffset].forEach(x => {
-          const ins = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8), insMat);
+        [2.6, 2.6 + this.trackOffset].forEach((x) => {
+          const ins = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8),
+            insMat,
+          );
           ins.position.set(x, 5.8, 0);
           mastGroup.add(ins);
         });
@@ -642,8 +711,12 @@ export class TrackSystem {
         this.trackGroup.add(mastGroup);
       }
 
-      const t1Pt = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2));
-      const t2Pt = pt.clone().add(normal.clone().multiplyScalar(this.trackOffset / 2));
+      const t1Pt = pt
+        .clone()
+        .add(normal.clone().multiplyScalar(-this.trackOffset / 2));
+      const t2Pt = pt
+        .clone()
+        .add(normal.clone().multiplyScalar(this.trackOffset / 2));
 
       contactWire1.push(t1Pt.clone().setY(5.4));
       contactWire2.push(t2Pt.clone().setY(5.4));
@@ -679,27 +752,27 @@ export class TrackSystem {
       map: this.textures.tunnelStoneTex,
       roughness: 0.92,
       metalness: 0.08,
-      side: THREE.BackSide
+      side: THREE.BackSide,
     });
 
     const portalMasonryMat = new THREE.MeshStandardMaterial({
       map: this.textures.portalMasonryTex,
       roughness: 0.82,
-      metalness: 0.18
+      metalness: 0.18,
     });
 
     const mountainRockMat = new THREE.MeshStandardMaterial({
       map: this.textures.mountainRockTex,
       roughness: 0.92,
-      metalness: 0.08
+      metalness: 0.08,
     });
 
     const archStripeMat = new THREE.MeshBasicMaterial({
-      map: this.textures.archStripeTex
+      map: this.textures.archStripeTex,
     });
 
     const signMat = new THREE.MeshBasicMaterial({
-      map: this.textures.portalSignTex
+      map: this.textures.portalSignTex,
     });
 
     // Broad Gauge Double Track Horseshoe Clearance Dimensions:
@@ -723,10 +796,12 @@ export class TrackSystem {
         const u = startU + (i / cSteps) * (endU - startU);
         const pt = this.curve.getPointAt(u);
         const tangent = this.curve.getTangentAt(u).normalize();
-        const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+        const normal = new THREE.Vector3()
+          .crossVectors(tangent, up)
+          .normalize();
 
         // Taper cutting height: ground level (0.5m) at outer approach, 13.8m high at the portal headwall
-        const factor = isEntry ? (i / cSteps) : (1.0 - i / cSteps);
+        const factor = isEntry ? i / cSteps : 1.0 - i / cSteps;
         const cutH = 0.5 + Math.pow(factor, 1.2) * 13.3;
 
         // 6 Profile vertices across cutting (with stepped geotechnical benches):
@@ -736,12 +811,30 @@ export class TrackSystem {
         // 3: Right track toe (x = 7.5, y = 0.18)
         // 4: Right bench top (x = 12.5, y = cutH * 0.55)
         // 5: Right crest (x = 18.0, y = cutH)
-        const vL0 = pt.clone().add(normal.clone().multiplyScalar(-18.0)).setY(pt.y + cutH);
-        const vL1 = pt.clone().add(normal.clone().multiplyScalar(-12.5)).setY(pt.y + cutH * 0.55);
-        const vL2 = pt.clone().add(normal.clone().multiplyScalar(-7.5)).setY(pt.y + 0.18);
-        const vR0 = pt.clone().add(normal.clone().multiplyScalar(7.5)).setY(pt.y + 0.18);
-        const vR1 = pt.clone().add(normal.clone().multiplyScalar(12.5)).setY(pt.y + cutH * 0.55);
-        const vR2 = pt.clone().add(normal.clone().multiplyScalar(18.0)).setY(pt.y + cutH);
+        const vL0 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(-18.0))
+          .setY(pt.y + cutH);
+        const vL1 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(-12.5))
+          .setY(pt.y + cutH * 0.55);
+        const vL2 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(-7.5))
+          .setY(pt.y + 0.18);
+        const vR0 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(7.5))
+          .setY(pt.y + 0.18);
+        const vR1 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(12.5))
+          .setY(pt.y + cutH * 0.55);
+        const vR2 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(18.0))
+          .setY(pt.y + cutH);
 
         [vL0, vL1, vL2, vR0, vR1, vR2].forEach((v, idx) => {
           cPos.push(v.x, v.y, v.z);
@@ -771,8 +864,8 @@ export class TrackSystem {
         }
       }
 
-      cGeo.setAttribute('position', new THREE.Float32BufferAttribute(cPos, 3));
-      cGeo.setAttribute('uv', new THREE.Float32BufferAttribute(cUVs, 2));
+      cGeo.setAttribute("position", new THREE.Float32BufferAttribute(cPos, 3));
+      cGeo.setAttribute("uv", new THREE.Float32BufferAttribute(cUVs, 2));
       cGeo.setIndex(cIndices);
       cGeo.computeVertexNormals();
 
@@ -783,8 +876,8 @@ export class TrackSystem {
       tunnelGroup.add(cMesh);
     };
 
-    buildRockCutting(this.tunnelStart - 0.025, this.tunnelStart, true);  // 145m Entrance Cutting
-    buildRockCutting(this.tunnelEnd, this.tunnelEnd + 0.025, false);    // 145m Exit Cutting
+    buildRockCutting(this.tunnelStart - 0.025, this.tunnelStart, true); // 145m Entrance Cutting
+    buildRockCutting(this.tunnelEnd, this.tunnelEnd + 0.025, false); // 145m Exit Cutting
 
     // ---------------------------------------------------------
     // 2. Hollow Vaulted Horseshoe Tunnel Bore (466m Underground)
@@ -801,14 +894,15 @@ export class TrackSystem {
     for (let a = Math.PI; a >= 0; a -= Math.PI / 14) {
       archPoints.push({
         x: Math.cos(a) * wHalf,
-        y: wallH + Math.sin(a) * (archH - wallH)
+        y: wallH + Math.sin(a) * (archH - wallH),
       });
     }
     archPoints.push({ x: wHalf, y: wallH });
     archPoints.push({ x: wHalf, y: 0.1 });
 
     for (let i = 0; i <= tSteps; i++) {
-      const u = this.tunnelStart + (i / tSteps) * (this.tunnelEnd - this.tunnelStart);
+      const u =
+        this.tunnelStart + (i / tSteps) * (this.tunnelEnd - this.tunnelStart);
       const pt = this.curve.getPointAt(u);
       const tangent = this.curve.getTangentAt(u).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
@@ -821,11 +915,14 @@ export class TrackSystem {
 
       // Warm sodium bulkhead wall lamps every 5 steps (~38m)
       if (i > 1 && i < tSteps - 1 && i % 5 === 0) {
-        [-wHalf + 0.22, wHalf - 0.22].forEach(lx => {
-          const lampPos = pt.clone().add(normal.clone().multiplyScalar(lx)).setY(pt.y + 4.2);
+        [-wHalf + 0.22, wHalf - 0.22].forEach((lx) => {
+          const lampPos = pt
+            .clone()
+            .add(normal.clone().multiplyScalar(lx))
+            .setY(pt.y + 4.2);
           const lampMesh = new THREE.Mesh(
             new THREE.BoxGeometry(0.35, 0.45, 0.35),
-            new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+            new THREE.MeshBasicMaterial({ color: 0xf59e0b }),
           );
           lampMesh.position.copy(lampPos);
           lampMesh.frustumCulled = false;
@@ -837,25 +934,37 @@ export class TrackSystem {
         });
 
         // Trackman Safety Refuge Niche (Safety manhole in tunnel wall with bright yellow border)
-        const side = (i % 2 === 0 ? 1 : -1);
+        const side = i % 2 === 0 ? 1 : -1;
         const nicheX = side * (wHalf + 0.35);
-        const nichePos = pt.clone().add(normal.clone().multiplyScalar(nicheX)).setY(pt.y + 1.2);
+        const nichePos = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(nicheX))
+          .setY(pt.y + 1.2);
         const nicheMesh = new THREE.Mesh(
           new THREE.BoxGeometry(0.8, 2.4, 1.8),
-          new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 })
+          new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 }),
         );
         nicheMesh.position.copy(nichePos);
-        nicheMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        nicheMesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          tangent,
+        );
         nicheMesh.frustumCulled = false;
         tunnelGroup.add(nicheMesh);
 
         // Yellow warning border frame around niche
         const frameMesh = new THREE.Mesh(
           new THREE.BoxGeometry(0.08, 2.5, 1.9),
-          new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+          new THREE.MeshBasicMaterial({ color: 0xfacc15 }),
         );
-        frameMesh.position.copy(pt).add(normal.clone().multiplyScalar(side * (wHalf - 0.05))).setY(pt.y + 1.2);
-        frameMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        frameMesh.position
+          .copy(pt)
+          .add(normal.clone().multiplyScalar(side * (wHalf - 0.05)))
+          .setY(pt.y + 1.2);
+        frameMesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          tangent,
+        );
         frameMesh.frustumCulled = false;
         tunnelGroup.add(frameMesh);
       }
@@ -871,8 +980,11 @@ export class TrackSystem {
       }
     }
 
-    tunnelGeo.setAttribute('position', new THREE.Float32BufferAttribute(tPos, 3));
-    tunnelGeo.setAttribute('uv', new THREE.Float32BufferAttribute(tUVs, 2));
+    tunnelGeo.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(tPos, 3),
+    );
+    tunnelGeo.setAttribute("uv", new THREE.Float32BufferAttribute(tUVs, 2));
     tunnelGeo.setIndex(tIndices);
     tunnelGeo.computeVertexNormals();
 
@@ -894,30 +1006,32 @@ export class TrackSystem {
     // Realistic Ghat mountain cross-section profile (relative to track center):
     const mProfile = [
       { x: -120.0, y: -0.2 }, // Ground toe left (flush with ground!)
-      { x: -85.0,  y: 16.0 }, // Lower green mountain slope
-      { x: -50.0,  y: 36.0 }, // Mid crags & rocky ledges
-      { x: -22.0,  y: 54.0 }, // Left summit shoulder
-      { x: 0.0,    y: 64.0 }, // Central Mountain Peak (56m above tunnel ceiling!)
-      { x: 22.0,   y: 54.0 }, // Right summit shoulder
-      { x: 50.0,   y: 36.0 }, // Mid crags & rocky ledges
-      { x: 85.0,   y: 16.0 }, // Lower green mountain slope
-      { x: 120.0,  y: -0.2 }  // Ground toe right (flush with ground!)
+      { x: -85.0, y: 16.0 }, // Lower green mountain slope
+      { x: -50.0, y: 36.0 }, // Mid crags & rocky ledges
+      { x: -22.0, y: 54.0 }, // Left summit shoulder
+      { x: 0.0, y: 64.0 }, // Central Mountain Peak (56m above tunnel ceiling!)
+      { x: 22.0, y: 54.0 }, // Right summit shoulder
+      { x: 50.0, y: 36.0 }, // Mid crags & rocky ledges
+      { x: 85.0, y: 16.0 }, // Lower green mountain slope
+      { x: 120.0, y: -0.2 }, // Ground toe right (flush with ground!)
     ];
 
     for (let i = 0; i <= mSteps; i++) {
-      const u = this.tunnelStart + (i / mSteps) * (this.tunnelEnd - this.tunnelStart);
+      const u =
+        this.tunnelStart + (i / mSteps) * (this.tunnelEnd - this.tunnelStart);
       const pt = this.curve.getPointAt(u);
       const tangent = this.curve.getTangentAt(u).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
       // Ridge undulation along the length (organic mountain ridge):
-      const ridgeWave = 1.0 + Math.sin(i * 0.28) * 0.08 + Math.cos(i * 0.15) * 0.05;
+      const ridgeWave =
+        1.0 + Math.sin(i * 0.28) * 0.08 + Math.cos(i * 0.15) * 0.05;
 
       for (let p = 0; p < mProfile.length; p++) {
         const offset = normal.clone().multiplyScalar(mProfile[p].x);
         // Base ground points stay strictly at -0.2; elevated points scale with ridge
         const baseH = mProfile[p].y;
-        const vy = (baseH <= 0.0) ? -0.2 : (pt.y + baseH * ridgeWave);
+        const vy = baseH <= 0.0 ? -0.2 : pt.y + baseH * ridgeWave;
         mPos.push(pt.x + offset.x, vy, pt.z + offset.z);
         mUVs.push(p / (mProfile.length - 1), (i / mSteps) * 12);
       }
@@ -933,8 +1047,8 @@ export class TrackSystem {
       }
     }
 
-    mGeo.setAttribute('position', new THREE.Float32BufferAttribute(mPos, 3));
-    mGeo.setAttribute('uv', new THREE.Float32BufferAttribute(mUVs, 2));
+    mGeo.setAttribute("position", new THREE.Float32BufferAttribute(mPos, 3));
+    mGeo.setAttribute("uv", new THREE.Float32BufferAttribute(mUVs, 2));
     mGeo.setIndex(mIndices);
     mGeo.computeVertexNormals();
 
@@ -970,7 +1084,10 @@ export class TrackSystem {
         } else if (Math.abs(px) <= 24.0) {
           lowerY = 13.8 - ((Math.abs(px) - 11.0) / 13.0) * 14.0; // Slopes down with wing wall
         }
-        const lowerPt = pt.clone().add(normal.clone().multiplyScalar(px)).setY(pt.y + lowerY);
+        const lowerPt = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(px))
+          .setY(pt.y + lowerY);
         cPos.push(lowerPt.x, lowerPt.y, lowerPt.z);
         cUVs.push(p / (mProfile.length - 1), 0.0);
       }
@@ -989,8 +1106,11 @@ export class TrackSystem {
         }
       }
 
-      capGeo.setAttribute('position', new THREE.Float32BufferAttribute(cPos, 3));
-      capGeo.setAttribute('uv', new THREE.Float32BufferAttribute(cUVs, 2));
+      capGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(cPos, 3),
+      );
+      capGeo.setAttribute("uv", new THREE.Float32BufferAttribute(cUVs, 2));
       capGeo.setIndex(cInd);
       capGeo.computeVertexNormals();
 
@@ -1001,24 +1121,28 @@ export class TrackSystem {
       tunnelGroup.add(capMesh);
     };
 
-    buildMountainEndcap(0, this.tunnelStart, false);      // Front Mountain Cliff
-    buildMountainEndcap(mSteps, this.tunnelEnd, true);    // Rear Mountain Cliff
+    buildMountainEndcap(0, this.tunnelStart, false); // Front Mountain Cliff
+    buildMountainEndcap(mSteps, this.tunnelEnd, true); // Rear Mountain Cliff
 
     // Ghat Mountain Pines & Boulders scattered naturally on slopes:
     for (let b = 0; b < 36; b++) {
-      const bu = this.tunnelStart + (b / 36) * (this.tunnelEnd - this.tunnelStart);
+      const bu =
+        this.tunnelStart + (b / 36) * (this.tunnelEnd - this.tunnelStart);
       const bpt = this.curve.getPointAt(bu);
       const btang = this.curve.getTangentAt(bu).normalize();
       const bnorm = new THREE.Vector3().crossVectors(btang, up).normalize();
 
-      const bside = (b % 2 === 0 ? 1 : -1);
+      const bside = b % 2 === 0 ? 1 : -1;
       const bDist = 28.0 + (b % 5) * 14.0;
       const treeY = 18.0 + (b % 4) * 8.0;
-      const treePos = bpt.clone().add(bnorm.clone().multiplyScalar(bside * bDist)).setY(bpt.y + treeY);
+      const treePos = bpt
+        .clone()
+        .add(bnorm.clone().multiplyScalar(bside * bDist))
+        .setY(bpt.y + treeY);
 
       const pine = new THREE.Mesh(
         new THREE.ConeGeometry(4.2, 11.0, 7),
-        new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85 })
+        new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85 }),
       );
       pine.position.copy(treePos);
       pine.castShadow = true;
@@ -1029,9 +1153,11 @@ export class TrackSystem {
       if (b % 3 === 0) {
         const boulder = new THREE.Mesh(
           new THREE.DodecahedronGeometry(3.2 + (b % 3), 1),
-          mountainRockMat
+          mountainRockMat,
         );
-        boulder.position.copy(treePos).add(new THREE.Vector3((b % 2) * 5, -3.0, (b % 3) * 4));
+        boulder.position
+          .copy(treePos)
+          .add(new THREE.Vector3((b % 2) * 5, -3.0, (b % 3) * 4));
         boulder.scale.set(1.4, 0.9, 1.2);
         boulder.castShadow = true;
         boulder.frustumCulled = false;
@@ -1052,7 +1178,10 @@ export class TrackSystem {
       const portalGroup = new THREE.Group();
       portalGroup.position.copy(pt);
       const lookDir = isExit ? tangent.clone() : tangent.clone().negate();
-      portalGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), lookDir);
+      portalGroup.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        lookDir,
+      );
 
       // A. Massive Stone Headwall Shape with REAL HORSESHOE ARCH HOLE
       const portalShape = new THREE.Shape();
@@ -1081,7 +1210,7 @@ export class TrackSystem {
         bevelEnabled: true,
         bevelThickness: 0.25,
         bevelSize: 0.25,
-        bevelSegments: 3
+        bevelSegments: 3,
       });
 
       const portalMesh = new THREE.Mesh(portalGeo, portalMasonryMat);
@@ -1097,7 +1226,10 @@ export class TrackSystem {
       ringShape.moveTo(-rOuter, 0.0);
       ringShape.lineTo(-rOuter, wallH);
       for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-        ringShape.lineTo(Math.cos(a) * rOuter, wallH + Math.sin(a) * (archH - wallH + 0.85));
+        ringShape.lineTo(
+          Math.cos(a) * rOuter,
+          wallH + Math.sin(a) * (archH - wallH + 0.85),
+        );
       }
       ringShape.lineTo(rOuter, 0.0);
       ringShape.closePath();
@@ -1106,35 +1238,47 @@ export class TrackSystem {
       ringHole.moveTo(-wHalf, 0.0);
       ringHole.lineTo(-wHalf, wallH);
       for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-        ringHole.lineTo(Math.cos(a) * wHalf, wallH + Math.sin(a) * (archH - wallH));
+        ringHole.lineTo(
+          Math.cos(a) * wHalf,
+          wallH + Math.sin(a) * (archH - wallH),
+        );
       }
       ringHole.lineTo(wHalf, 0.0);
       ringHole.closePath();
       ringShape.holes.push(ringHole);
 
-      const ringGeo = new THREE.ExtrudeGeometry(ringShape, { depth: 0.18, bevelEnabled: false });
+      const ringGeo = new THREE.ExtrudeGeometry(ringShape, {
+        depth: 0.18,
+        bevelEnabled: false,
+      });
       const ringMesh = new THREE.Mesh(ringGeo, archStripeMat);
       ringMesh.position.z = 1.5; // Prominently displayed on portal face
       ringMesh.frustumCulled = false;
       portalGroup.add(ringMesh);
 
       // C. Heavy Stone Parapet Coping across the top of headwall
-      const parapet = new THREE.Mesh(new THREE.BoxGeometry(23.0, 0.85, 3.4), portalMasonryMat);
+      const parapet = new THREE.Mesh(
+        new THREE.BoxGeometry(23.0, 0.85, 3.4),
+        portalMasonryMat,
+      );
       parapet.position.set(0, 14.2, 0.0);
       parapet.castShadow = true;
       parapet.frustumCulled = false;
       portalGroup.add(parapet);
 
       // End pillars on parapet
-      [-11.2, 11.2].forEach(px => {
-        const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 3.6), portalMasonryMat);
+      [-11.2, 11.2].forEach((px) => {
+        const pillar = new THREE.Mesh(
+          new THREE.BoxGeometry(1.6, 1.4, 3.6),
+          portalMasonryMat,
+        );
         pillar.position.set(px, 14.8, 0.0);
         pillar.castShadow = true;
         portalGroup.add(pillar);
       });
 
       // D. Heavy Stepped Retaining Wing Walls (Flaring 16m out into the rock cutting)
-      [-11.0, 11.0].forEach(wx => {
+      [-11.0, 11.0].forEach((wx) => {
         const sideSign = wx > 0 ? 1 : -1;
 
         // 3 stepped tiers of stone retaining wall
@@ -1144,7 +1288,10 @@ export class TrackSystem {
           const tZ = -3.0 - tier * 5.2;
           const tX = wx + sideSign * (1.8 + tier * 2.2);
 
-          const wing = new THREE.Mesh(new THREE.BoxGeometry(2.4, tHeight, tLen), portalMasonryMat);
+          const wing = new THREE.Mesh(
+            new THREE.BoxGeometry(2.4, tHeight, tLen),
+            portalMasonryMat,
+          );
           wing.position.set(tX, tHeight / 2, tZ);
           wing.rotation.y = sideSign * -0.38;
           wing.castShadow = true;
@@ -1152,7 +1299,10 @@ export class TrackSystem {
           portalGroup.add(wing);
 
           // Coping capstone on tier
-          const cap = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.45, tLen + 0.4), portalMasonryMat);
+          const cap = new THREE.Mesh(
+            new THREE.BoxGeometry(2.8, 0.45, tLen + 0.4),
+            portalMasonryMat,
+          );
           cap.position.set(tX, tHeight + 0.22, tZ);
           cap.rotation.y = sideSign * -0.38;
           cap.castShadow = true;
@@ -1161,20 +1311,33 @@ export class TrackSystem {
       });
 
       // E. Large Bilingual Indian Railways Enamel Signboard
-      const signBoard = new THREE.Mesh(new THREE.BoxGeometry(10.5, 2.4, 0.18), signMat);
+      const signBoard = new THREE.Mesh(
+        new THREE.BoxGeometry(10.5, 2.4, 0.18),
+        signMat,
+      );
       signBoard.position.set(0, 10.6, 1.55); // Mounted prominently above the arch keystone
       signBoard.castShadow = true;
       signBoard.frustumCulled = false;
       portalGroup.add(signBoard);
 
       // F. 25kV Catenary Transition Assembly on Portal Face
-      const catBracketMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.3 });
-      const bracketArm = new THREE.Mesh(new THREE.BoxGeometry(11.0, 0.16, 0.16), catBracketMat);
+      const catBracketMat = new THREE.MeshStandardMaterial({
+        color: 0x475569,
+        metalness: 0.8,
+        roughness: 0.3,
+      });
+      const bracketArm = new THREE.Mesh(
+        new THREE.BoxGeometry(11.0, 0.16, 0.16),
+        catBracketMat,
+      );
       bracketArm.position.set(0, 6.4, 1.45);
       portalGroup.add(bracketArm);
 
-      [-this.trackOffset / 2, this.trackOffset / 2].forEach(cx => {
-        const ins = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+      [-this.trackOffset / 2, this.trackOffset / 2].forEach((cx) => {
+        const ins = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8),
+          new THREE.MeshStandardMaterial({ color: 0x78350f }),
+        );
         ins.position.set(cx, 6.0, 1.45);
         portalGroup.add(ins);
       });
@@ -1184,7 +1347,7 @@ export class TrackSystem {
     };
 
     buildPortal(this.tunnelStart, false); // Entrance Portal
-    buildPortal(this.tunnelEnd, true);    // Exit Portal
+    buildPortal(this.tunnelEnd, true); // Exit Portal
 
     tunnelGroup.frustumCulled = false;
     this.trackGroup.add(tunnelGroup);
@@ -1194,9 +1357,18 @@ export class TrackSystem {
   // Indian Flora (Coconut Palms & Banyan Trees)
   // ---------------------------------------------------------
   buildIndianTrees() {
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x452b1f, roughness: 0.9 });
-    const foliageMat1 = new THREE.MeshStandardMaterial({ color: 0x1b5e20, roughness: 0.75 });
-    const foliageMat2 = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.75 });
+    const trunkMat = new THREE.MeshStandardMaterial({
+      color: 0x452b1f,
+      roughness: 0.9,
+    });
+    const foliageMat1 = new THREE.MeshStandardMaterial({
+      color: 0x1b5e20,
+      roughness: 0.75,
+    });
+    const foliageMat2 = new THREE.MeshStandardMaterial({
+      color: 0x2e7d32,
+      roughness: 0.75,
+    });
 
     const treeGroup = new THREE.Group();
     const up = new THREE.Vector3(0, 1, 0);
@@ -1211,27 +1383,39 @@ export class TrackSystem {
       const tangent = this.curve.getTangentAt(u).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
-      const side = (i % 2 === 0 ? 1 : -1);
+      const side = i % 2 === 0 ? 1 : -1;
       const dist = 11.5 + (i % 5) * 3.2;
-      const treePos = pt.clone().add(normal.clone().multiplyScalar(side * dist));
+      const treePos = pt
+        .clone()
+        .add(normal.clone().multiplyScalar(side * dist));
 
       const tree = new THREE.Group();
       tree.position.copy(treePos);
 
-      const isPalm = (i % 3 === 0);
+      const isPalm = i % 3 === 0;
 
       if (isPalm) {
         // Indian Coconut / Date Palm
         const pHeight = 8.5 + (i % 4) * 1.5;
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.32, pHeight, 8), trunkMat);
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18, 0.32, pHeight, 8),
+          trunkMat,
+        );
         trunk.position.y = pHeight / 2;
         trunk.rotation.z = (Math.random() - 0.5) * 0.12;
         tree.add(trunk);
 
         for (let f = 0; f < 8; f++) {
           const fAngle = (f / 8) * Math.PI * 2;
-          const frond = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.08, 3.2), foliageMat1);
-          frond.position.set(Math.cos(fAngle) * 1.4, pHeight + 0.2, Math.sin(fAngle) * 1.4);
+          const frond = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.08, 3.2),
+            foliageMat1,
+          );
+          frond.position.set(
+            Math.cos(fAngle) * 1.4,
+            pHeight + 0.2,
+            Math.sin(fAngle) * 1.4,
+          );
           frond.rotation.y = fAngle;
           frond.rotation.x = 0.35;
           tree.add(frond);
@@ -1239,7 +1423,15 @@ export class TrackSystem {
       } else {
         // Layered Neem / Banyan Tree
         const scale = 1.0 + (i % 4) * 0.25;
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25 * scale, 0.45 * scale, 4.0 * scale, 7), trunkMat);
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            0.25 * scale,
+            0.45 * scale,
+            4.0 * scale,
+            7,
+          ),
+          trunkMat,
+        );
         trunk.position.y = 2.0 * scale;
         trunk.castShadow = true;
         tree.add(trunk);
@@ -1247,11 +1439,14 @@ export class TrackSystem {
         const folMat = i % 2 === 0 ? foliageMat1 : foliageMat2;
         for (let layer = 0; layer < 3; layer++) {
           const rad = (2.2 - layer * 0.45) * scale;
-          const leafCluster = new THREE.Mesh(new THREE.DodecahedronGeometry(rad, 1), folMat);
+          const leafCluster = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(rad, 1),
+            folMat,
+          );
           leafCluster.position.set(
             (Math.random() - 0.5) * 0.4 * scale,
             (3.6 + layer * 1.3) * scale,
-            (Math.random() - 0.5) * 0.4 * scale
+            (Math.random() - 0.5) * 0.4 * scale,
           );
           leafCluster.castShadow = true;
           tree.add(leafCluster);
@@ -1271,7 +1466,7 @@ export class TrackSystem {
     const hillMat = new THREE.MeshStandardMaterial({
       color: 0x475569, // Soft atmospheric blue-slate distant mountain haze
       roughness: 0.95,
-      metalness: 0.05
+      metalness: 0.05,
     });
 
     const ridgeCount = 16;
@@ -1287,7 +1482,7 @@ export class TrackSystem {
       ridgeMesh.position.set(
         Math.cos(angle) * radius,
         -h * 0.35, // Sunk deeply so only smooth gentle crests rise above horizon
-        Math.sin(angle) * radius
+        Math.sin(angle) * radius,
       );
       this.trackGroup.add(ridgeMesh);
     }
@@ -1307,48 +1502,48 @@ export class TrackSystem {
     const paverMat = new THREE.MeshStandardMaterial({
       map: this.textures.platformPaverTex,
       roughness: 0.82,
-      metalness: 0.1
+      metalness: 0.1,
     });
 
     const concreteWallMat = new THREE.MeshStandardMaterial({
       color: 0xcbd5e1, // Light concrete coping and wall
-      roughness: 0.85
+      roughness: 0.85,
     });
 
     const canopyMat = new THREE.MeshStandardMaterial({
       color: 0x1e3a8a, // Indian Railways Classic Navy Blue Shed
       roughness: 0.45,
-      metalness: 0.55
+      metalness: 0.55,
     });
 
     const steelMat = new THREE.MeshStandardMaterial({
       color: 0x334155, // Dark slate steel columns and trusses
       roughness: 0.4,
-      metalness: 0.7
+      metalness: 0.7,
     });
 
     const fobSteelMat = new THREE.MeshStandardMaterial({
       color: 0x2563eb, // Vibrant IR Foot Over Bridge Blue
       roughness: 0.4,
-      metalness: 0.6
+      metalness: 0.6,
     });
 
     const buildingMat = new THREE.MeshStandardMaterial({
       map: this.textures.stationBuildingTex,
       roughness: 0.85,
-      metalness: 0.15
+      metalness: 0.15,
     });
 
     const clockMat = new THREE.MeshBasicMaterial({
-      map: this.textures.stationClockTex
+      map: this.textures.stationClockTex,
     });
 
     const stBoardMat = new THREE.MeshBasicMaterial({
-      map: this.textures.stationBoardTex
+      map: this.textures.stationBoardTex,
     });
 
     const trainInfoMat = new THREE.MeshBasicMaterial({
-      map: this.textures.trainInfoTex
+      map: this.textures.trainInfoTex,
     });
 
     // ---------------------------------------------------------
@@ -1371,10 +1566,12 @@ export class TrackSystem {
       const outerX = isPlatform1 ? -11.35 : 11.35;
 
       for (let i = 0; i <= stSteps; i++) {
-        const u = (stCenterProg - stSpan / 2) + (i / stSteps) * stSpan;
+        const u = stCenterProg - stSpan / 2 + (i / stSteps) * stSpan;
         const pt = this.curve.getPointAt(u);
         const tangent = this.curve.getTangentAt(u).normalize();
-        const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+        const normal = new THREE.Vector3()
+          .crossVectors(tangent, up)
+          .normalize();
 
         // High-level passenger platform height (0.73m above rail level, y = 1.05m)
         // Gently sloping end ramps at both platform tips
@@ -1387,10 +1584,22 @@ export class TrackSystem {
         // 1: Top coping edge facing track (with tactile warning line)
         // 2: Platform deck outer back edge
         // 3: Outer back wall bottom
-        const v0 = pt.clone().add(normal.clone().multiplyScalar(innerX)).setY(pt.y + 0.18);
-        const v1 = pt.clone().add(normal.clone().multiplyScalar(innerX)).setY(pt.y + deckY);
-        const v2 = pt.clone().add(normal.clone().multiplyScalar(outerX)).setY(pt.y + deckY);
-        const v3 = pt.clone().add(normal.clone().multiplyScalar(outerX)).setY(pt.y + 0.18);
+        const v0 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(innerX))
+          .setY(pt.y + 0.18);
+        const v1 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(innerX))
+          .setY(pt.y + deckY);
+        const v2 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(outerX))
+          .setY(pt.y + deckY);
+        const v3 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(outerX))
+          .setY(pt.y + 0.18);
 
         [v0, v1, v2, v3].forEach((v, idx) => {
           pPos.push(v.x, v.y, v.z);
@@ -1439,8 +1648,8 @@ export class TrackSystem {
         }
       }
 
-      pGeo.setAttribute('position', new THREE.Float32BufferAttribute(pPos, 3));
-      pGeo.setAttribute('uv', new THREE.Float32BufferAttribute(pUVs, 2));
+      pGeo.setAttribute("position", new THREE.Float32BufferAttribute(pPos, 3));
+      pGeo.setAttribute("uv", new THREE.Float32BufferAttribute(pUVs, 2));
       pGeo.setIndex(pInd);
       pGeo.computeVertexNormals();
 
@@ -1450,7 +1659,7 @@ export class TrackSystem {
       stGroup.add(pMesh);
     };
 
-    buildCurvedPlatform(true);  // Platform 1 (Main Platform)
+    buildCurvedPlatform(true); // Platform 1 (Main Platform)
     buildCurvedPlatform(false); // Platform 2 (Island Platform)
 
     // ---------------------------------------------------------
@@ -1459,7 +1668,7 @@ export class TrackSystem {
     // ---------------------------------------------------------
     const buildPlatformCanopy = (isPlatform1) => {
       const canopySteps = 26;
-      const canopySpan = 0.040; // ~235m covered zone
+      const canopySpan = 0.04; // ~235m covered zone
       const cGeo = new THREE.BufferGeometry();
       const cPos = [];
       const cUVs = [];
@@ -1470,15 +1679,27 @@ export class TrackSystem {
       const outerEave = isPlatform1 ? -11.5 : 11.5;
 
       for (let i = 0; i <= canopySteps; i++) {
-        const u = (stCenterProg - canopySpan / 2) + (i / canopySteps) * canopySpan;
+        const u =
+          stCenterProg - canopySpan / 2 + (i / canopySteps) * canopySpan;
         const pt = this.curve.getPointAt(u);
         const tangent = this.curve.getTangentAt(u).normalize();
-        const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+        const normal = new THREE.Vector3()
+          .crossVectors(tangent, up)
+          .normalize();
 
         // 3 Arched canopy profile points:
-        const vEave1  = pt.clone().add(normal.clone().multiplyScalar(innerEave)).setY(pt.y + 4.7);
-        const vRidge  = pt.clone().add(normal.clone().multiplyScalar(centerRidge)).setY(pt.y + 5.4);
-        const vEave2  = pt.clone().add(normal.clone().multiplyScalar(outerEave)).setY(pt.y + 4.7);
+        const vEave1 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(innerEave))
+          .setY(pt.y + 4.7);
+        const vRidge = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(centerRidge))
+          .setY(pt.y + 5.4);
+        const vEave2 = pt
+          .clone()
+          .add(normal.clone().multiplyScalar(outerEave))
+          .setY(pt.y + 4.7);
 
         [vEave1, vRidge, vEave2].forEach((v, idx) => {
           cPos.push(v.x, v.y, v.z);
@@ -1487,50 +1708,85 @@ export class TrackSystem {
 
         // Steel support columns every 3 steps (~18m)
         if (i % 3 === 0) {
-          const colPos = pt.clone().add(normal.clone().multiplyScalar(centerRidge)).setY(pt.y + 1.05);
-          const col = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.3, 0.35), steelMat);
+          const colPos = pt
+            .clone()
+            .add(normal.clone().multiplyScalar(centerRidge))
+            .setY(pt.y + 1.05);
+          const col = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 4.3, 0.35),
+            steelMat,
+          );
           col.position.copy(colPos).setY(colPos.y + 2.15);
           col.castShadow = true;
           col.frustumCulled = false;
           stGroup.add(col);
 
           // Cantilever roof truss arms spreading out to eaves
-          const trussArm = new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.15, 0.15), steelMat);
+          const trussArm = new THREE.Mesh(
+            new THREE.BoxGeometry(7.8, 0.15, 0.15),
+            steelMat,
+          );
           trussArm.position.copy(colPos).setY(colPos.y + 3.8);
-          trussArm.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), normal);
+          trussArm.quaternion.setFromUnitVectors(
+            new THREE.Vector3(1, 0, 0),
+            normal,
+          );
           trussArm.frustumCulled = false;
           stGroup.add(trussArm);
 
           // Warm suspended platform luminaire
           const lightBar = new THREE.Mesh(
             new THREE.BoxGeometry(0.3, 0.12, 1.8),
-            new THREE.MeshBasicMaterial({ color: 0xfffbeb })
+            new THREE.MeshBasicMaterial({ color: 0xfffbeb }),
           );
           lightBar.position.copy(colPos).setY(colPos.y + 3.5);
-          lightBar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+          lightBar.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            tangent,
+          );
           lightBar.frustumCulled = false;
           stGroup.add(lightBar);
 
           // Digital Coach Position Indicator (Amber LED box hanging from truss)
           if (isPlatform1 && i > 2 && i < canopySteps - 2) {
-            const coachNames = ['LOCO', 'GEN', 'S1', 'B1', 'B2', 'B3', 'A1', 'H1'];
+            const coachNames = [
+              "LOCO",
+              "GEN",
+              "S1",
+              "B1",
+              "B2",
+              "B3",
+              "A1",
+              "H1",
+            ];
             const cName = coachNames[(i / 3 - 1) % coachNames.length];
             const coachBox = new THREE.Mesh(
               new THREE.BoxGeometry(0.65, 0.45, 0.95),
-              new THREE.MeshBasicMaterial({ color: 0x09090b })
+              new THREE.MeshBasicMaterial({ color: 0x09090b }),
             );
-            coachBox.position.copy(colPos).setY(colPos.y + 3.2).add(normal.clone().multiplyScalar(3.2));
-            coachBox.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+            coachBox.position
+              .copy(colPos)
+              .setY(colPos.y + 3.2)
+              .add(normal.clone().multiplyScalar(3.2));
+            coachBox.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              tangent,
+            );
             coachBox.frustumCulled = false;
             stGroup.add(coachBox);
 
             // Glowing Coach text on both faces
             const cLed = new THREE.Mesh(
               new THREE.PlaneGeometry(0.85, 0.35),
-              new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+              new THREE.MeshBasicMaterial({ color: 0xf59e0b }),
             );
-            cLed.position.copy(coachBox.position).add(normal.clone().multiplyScalar(0.34));
-            cLed.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+            cLed.position
+              .copy(coachBox.position)
+              .add(normal.clone().multiplyScalar(0.34));
+            cLed.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              normal,
+            );
             cLed.frustumCulled = false;
             stGroup.add(cLed);
           }
@@ -1553,8 +1809,8 @@ export class TrackSystem {
         }
       }
 
-      cGeo.setAttribute('position', new THREE.Float32BufferAttribute(cPos, 3));
-      cGeo.setAttribute('uv', new THREE.Float32BufferAttribute(cUVs, 2));
+      cGeo.setAttribute("position", new THREE.Float32BufferAttribute(cPos, 3));
+      cGeo.setAttribute("uv", new THREE.Float32BufferAttribute(cUVs, 2));
       cGeo.setIndex(cInd);
       cGeo.computeVertexNormals();
 
@@ -1565,7 +1821,7 @@ export class TrackSystem {
       stGroup.add(canopyMesh);
     };
 
-    buildPlatformCanopy(true);  // Platform 1 Canopy
+    buildPlatformCanopy(true); // Platform 1 Canopy
     buildPlatformCanopy(false); // Platform 2 Canopy
 
     // ---------------------------------------------------------
@@ -1582,15 +1838,21 @@ export class TrackSystem {
 
     // Elevated Walkway Truss Bridge (Spans x = -7.5m to +7.5m across both tracks)
     const fobBridgeSpan = 16.0;
-    const fobFloor = new THREE.Mesh(new THREE.BoxGeometry(fobBridgeSpan, 0.35, 3.2), fobSteelMat);
+    const fobFloor = new THREE.Mesh(
+      new THREE.BoxGeometry(fobBridgeSpan, 0.35, 3.2),
+      fobSteelMat,
+    );
     fobFloor.position.set(0, 7.3, 0);
     fobFloor.castShadow = true;
     fobFloor.frustumCulled = false;
     fobGroup.add(fobFloor);
 
     // Blue Pratt Truss side railings
-    [-1.5, 1.5].forEach(fz => {
-      const truss = new THREE.Mesh(new THREE.BoxGeometry(fobBridgeSpan, 1.8, 0.12), fobSteelMat);
+    [-1.5, 1.5].forEach((fz) => {
+      const truss = new THREE.Mesh(
+        new THREE.BoxGeometry(fobBridgeSpan, 1.8, 0.12),
+        fobSteelMat,
+      );
       truss.position.set(0, 8.2, fz);
       truss.castShadow = true;
       truss.frustumCulled = false;
@@ -1598,22 +1860,31 @@ export class TrackSystem {
     });
 
     // Covered FOB Walkway Canopy Roof
-    const fobRoof = new THREE.Mesh(new THREE.BoxGeometry(fobBridgeSpan + 0.4, 0.15, 3.6), canopyMat);
+    const fobRoof = new THREE.Mesh(
+      new THREE.BoxGeometry(fobBridgeSpan + 0.4, 0.15, 3.6),
+      canopyMat,
+    );
     fobRoof.position.set(0, 9.4, 0);
     fobRoof.castShadow = true;
     fobRoof.frustumCulled = false;
     fobGroup.add(fobRoof);
 
     // Large Bilingual Station Nameplate on FOB Girder facing approaching trains
-    const fobNamePlate = new THREE.Mesh(new THREE.BoxGeometry(6.5, 1.4, 0.12), stBoardMat);
+    const fobNamePlate = new THREE.Mesh(
+      new THREE.BoxGeometry(6.5, 1.4, 0.12),
+      stBoardMat,
+    );
     fobNamePlate.position.set(0, 8.4, 1.6);
     fobNamePlate.castShadow = true;
     fobNamePlate.frustumCulled = false;
     fobGroup.add(fobNamePlate);
 
     // Heavy Support Trestle Towers on Platform 1 and Platform 2
-    [-7.5, 7.5].forEach(tx => {
-      const tower = new THREE.Mesh(new THREE.BoxGeometry(1.4, 6.3, 2.6), steelMat);
+    [-7.5, 7.5].forEach((tx) => {
+      const tower = new THREE.Mesh(
+        new THREE.BoxGeometry(1.4, 6.3, 2.6),
+        steelMat,
+      );
       tower.position.set(tx, 4.15, 0);
       tower.castShadow = true;
       tower.frustumCulled = false;
@@ -1624,7 +1895,10 @@ export class TrackSystem {
       for (let s = 0; s < stepCount; s++) {
         const stepY = 7.1 - (s / stepCount) * 6.0;
         const stepZ = 1.8 + s * 0.72;
-        const step = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.22, 0.75), fobSteelMat);
+        const step = new THREE.Mesh(
+          new THREE.BoxGeometry(2.2, 0.22, 0.75),
+          fobSteelMat,
+        );
         step.position.set(tx, stepY, stepZ);
         step.castShadow = true;
         step.frustumCulled = false;
@@ -1632,7 +1906,10 @@ export class TrackSystem {
       }
 
       // Staircase blue handrails
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 13.5), fobSteelMat);
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, 0.1, 13.5),
+        fobSteelMat,
+      );
       rail.position.set(tx - 1.15, 4.8, 7.5);
       rail.rotation.x = -0.42;
       fobGroup.add(rail);
@@ -1651,10 +1928,16 @@ export class TrackSystem {
     // ---------------------------------------------------------
     const bldgGroup = new THREE.Group();
     bldgGroup.position.copy(fobPt);
-    bldgGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fobTang);
+    bldgGroup.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      fobTang,
+    );
 
     // Main Concourse Building (Behind Platform 1, x = -19.5m, width = 84m along Z)
-    const mainBldg = new THREE.Mesh(new THREE.BoxGeometry(16.0, 14.5, 84.0), buildingMat);
+    const mainBldg = new THREE.Mesh(
+      new THREE.BoxGeometry(16.0, 14.5, 84.0),
+      buildingMat,
+    );
     mainBldg.position.set(-19.5, 7.25, 0);
     mainBldg.castShadow = true;
     mainBldg.receiveShadow = true;
@@ -1662,29 +1945,44 @@ export class TrackSystem {
     bldgGroup.add(mainBldg);
 
     // Cream Sandstone Entrance Portico & Colonnade
-    const porticoMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.6 });
-    const portico = new THREE.Mesh(new THREE.BoxGeometry(4.2, 10.0, 24.0), porticoMat);
+    const porticoMat = new THREE.MeshStandardMaterial({
+      color: 0xfef3c7,
+      roughness: 0.6,
+    });
+    const portico = new THREE.Mesh(
+      new THREE.BoxGeometry(4.2, 10.0, 24.0),
+      porticoMat,
+    );
     portico.position.set(-11.4, 5.0, 0);
     portico.castShadow = true;
     portico.frustumCulled = false;
     bldgGroup.add(portico);
 
     // 24m Grand Central Station Clock Tower
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(9.0, 24.0, 9.0), buildingMat);
+    const tower = new THREE.Mesh(
+      new THREE.BoxGeometry(9.0, 24.0, 9.0),
+      buildingMat,
+    );
     tower.position.set(-19.5, 12.0, 0);
     tower.castShadow = true;
     tower.frustumCulled = false;
     bldgGroup.add(tower);
 
     // Sandstone Tower Crown & Battlements
-    const crown = new THREE.Mesh(new THREE.BoxGeometry(10.2, 1.4, 10.2), porticoMat);
+    const crown = new THREE.Mesh(
+      new THREE.BoxGeometry(10.2, 1.4, 10.2),
+      porticoMat,
+    );
     crown.position.set(-19.5, 24.2, 0);
     crown.castShadow = true;
     crown.frustumCulled = false;
     bldgGroup.add(crown);
 
     // Flagpole with Indian Tricolor Flag on top of Clock Tower
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 6.5, 8), steelMat);
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.12, 6.5, 8),
+      steelMat,
+    );
     pole.position.set(-19.5, 27.5, 0);
     bldgGroup.add(pole);
 
@@ -1694,7 +1992,10 @@ export class TrackSystem {
     bldgGroup.add(flag);
 
     // 4.0m Circular Station Clock Dials on Clock Tower (Facing tracks and platform)
-    const clockDial = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 4.2), clockMat);
+    const clockDial = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2, 4.2),
+      clockMat,
+    );
     clockDial.position.set(-14.9, 19.5, 0);
     clockDial.rotation.y = Math.PI / 2;
     clockDial.frustumCulled = false;
@@ -1702,7 +2003,10 @@ export class TrackSystem {
 
     // Illuminated 3D Station Nameplate on Building Roof: "रतलाम जंक्शन • RATLAM JUNCTION"
     const roofSignMat = new THREE.MeshBasicMaterial({ color: 0xdc2626 });
-    const roofSignBoard = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.8, 38.0), roofSignMat);
+    const roofSignBoard = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 1.8, 38.0),
+      roofSignMat,
+    );
     roofSignBoard.position.set(-11.6, 15.4, 0);
     roofSignBoard.castShadow = true;
     roofSignBoard.frustumCulled = false;
@@ -1716,20 +2020,29 @@ export class TrackSystem {
     // Bilingual Enamel Boards, Digital Train Departure Screens, IRCTC Stalls, Benches, Lights & Safety Fence
     // ---------------------------------------------------------
     // A. 3 Large Bilingual Yellow Enamel Station Boards on Platform 1 & Platform 2
-    [-0.022, 0.0, 0.022].forEach(uOffset => {
+    [-0.022, 0.0, 0.022].forEach((uOffset) => {
       const bU = stCenterProg + uOffset;
       const bPt = this.curve.getPointAt(bU);
       const bTang = this.curve.getTangentAt(bU).normalize();
       const bNorm = new THREE.Vector3().crossVectors(bTang, up).normalize();
 
       // Platform 1 Board
-      const bPos1 = bPt.clone().add(bNorm.clone().multiplyScalar(-7.6)).setY(bPt.y + 1.05);
-      const bPost1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.8, 8), steelMat);
+      const bPos1 = bPt
+        .clone()
+        .add(bNorm.clone().multiplyScalar(-7.6))
+        .setY(bPt.y + 1.05);
+      const bPost1 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 2.8, 8),
+        steelMat,
+      );
       bPost1.position.copy(bPos1).setY(bPos1.y + 1.4);
       bPost1.frustumCulled = false;
       stGroup.add(bPost1);
 
-      const bBoard1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 4.8), stBoardMat);
+      const bBoard1 = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 1.8, 4.8),
+        stBoardMat,
+      );
       bBoard1.position.copy(bPos1).setY(bPos1.y + 2.4);
       bBoard1.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), bNorm);
       bBoard1.castShadow = true;
@@ -1737,13 +2050,22 @@ export class TrackSystem {
       stGroup.add(bBoard1);
 
       // Platform 2 Board
-      const bPos2 = bPt.clone().add(bNorm.clone().multiplyScalar(7.6)).setY(bPt.y + 1.05);
-      const bPost2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.8, 8), steelMat);
+      const bPos2 = bPt
+        .clone()
+        .add(bNorm.clone().multiplyScalar(7.6))
+        .setY(bPt.y + 1.05);
+      const bPost2 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 2.8, 8),
+        steelMat,
+      );
       bPost2.position.copy(bPos2).setY(bPos2.y + 1.4);
       bPost2.frustumCulled = false;
       stGroup.add(bPost2);
 
-      const bBoard2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 4.8), stBoardMat);
+      const bBoard2 = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 1.8, 4.8),
+        stBoardMat,
+      );
       bBoard2.position.copy(bPos2).setY(bPos2.y + 2.4);
       bBoard2.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), bNorm);
       bBoard2.castShadow = true;
@@ -1752,30 +2074,48 @@ export class TrackSystem {
     });
 
     // B. Electronic Train Departure Displays Suspended Under Canopy
-    [-0.010, 0.010].forEach(uOffset => {
+    [-0.01, 0.01].forEach((uOffset) => {
       const dU = stCenterProg + uOffset;
       const dPt = this.curve.getPointAt(dU);
       const dTang = this.curve.getTangentAt(dU).normalize();
       const dNorm = new THREE.Vector3().crossVectors(dTang, up).normalize();
 
-      const depScreen = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.1, 4.2), trainInfoMat);
-      depScreen.position.copy(dPt).add(dNorm.clone().multiplyScalar(-7.6)).setY(dPt.y + 4.2);
-      depScreen.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dNorm);
+      const depScreen = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 1.1, 4.2),
+        trainInfoMat,
+      );
+      depScreen.position
+        .copy(dPt)
+        .add(dNorm.clone().multiplyScalar(-7.6))
+        .setY(dPt.y + 4.2);
+      depScreen.quaternion.setFromUnitVectors(
+        new THREE.Vector3(1, 0, 0),
+        dNorm,
+      );
       depScreen.frustumCulled = false;
       stGroup.add(depScreen);
     });
 
     // C. IRCTC Food & Chai Kiosks on Platform 1 & Platform 2
-    const irctcMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 });
+    const irctcMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      roughness: 0.5,
+    });
     [-0.014, 0.014].forEach((uOffset, kIdx) => {
       const kU = stCenterProg + uOffset;
       const kPt = this.curve.getPointAt(kU);
       const kTang = this.curve.getTangentAt(kU).normalize();
       const kNorm = new THREE.Vector3().crossVectors(kTang, up).normalize();
 
-      const kPos = kPt.clone().add(kNorm.clone().multiplyScalar(kIdx === 0 ? -9.5 : 9.5)).setY(kPt.y + 1.05);
+      const kPos = kPt
+        .clone()
+        .add(kNorm.clone().multiplyScalar(kIdx === 0 ? -9.5 : 9.5))
+        .setY(kPt.y + 1.05);
 
-      const kiosk = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.6, 4.5), irctcMat);
+      const kiosk = new THREE.Mesh(
+        new THREE.BoxGeometry(2.4, 2.6, 4.5),
+        irctcMat,
+      );
       kiosk.position.copy(kPos).setY(kPos.y + 1.3);
       kiosk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), kTang);
       kiosk.castShadow = true;
@@ -1783,48 +2123,80 @@ export class TrackSystem {
       stGroup.add(kiosk);
 
       // Yellow canopy awning on stall
-      const awning = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.25, 4.8), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+      const awning = new THREE.Mesh(
+        new THREE.BoxGeometry(2.8, 0.25, 4.8),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15 }),
+      );
       awning.position.copy(kPos).setY(kPos.y + 2.6);
       awning.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), kTang);
       stGroup.add(awning);
     });
 
     // D. Platform Passenger Benches (10 Benches along Platform 1 & 2)
-    const benchWoodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
+    const benchWoodMat = new THREE.MeshStandardMaterial({
+      color: 0x78350f,
+      roughness: 0.7,
+    });
     for (let b = 0; b < 10; b++) {
-      const bU = (stCenterProg - 0.018) + (b / 9) * 0.036;
+      const bU = stCenterProg - 0.018 + (b / 9) * 0.036;
       const bPt = this.curve.getPointAt(bU);
       const bTang = this.curve.getTangentAt(bU).normalize();
       const bNorm = new THREE.Vector3().crossVectors(bTang, up).normalize();
 
-      [-7.6, 7.6].forEach(bx => {
-        const benchPos = bPt.clone().add(bNorm.clone().multiplyScalar(bx)).setY(bPt.y + 1.05);
-        const bench = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 2.2), benchWoodMat);
+      [-7.6, 7.6].forEach((bx) => {
+        const benchPos = bPt
+          .clone()
+          .add(bNorm.clone().multiplyScalar(bx))
+          .setY(bPt.y + 1.05);
+        const bench = new THREE.Mesh(
+          new THREE.BoxGeometry(0.7, 0.45, 2.2),
+          benchWoodMat,
+        );
         bench.position.copy(benchPos).setY(benchPos.y + 0.25);
         bench.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), bTang);
         bench.castShadow = true;
         bench.frustumCulled = false;
         stGroup.add(bench);
 
-        const benchBack = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 2.2), benchWoodMat);
-        benchBack.position.copy(benchPos).add(bNorm.clone().multiplyScalar(bx > 0 ? 0.3 : -0.3)).setY(benchPos.y + 0.6);
-        benchBack.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), bTang);
+        const benchBack = new THREE.Mesh(
+          new THREE.BoxGeometry(0.1, 0.5, 2.2),
+          benchWoodMat,
+        );
+        benchBack.position
+          .copy(benchPos)
+          .add(bNorm.clone().multiplyScalar(bx > 0 ? 0.3 : -0.3))
+          .setY(benchPos.y + 0.6);
+        benchBack.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          bTang,
+        );
         stGroup.add(benchBack);
       });
     }
 
     // E. High Mast Yard Floodlight Tower (25m tall hexagonal mast with circular floodlight ring)
     const mastPt = this.curve.getPointAt(stCenterProg);
-    const mastNorm = new THREE.Vector3().crossVectors(this.curve.getTangentAt(stCenterProg).normalize(), up).normalize();
-    const mastPos = mastPt.clone().add(mastNorm.clone().multiplyScalar(16.0)).setY(0);
+    const mastNorm = new THREE.Vector3()
+      .crossVectors(this.curve.getTangentAt(stCenterProg).normalize(), up)
+      .normalize();
+    const mastPos = mastPt
+      .clone()
+      .add(mastNorm.clone().multiplyScalar(16.0))
+      .setY(0);
 
-    const highMast = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.75, 25.0, 8), steelMat);
+    const highMast = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.75, 25.0, 8),
+      steelMat,
+    );
     highMast.position.copy(mastPos).setY(12.5);
     highMast.castShadow = true;
     highMast.frustumCulled = false;
     stGroup.add(highMast);
 
-    const lightRing = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.15, 8, 16), steelMat);
+    const lightRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.8, 0.15, 8, 16),
+      steelMat,
+    );
     lightRing.rotation.x = Math.PI / 2;
     lightRing.position.copy(mastPos).setY(24.5);
     stGroup.add(lightRing);
@@ -1837,16 +2209,22 @@ export class TrackSystem {
     const fenceSteps = 28;
     const fenceSpan = 0.046;
     for (let f = 0; f < fenceSteps; f++) {
-      const fU = (stCenterProg - fenceSpan / 2) + (f / fenceSteps) * fenceSpan;
+      const fU = stCenterProg - fenceSpan / 2 + (f / fenceSteps) * fenceSpan;
       const fPt = this.curve.getPointAt(fU);
       const fTang = this.curve.getTangentAt(fU).normalize();
 
-      const fPost = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2, 6), steelMat);
+      const fPost = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 1.2, 6),
+        steelMat,
+      );
       fPost.position.copy(fPt).setY(fPt.y + 0.6);
       fPost.frustumCulled = false;
       stGroup.add(fPost);
 
-      const fBar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 4.8), steelMat);
+      const fBar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.06, 4.8),
+        steelMat,
+      );
       fBar.position.copy(fPt).setY(fPt.y + 0.9);
       fBar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fTang);
       fBar.frustumCulled = false;
@@ -1866,17 +2244,32 @@ export class TrackSystem {
     const tangent = this.curve.getTangentAt(this.crossingProgress).normalize();
 
     crossGroup.position.copy(crossPt);
-    crossGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+    crossGroup.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      tangent,
+    );
 
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
-    const barrierMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 });
+    const roadMat = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      roughness: 0.9,
+    });
+    const barrierMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      roughness: 0.4,
+    });
 
-    const road = new THREE.Mesh(new THREE.BoxGeometry(26.0, 0.12, 8.0), roadMat);
+    const road = new THREE.Mesh(
+      new THREE.BoxGeometry(26.0, 0.12, 8.0),
+      roadMat,
+    );
     road.position.y = 0.06;
     crossGroup.add(road);
 
-    [-5.5, 5.5].forEach(x => {
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(7.0, 0.15, 0.12), barrierMat);
+    [-5.5, 5.5].forEach((x) => {
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(7.0, 0.15, 0.12),
+        barrierMat,
+      );
       arm.position.set(x > 0 ? -3.5 : 3.5, 1.1, x > 0 ? 4.5 : -4.5);
       crossGroup.add(arm);
     });
@@ -1889,38 +2282,49 @@ export class TrackSystem {
   // ---------------------------------------------------------
   buildSignals() {
     this.signals = [];
-    const positions = [0.12, 0.35, 0.60, 0.82];
+    const positions = [0.12, 0.35, 0.6, 0.82];
     const up = new THREE.Vector3(0, 1, 0);
 
-    positions.forEach(prog => {
+    positions.forEach((prog) => {
       const pt = this.curve.getPointAt(prog);
       const tangent = this.curve.getTangentAt(prog).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
       const sigGroup = new THREE.Group();
-      sigGroup.position.copy(pt).add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.4));
-      sigGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+      sigGroup.position
+        .copy(pt)
+        .add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.4));
+      sigGroup.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        tangent,
+      );
 
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.8, 8), new THREE.MeshStandardMaterial({ color: 0x9ca3af }));
+      const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 4.8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x9ca3af }),
+      );
       post.position.y = 2.4;
       sigGroup.add(post);
 
-      const sigBox = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.3, 0.28), new THREE.MeshStandardMaterial({ color: 0x111 }));
+      const sigBox = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 1.3, 0.28),
+        new THREE.MeshStandardMaterial({ color: 0x111 }),
+      );
       sigBox.position.set(0, 4.2, 0);
       sigGroup.add(sigBox);
 
       const lamps = {};
       const lampDefs = [
-        { name: 'green', y: 4.6, col: 0x00e676 },
-        { name: 'yellow1', y: 4.3, col: 0xffd600 },
-        { name: 'red', y: 4.0, col: 0xff1744 },
-        { name: 'yellow2', y: 3.7, col: 0xffd600 }
+        { name: "green", y: 4.6, col: 0x00e676 },
+        { name: "yellow1", y: 4.3, col: 0xffd600 },
+        { name: "red", y: 4.0, col: 0xff1744 },
+        { name: "yellow2", y: 3.7, col: 0xffd600 },
       ];
 
-      lampDefs.forEach(l => {
+      lampDefs.forEach((l) => {
         const mesh = new THREE.Mesh(
           new THREE.CylinderGeometry(0.07, 0.07, 0.05, 12).rotateX(Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: 0x222 })
+          new THREE.MeshBasicMaterial({ color: 0x222 }),
         );
         mesh.position.set(0, l.y, 0.15);
         sigGroup.add(mesh);
@@ -1928,34 +2332,37 @@ export class TrackSystem {
       });
 
       this.trackGroup.add(sigGroup);
-      this.signals.push({ progress: prog, lamps, currentAspect: 'green' });
+      this.signals.push({ progress: prog, lamps, currentAspect: "green" });
     });
 
     this.updateSignals(0);
   }
 
   updateSignals(trainProgress) {
-    this.signals.forEach(sig => {
-      let aspect = 'green';
+    this.signals.forEach((sig) => {
+      let aspect = "green";
       const dist = (sig.progress - trainProgress + 1.0) % 1.0;
 
-      if (dist < 0.04) aspect = 'red';
-      else if (dist < 0.09) aspect = 'yellow';
-      else if (dist < 0.15) aspect = 'double_yellow';
-      else aspect = 'green';
+      if (dist < 0.04) aspect = "red";
+      else if (dist < 0.09) aspect = "yellow";
+      else if (dist < 0.15) aspect = "double_yellow";
+      else aspect = "green";
 
       sig.currentAspect = aspect;
 
-      Object.keys(sig.lamps).forEach(k => {
+      Object.keys(sig.lamps).forEach((k) => {
         sig.lamps[k].mesh.material.color.setHex(0x222);
       });
 
-      if (aspect === 'green') sig.lamps.green.mesh.material.color.setHex(sig.lamps.green.color);
-      else if (aspect === 'yellow') sig.lamps.yellow1.mesh.material.color.setHex(sig.lamps.yellow1.color);
-      else if (aspect === 'double_yellow') {
+      if (aspect === "green")
+        sig.lamps.green.mesh.material.color.setHex(sig.lamps.green.color);
+      else if (aspect === "yellow")
+        sig.lamps.yellow1.mesh.material.color.setHex(sig.lamps.yellow1.color);
+      else if (aspect === "double_yellow") {
         sig.lamps.yellow1.mesh.material.color.setHex(sig.lamps.yellow1.color);
         sig.lamps.yellow2.mesh.material.color.setHex(sig.lamps.yellow2.color);
-      } else if (aspect === 'red') sig.lamps.red.mesh.material.color.setHex(sig.lamps.red.color);
+      } else if (aspect === "red")
+        sig.lamps.red.mesh.material.color.setHex(sig.lamps.red.color);
     });
   }
 
@@ -1970,10 +2377,18 @@ export class TrackSystem {
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
       const postGroup = new THREE.Group();
-      postGroup.position.copy(pt).add(normal.clone().multiplyScalar(this.trackOffset / 2 + 2.5));
-      postGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+      postGroup.position
+        .copy(pt)
+        .add(normal.clone().multiplyScalar(this.trackOffset / 2 + 2.5));
+      postGroup.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        tangent,
+      );
 
-      const stone = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.85, 0.18), postMat);
+      const stone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.85, 0.18),
+        postMat,
+      );
       stone.position.y = 0.42;
       postGroup.add(stone);
 
@@ -1991,24 +2406,26 @@ export class TrackSystem {
     const up = new THREE.Vector3(0, 1, 0);
     const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
-    const offset = trackIndex === 0 ? -this.trackOffset / 2 : this.trackOffset / 2;
+    const offset =
+      trackIndex === 0 ? -this.trackOffset / 2 : this.trackOffset / 2;
     const position = pt.clone().add(normal.clone().multiplyScalar(offset));
     position.y += this.railHeight;
 
     const delta = 0.002;
-    const pPrev = this.curve.getPointAt(((u - delta) + 1.0) % 1.0);
+    const pPrev = this.curve.getPointAt((u - delta + 1.0) % 1.0);
     const pNext = this.curve.getPointAt((u + delta) % 1.0);
     const v1 = pt.clone().sub(pPrev);
     const v2 = pNext.clone().sub(pt);
     const cross = new THREE.Vector3().crossVectors(v1, v2);
-    const curveRadius = cross.length() > 0.0001 ? 1.0 / cross.length() * 50 : 0;
+    const curveRadius =
+      cross.length() > 0.0001 ? (1.0 / cross.length()) * 50 : 0;
     const curveSign = cross.y > 0 ? 1 : -1;
 
     return {
       position,
       tangent,
       normal,
-      curveRadius: curveRadius * curveSign
+      curveRadius: curveRadius * curveSign,
     };
   }
 
@@ -2020,7 +2437,7 @@ export class TrackSystem {
     return {
       position: centerT.position,
       heading: centerT.tangent,
-      curveRadius: centerT.curveRadius
+      curveRadius: centerT.curveRadius,
     };
   }
 }
