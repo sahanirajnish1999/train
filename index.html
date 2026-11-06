@@ -1,258 +1,478 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <title>Indian Railways Train Simulator | WAP-7 High-Speed Electric</title>
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Indian Railways Train Simulator | WAP-7 High-Speed Electric</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- WebGL 3D Canvas Container -->
+    <div id="canvas-container"></div>
 
-  <!-- WebGL 3D Canvas Container -->
-  <div id="canvas-container"></div>
-
-  <!-- HUD Interface Overlay -->
-  <div id="hud-overlay">
-    
-    <!-- TOP BAR -->
-    <header class="hud-top-bar hud-interactive">
-      <div class="train-title-card">
-        <div class="ir-badge">
-          <span class="crest">🚂</span>
-          <span>INDIAN RAILWAYS / भारतीय रेल</span>
+    <!-- HUD Interface Overlay -->
+    <div id="hud-overlay">
+      <!-- TOP BAR -->
+      <header class="hud-top-bar hud-interactive">
+        <div class="train-title-card">
+          <div class="ir-badge">
+            <span class="crest">🚂</span>
+            <span>INDIAN RAILWAYS / भारतीय रेल</span>
+          </div>
+          <div class="train-name" id="train-title">12301 RAJDHANI EXPRESS</div>
+          <div class="train-sub">
+            <span id="loco-shed">GZB WAP-7 #30201</span>
+            <span>•</span>
+            <span id="loco-class">Electric 25kV AC (6,350 HP)</span>
+          </div>
         </div>
-        <div class="train-name" id="train-title">12301 RAJDHANI EXPRESS</div>
-        <div class="train-sub">
-          <span id="loco-shed">GZB WAP-7 #30201</span>
-          <span>•</span>
-          <span id="loco-class">Electric 25kV AC (6,350 HP)</span>
+
+        <div class="route-card">
+          <div class="route-info">
+            <span class="route-label">Next Station</span>
+            <span class="route-value">RATLAM JN</span>
+          </div>
+          <div class="route-info">
+            <span class="route-label">Distance</span>
+            <span class="route-value" id="station-dist">1.8 km</span>
+          </div>
+          <div class="route-info">
+            <span class="route-label">Track Speed</span>
+            <span class="route-value" style="color: #00e676">160 KM/H</span>
+          </div>
+        </div>
+
+        <!-- Quick Utility Tools -->
+        <div class="quick-tools">
+          <button
+            class="tool-btn active"
+            id="btn-toggle-kavach"
+            title="Toggle AI Sensor & Safety Panel"
+          >
+            🛡️ AI Sensor
+          </button>
+          <button
+            class="tool-btn"
+            id="btn-slow-mo"
+            title="Toggle Slow Motion Time-Warp (1.0x / 0.5x / 0.25x / 0.1x) [Key Z]"
+            style="background: rgba(3, 105, 161, 0.4); border-color: #38bdf8"
+          >
+            ⏱️ SLOW-MO: 1x
+          </button>
+          <button
+            class="tool-btn"
+            id="btn-weather"
+            title="Cycle Weather / Time [Key V]"
+          >
+            🌦️ DAY
+          </button>
+          <button
+            class="tool-btn"
+            id="btn-help"
+            title="Keyboard Controls Guide"
+          >
+            ❓ Help
+          </button>
+        </div>
+      </header>
+
+      <!-- CENTER ALERT BANNER (Only active during obstacle safety rescue events) -->
+      <div id="alert-banner" style="display: none"></div>
+
+      <!-- CINEMATIC SLOW-MOTION STATUS BADGE -->
+      <div
+        id="slowmo-badge"
+        style="
+          display: none;
+          position: fixed;
+          top: 78px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(3, 105, 161, 0.95);
+          color: #ffffff;
+          padding: 6px 20px;
+          border-radius: 20px;
+          font-weight: 800;
+          font-size: 13px;
+          letter-spacing: 1.5px;
+          border: 1.5px solid #38bdf8;
+          box-shadow: 0 0 20px rgba(56, 189, 248, 0.7);
+          z-index: 1000;
+          pointer-events: none;
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+        "
+      >
+        ⏱️ SLOW MOTION (0.25x) ACTIVE • TRAIN SPEED PRESERVED
+      </div>
+
+      <!-- AI SENSOR FUSION & SAFETY CONTROLLER HUD CARD -->
+      <div class="ai-kavach-card hud-interactive" id="ai-kavach-card">
+        <div class="kavach-header">
+          <div class="kavach-title">
+            <span class="sensor-pulse"></span>
+            <span>AI SENSOR FUSION & SAFETY CONTROLLER</span>
+          </div>
+          <button
+            id="btn-kavach-minimize"
+            class="kavach-min-btn"
+            title="Minimize / Expand AI Sensor Card"
+          >
+            −
+          </button>
+        </div>
+        <div class="kavach-sub">
+          1 km LiDAR & Camera • Electric Shock • Capture Net (< 150 kg)
+        </div>
+
+        <!-- Active Sensors Status Row -->
+        <div class="kavach-sensors-row">
+          <span class="sensor-badge active" id="badge-cam"
+            >📷 Camera (1km)</span
+          >
+          <span class="sensor-badge active" id="badge-lidar"
+            >📡 LiDAR (1km)</span
+          >
+          <span class="sensor-badge active" id="badge-shock"
+            >⚡ 4x Front Senders</span
+          >
+          <span class="sensor-badge active" id="badge-side-guard"
+            >⚡ Coach Side Guards (2-3m)</span
+          >
+          <span class="sensor-badge active" id="badge-net"
+            >🪤 Net (<150kg)</span
+          >
+        </div>
+
+        <!-- Real-Time Target Scanner Box -->
+        <div class="kavach-scanner-box" id="kavach-scanner-box">
+          <div class="scanner-row">
+            <span class="scanner-label">TARGET:</span>
+            <span class="scanner-value" id="kavach-target-name"
+              >NONE (TRACK CLEAR)</span
+            >
+          </div>
+          <div class="scanner-row">
+            <span class="scanner-label">DISTANCE:</span>
+            <span class="scanner-value" id="kavach-target-dist">---</span>
+          </div>
+          <div class="scanner-row">
+            <span class="scanner-label">EST. WEIGHT:</span>
+            <span class="scanner-value" id="kavach-target-mass">---</span>
+          </div>
+          <div class="scanner-row">
+            <span class="scanner-label">STAGE 1 (SHOCK):</span>
+            <span class="scanner-value" id="kavach-target-spec"
+              >STANDBY (1 km)</span
+            >
+          </div>
+          <div class="scanner-row">
+            <span class="scanner-label">STAGE 2 (DECISION):</span>
+            <span class="scanner-status" id="kavach-action"
+              >TRACK CLEAR — STANDBY (1 km)</span
+            >
+          </div>
+        </div>
+
+        <!-- Scoop Payload Capacity Monitor -->
+        <div class="kavach-payload-box">
+          <div class="payload-header">
+            <span>NET PAYLOAD (MAX 150 KG):</span>
+            <span id="kavach-payload-val">0 kg (0 Secured)</span>
+          </div>
+          <div class="progress-track" style="margin-top: 5px; height: 6px">
+            <div
+              class="progress-bar"
+              id="kavach-payload-bar"
+              style="width: 0%; background: #00e676"
+            ></div>
+          </div>
         </div>
       </div>
 
-      <div class="route-card">
-        <div class="route-info">
-          <span class="route-label">Next Station</span>
-          <span class="route-value">RATLAM JN</span>
+      <!-- FLOATING DUAL-TIER CONSOLE DOCK & TELEMETRY TICKER -->
+      <div
+        class="floating-console-container hud-interactive"
+        id="floating-console-container"
+      >
+        <!-- Tier 1: Viewport Toolbar -->
+        <div class="viewport-pill-bar">
+          <span class="viewport-label">VIEWPORT:</span>
+          <button
+            class="viewport-btn active"
+            data-cam="orbit"
+            id="btn-cam-orbit"
+            title="Orbit 360° Camera [Drag to Orbit, Scroll to Zoom]"
+          >
+            ORBIT 360°
+          </button>
+          <button
+            class="viewport-btn"
+            data-cam="cab"
+            id="btn-cam-cab"
+            title="Loco Pilot Cockpit View"
+          >
+            TX CAB
+          </button>
+          <button
+            class="viewport-btn"
+            data-cam="target"
+            id="btn-cam-target"
+            title="Target View Looking Back at Approaching Train"
+          >
+            RX TARGET
+          </button>
+          <button
+            class="viewport-btn"
+            data-cam="action"
+            id="btn-cam-action"
+            title="Coach Side Shield & Net Flank View"
+          >
+            COACH SHIELD
+          </button>
+          <button
+            class="viewport-btn"
+            data-cam="drone"
+            id="btn-cam-drone"
+            title="Top-Down Overhead Radar Overview"
+          >
+            TOP RADAR
+          </button>
+          <button
+            class="viewport-btn"
+            data-cam="net"
+            id="btn-cam-net-dock"
+            title="Close-Up Front Capture Net View"
+          >
+            🪤 CAPTURE NET
+          </button>
+          <button
+            class="viewport-btn"
+            id="btn-auto-spin"
+            title="Toggle 360° Cinematic Auto Spin"
+          >
+            AUTO SPIN
+          </button>
         </div>
-        <div class="route-info">
-          <span class="route-label">Distance</span>
-          <span class="route-value" id="station-dist">1.8 km</span>
-        </div>
-        <div class="route-info">
-          <span class="route-label">Track Speed</span>
-          <span class="route-value" style="color: #00e676;">160 KM/H</span>
-        </div>
-      </div>
 
-      <!-- Quick Utility Tools -->
-      <div class="quick-tools">
-        <button class="tool-btn active" id="btn-toggle-kavach" title="Toggle AI Sensor & Safety Panel">🛡️ AI Sensor</button>
-        <button class="tool-btn" id="btn-slow-mo" title="Toggle Slow Motion Time-Warp (1.0x / 0.5x / 0.25x / 0.1x) [Key Z]" style="background: rgba(3, 105, 161, 0.4); border-color: #38bdf8;">⏱️ SLOW-MO: 1x</button>
-        <button class="tool-btn" id="btn-weather" title="Cycle Weather / Time [Key V]">🌦️ DAY</button>
-        <button class="tool-btn" id="btn-help" title="Keyboard Controls Guide">❓ Help</button>
-      </div>
-    </header>
+        <!-- Tier 2: Main Floating Control Console Bar -->
+        <div class="console-main-bar">
+          <!-- Running / Paused State Button -->
+          <button
+            class="btn-console-running"
+            id="btn-run-pause"
+            title="Toggle Simulation Running / Paused"
+          >
+            ▶ RUNNING
+          </button>
 
-    <!-- CENTER ALERT BANNER (Only active during obstacle safety rescue events) -->
-    <div id="alert-banner" style="display: none;"></div>
+          <!-- Locomotive Speed Pod -->
+          <div class="console-speed-pod">
+            <span class="pod-label">LOCOMOTIVE SPEED</span>
+            <span class="pod-value" id="console-speed-val">120</span>
+            <span class="pod-unit">KM/H</span>
+          </div>
 
-    <!-- CINEMATIC SLOW-MOTION STATUS BADGE -->
-    <div id="slowmo-badge" style="display: none; position: fixed; top: 78px; left: 50%; transform: translateX(-50%); background: rgba(3, 105, 161, 0.95); color: #ffffff; padding: 6px 20px; border-radius: 20px; font-weight: 800; font-size: 13px; letter-spacing: 1.5px; border: 1.5px solid #38bdf8; box-shadow: 0 0 20px rgba(56, 189, 248, 0.7); z-index: 1000; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">⏱️ SLOW MOTION (0.25x) ACTIVE • TRAIN SPEED PRESERVED</div>
+          <!-- Speed Preset Buttons -->
+          <div class="speed-presets-group">
+            <button
+              class="speed-preset-btn"
+              data-speed="0"
+              id="btn-spd-0"
+              title="Stop Train"
+            >
+              STOP
+            </button>
+            <button
+              class="speed-preset-btn"
+              data-speed="40"
+              id="btn-spd-40"
+              title="Set Speed to 40 km/h"
+            >
+              40
+            </button>
+            <button
+              class="speed-preset-btn"
+              data-speed="80"
+              id="btn-spd-80"
+              title="Set Speed to 80 km/h"
+            >
+              80
+            </button>
+            <button
+              class="speed-preset-btn active"
+              data-speed="120"
+              id="btn-spd-120"
+              title="Cruise Speed 120 km/h"
+            >
+              120<br /><span class="preset-sub">CRUISE</span>
+            </button>
+            <button
+              class="speed-preset-btn"
+              data-speed="160"
+              id="btn-spd-160"
+              title="Maximum Speed 160 km/h"
+            >
+              160<br /><span class="preset-sub">MAX</span>
+            </button>
+          </div>
 
-    <!-- AI SENSOR FUSION & SAFETY CONTROLLER HUD CARD -->
-    <div class="ai-kavach-card hud-interactive" id="ai-kavach-card">
-      <div class="kavach-header">
-        <div class="kavach-title">
-          <span class="sensor-pulse"></span>
-          <span>AI SENSOR FUSION & SAFETY CONTROLLER</span>
+          <!-- Action / System Toggles -->
+          <button
+            class="console-pill-btn active-cyan"
+            id="btn-ai-sensor-mode"
+            title="Toggle AI Sensor Mode: AUTO / MANUAL"
+          >
+            🛡️ AI SENSOR: AUTO
+          </button>
+          <button
+            class="console-pill-btn active-cyan"
+            id="btn-console-shock"
+            title="Manual Electric Shock Pulse [Key B]"
+          >
+            ⚡ E-SHOCK: ACTIVE
+          </button>
+          <button
+            class="console-pill-btn"
+            id="btn-console-net"
+            title="Deploy or Retract Front Net [Key O]"
+          >
+            🪤 NET: RETRACTED
+          </button>
+          <button
+            class="console-pill-btn"
+            id="btn-console-horn"
+            title="Sound Dual-Tone Pneumatic Horn [Space / Key H]"
+          >
+            🎺 HORN
+          </button>
+          <button
+            class="console-pill-btn emergency"
+            id="btn-console-emergency"
+            title="Emergency Brake Dump [Key E]"
+          >
+            🚨 EMERGENCY BRAKE
+          </button>
+          <button
+            class="console-pill-btn"
+            id="btn-console-reset"
+            title="Reset Run to Starting Line"
+          >
+            🔄 RESET RUN
+          </button>
         </div>
-        <button id="btn-kavach-minimize" class="kavach-min-btn" title="Minimize / Expand AI Sensor Card">−</button>
-      </div>
-      <div class="kavach-sub">1 km LiDAR & Camera • Electric Shock • Capture Net (< 150 kg)</div>
 
-      <!-- Active Sensors Status Row -->
-      <div class="kavach-sensors-row">
-        <span class="sensor-badge active" id="badge-cam">📷 Camera (1km)</span>
-        <span class="sensor-badge active" id="badge-lidar">📡 LiDAR (1km)</span>
-        <span class="sensor-badge active" id="badge-shock">⚡ 4x Front Senders</span>
-        <span class="sensor-badge active" id="badge-side-guard">⚡ Coach Side Guards (2-3m)</span>
-        <span class="sensor-badge active" id="badge-net">🪤 Net (<150kg)</span>
-      </div>
-
-      <!-- Real-Time Target Scanner Box -->
-      <div class="kavach-scanner-box" id="kavach-scanner-box">
-        <div class="scanner-row">
-          <span class="scanner-label">TARGET:</span>
-          <span class="scanner-value" id="kavach-target-name">NONE (TRACK CLEAR)</span>
-        </div>
-        <div class="scanner-row">
-          <span class="scanner-label">DISTANCE:</span>
-          <span class="scanner-value" id="kavach-target-dist">---</span>
-        </div>
-        <div class="scanner-row">
-          <span class="scanner-label">EST. WEIGHT:</span>
-          <span class="scanner-value" id="kavach-target-mass">---</span>
-        </div>
-        <div class="scanner-row">
-          <span class="scanner-label">STAGE 1 (SHOCK):</span>
-          <span class="scanner-value" id="kavach-target-spec">STANDBY (1 km)</span>
-        </div>
-        <div class="scanner-row">
-          <span class="scanner-label">STAGE 2 (DECISION):</span>
-          <span class="scanner-status" id="kavach-action">TRACK CLEAR — STANDBY (1 km)</span>
-        </div>
-      </div>
-
-      <!-- Scoop Payload Capacity Monitor -->
-      <div class="kavach-payload-box">
-        <div class="payload-header">
-          <span>NET PAYLOAD (MAX 150 KG):</span>
-          <span id="kavach-payload-val">0 kg (0 Secured)</span>
-        </div>
-        <div class="progress-track" style="margin-top: 5px; height: 6px;">
-          <div class="progress-bar" id="kavach-payload-bar" style="width: 0%; background: #00e676;"></div>
+        <!-- Tier 3: Safety Protocol Status Ticker -->
+        <div class="telemetry-ticker-bar" id="telemetry-ticker-bar">
+          <span
+            >SAFETY PROTOCOL:
+            <strong>1. DELIVER E-SHOCK TO MOVE OFF TRACK</strong></span
+          >
+          <span>|</span>
+          <span
+            ><strong
+              >2. IF STILL ON TRACK: DEPLOY NET IF WEIGHT &lt; 150 KG</strong
+            ></span
+          >
+          <span>|</span>
+          <span
+            >STATUS:
+            <strong id="ticker-status" style="color: #34d399"
+              >ACTIVE MONITORING (1 km)</strong
+            ></span
+          >
+          <span class="ticker-controls-hint"
+            >DRAG TO ORBIT 360° | SCROLL TO ZOOM</span
+          >
         </div>
       </div>
     </div>
 
-    <!-- FLOATING DUAL-TIER CONSOLE DOCK & TELEMETRY TICKER -->
-    <div class="floating-console-container hud-interactive" id="floating-console-container">
-      
-      <!-- Tier 1: Viewport Toolbar -->
-      <div class="viewport-pill-bar">
-        <span class="viewport-label">VIEWPORT:</span>
-        <button class="viewport-btn active" data-cam="orbit" id="btn-cam-orbit" title="Orbit 360° Camera [Drag to Orbit, Scroll to Zoom]">ORBIT 360°</button>
-        <button class="viewport-btn" data-cam="cab" id="btn-cam-cab" title="Loco Pilot Cockpit View">TX CAB</button>
-        <button class="viewport-btn" data-cam="target" id="btn-cam-target" title="Target View Looking Back at Approaching Train">RX TARGET</button>
-        <button class="viewport-btn" data-cam="action" id="btn-cam-action" title="Coach Side Shield & Net Flank View">COACH SHIELD</button>
-        <button class="viewport-btn" data-cam="drone" id="btn-cam-drone" title="Top-Down Overhead Radar Overview">TOP RADAR</button>
-        <button class="viewport-btn" data-cam="net" id="btn-cam-net-dock" title="Close-Up Front Capture Net View">🪤 CAPTURE NET</button>
-        <button class="viewport-btn" id="btn-auto-spin" title="Toggle 360° Cinematic Auto Spin">AUTO SPIN</button>
+    <!-- HELP & KEYBOARD SHORTCUTS MODAL -->
+    <div id="help-modal">
+      <div class="modal-header">
+        <div class="modal-title">Loco Pilot Keyboard & Touch Controls</div>
+        <button class="modal-close" id="close-help">&times;</button>
       </div>
-
-      <!-- Tier 2: Main Floating Control Console Bar -->
-      <div class="console-main-bar">
-        <!-- Running / Paused State Button -->
-        <button class="btn-console-running" id="btn-run-pause" title="Toggle Simulation Running / Paused">▶ RUNNING</button>
-
-        <!-- Locomotive Speed Pod -->
-        <div class="console-speed-pod">
-          <span class="pod-label">LOCOMOTIVE SPEED</span>
-          <span class="pod-value" id="console-speed-val">120</span>
-          <span class="pod-unit">KM/H</span>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Throttle Notch Up (+1)</span>
+          <span class="kbd-badge">W / ↑</span>
         </div>
-
-        <!-- Speed Preset Buttons -->
-        <div class="speed-presets-group">
-          <button class="speed-preset-btn" data-speed="0" id="btn-spd-0" title="Stop Train">STOP</button>
-          <button class="speed-preset-btn" data-speed="40" id="btn-spd-40" title="Set Speed to 40 km/h">40</button>
-          <button class="speed-preset-btn" data-speed="80" id="btn-spd-80" title="Set Speed to 80 km/h">80</button>
-          <button class="speed-preset-btn active" data-speed="120" id="btn-spd-120" title="Cruise Speed 120 km/h">120<br><span class="preset-sub">CRUISE</span></button>
-          <button class="speed-preset-btn" data-speed="160" id="btn-spd-160" title="Maximum Speed 160 km/h">160<br><span class="preset-sub">MAX</span></button>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Throttle Notch Down (-1)</span>
+          <span class="kbd-badge">S / ↓</span>
         </div>
-
-        <!-- Action / System Toggles -->
-        <button class="console-pill-btn active-cyan" id="btn-ai-sensor-mode" title="Toggle AI Sensor Mode: AUTO / MANUAL">🛡️ AI SENSOR: AUTO</button>
-        <button class="console-pill-btn active-cyan" id="btn-console-shock" title="Manual Electric Shock Pulse [Key B]">⚡ E-SHOCK: ACTIVE</button>
-        <button class="console-pill-btn" id="btn-console-net" title="Deploy or Retract Front Net [Key O]">🪤 NET: RETRACTED</button>
-        <button class="console-pill-btn" id="btn-console-horn" title="Sound Dual-Tone Pneumatic Horn [Space / Key H]">🎺 HORN</button>
-        <button class="console-pill-btn emergency" id="btn-console-emergency" title="Emergency Brake Dump [Key E]">🚨 EMERGENCY BRAKE</button>
-        <button class="console-pill-btn" id="btn-console-reset" title="Reset Run to Starting Line">🔄 RESET RUN</button>
-      </div>
-
-      <!-- Tier 3: Safety Protocol Status Ticker -->
-      <div class="telemetry-ticker-bar" id="telemetry-ticker-bar">
-        <span>SAFETY PROTOCOL: <strong>1. DELIVER E-SHOCK TO MOVE OFF TRACK</strong></span>
-        <span>|</span>
-        <span><strong>2. IF STILL ON TRACK: DEPLOY NET IF WEIGHT &lt; 150 KG</strong></span>
-        <span>|</span>
-        <span>STATUS: <strong id="ticker-status" style="color: #34d399;">ACTIVE MONITORING (1 km)</strong></span>
-        <span class="ticker-controls-hint">DRAG TO ORBIT 360° | SCROLL TO ZOOM</span>
-      </div>
-
-    </div>
-
-  </div>
-
-  <!-- HELP & KEYBOARD SHORTCUTS MODAL -->
-  <div id="help-modal">
-    <div class="modal-header">
-      <div class="modal-title">Loco Pilot Keyboard & Touch Controls</div>
-      <button class="modal-close" id="close-help">&times;</button>
-    </div>
-    <div class="shortcuts-grid">
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Throttle Notch Up (+1)</span>
-        <span class="kbd-badge">W / ↑</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Throttle Notch Down (-1)</span>
-        <span class="kbd-badge">S / ↓</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Apply Train Brake (A-9)</span>
-        <span class="kbd-badge">A</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Release Train Brake</span>
-        <span class="kbd-badge">D</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Dual-Tone Indian Horn</span>
-        <span class="kbd-badge">Space / H</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Emergency Brake (Slam)</span>
-        <span class="kbd-badge">E</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Reverser (Fwd / Neut / Rev)</span>
-        <span class="kbd-badge">R</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Cycle Camera Mode</span>
-        <span class="kbd-badge">C</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Headlight High/Dim/Off</span>
-        <span class="kbd-badge">L</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Slow-Mo Time-Warp (1x / 0.5x / 0.25x / 0.1x)</span>
-        <span class="kbd-badge">Z</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Focus Capture Net View Cam</span>
-        <span class="kbd-badge">N</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Manual Net Deploy / Retract</span>
-        <span class="kbd-badge">O</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Pantograph Raise/Lower</span>
-        <span class="kbd-badge">P</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Cycle Weather / Time of Day</span>
-        <span class="kbd-badge">V</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Look Around in Cab</span>
-        <span class="kbd-badge">Mouse Drag</span>
-      </div>
-      <div class="shortcut-row">
-        <span class="shortcut-desc">Mute / Unmute Audio</span>
-        <span class="kbd-badge">M</span>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Train Brake (A-9)</span>
+          <span class="kbd-badge">A</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Release Train Brake</span>
+          <span class="kbd-badge">D</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Dual-Tone Indian Horn</span>
+          <span class="kbd-badge">Space / H</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Emergency Brake (Slam)</span>
+          <span class="kbd-badge">E</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Reverser (Fwd / Neut / Rev)</span>
+          <span class="kbd-badge">R</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Cycle Camera Mode</span>
+          <span class="kbd-badge">C</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Headlight High/Dim/Off</span>
+          <span class="kbd-badge">L</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc"
+            >Slow-Mo Time-Warp (1x / 0.5x / 0.25x / 0.1x)</span
+          >
+          <span class="kbd-badge">Z</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Focus Capture Net View Cam</span>
+          <span class="kbd-badge">N</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Manual Net Deploy / Retract</span>
+          <span class="kbd-badge">O</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Pantograph Raise/Lower</span>
+          <span class="kbd-badge">P</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Cycle Weather / Time of Day</span>
+          <span class="kbd-badge">V</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Look Around in Cab</span>
+          <span class="kbd-badge">Mouse Drag</span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-desc">Mute / Unmute Audio</span>
+          <span class="kbd-badge">M</span>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Main Self-Contained Bundle with Cache-Buster -->
-  <script src="bundle.js?v=20261106_v3"></script>
-</body>
+    <!-- Main Self-Contained Bundle with Cache-Buster -->
+    <script src="bundle.js?v=20261106_v3"></script>
+  </body>
 </html>
-
