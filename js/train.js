@@ -597,6 +597,13 @@ export class TrainModel {
     roofCenterMesh.scale.set(1, 0.38, 1);
     group.add(roofCenterMesh);
 
+    // Longitudinal roof stiffening ribs (4 parallel ribs)
+    [-1.1, -0.6, 0.6, 1.1].forEach(rx => {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, centerLen), materials.roof);
+      rib.position.set(rx, 3.52, 0);
+      group.add(rib);
+    });
+
     // Dynamic Braking Resistor Cooling Louver Hoods on roof
     [-3.8, -1.2, 1.2, 3.8].forEach(rz => {
       const hood = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 1.8), materials.darkSteel);
@@ -616,7 +623,7 @@ export class TrainModel {
       cabGroup.position.set(0, 0, dir * (centerLen / 2));
       cabGroup.scale.set(1, 1, dir); // Mirrored along Z
 
-      // Tapered Aerodynamic Cab Shell (slopes backward at 8.5 degrees)
+      // Tapered Aerodynamic Cab Shell
       const cabBody = new THREE.Mesh(new THREE.BoxGeometry(width, height, cabLen), [
         materials.side, materials.side, materials.roof, materials.darkSteel, materials.front, materials.darkSteel
       ]);
@@ -633,68 +640,142 @@ export class TrainModel {
       cabRoof.scale.set(1, 0.38, 1);
       cabGroup.add(cabRoof);
 
-      // Front Sloped Nose Face (Raked backward aerodynamic wedge)
-      const noseWedge = new THREE.Mesh(
-        new THREE.ConeGeometry(width / 2, 0.9, 4).rotateY(Math.PI / 4).scale(1.0, 1.0, 0.5),
+      // A. Sloping Lower Bonnet Deck (WAP-7 Aerodynamic Prow)
+      const bonnetWidth = width * 0.96;
+      const bonnetDeck = new THREE.Mesh(
+        new THREE.BoxGeometry(bonnetWidth, 0.08, 0.52),
         materials.front
       );
-      noseWedge.position.set(0, 2.50, cabLen + 0.12);
-      cabGroup.add(noseWedge);
+      bonnetDeck.position.set(0, 1.66, cabLen + 0.22);
+      bonnetDeck.rotation.x = -0.52; // Sleek 30-degree forward slope
+      bonnetDeck.castShadow = true;
+      cabGroup.add(bonnetDeck);
+
+      // Central Prow Ridge
+      const prowRidge = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.06, 0.54),
+        materials.front
+      );
+      prowRidge.position.set(0, 1.68, cabLen + 0.23);
+      prowRidge.rotation.x = -0.52;
+      cabGroup.add(prowRidge);
+
+      // Lower Front Nose Vertical Face Plate (Livery Plate above Buffer Beam)
+      const noseFace = new THREE.Mesh(
+        new THREE.BoxGeometry(bonnetWidth, 0.58, 0.16),
+        materials.front
+      );
+      noseFace.position.set(0, 1.32, cabLen + 0.32);
+      noseFace.castShadow = true;
+      cabGroup.add(noseFace);
+
+      // Corner Fillets
+      [-1, 1].forEach(side => {
+        const cornerFillet = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.22, 0.22, 1.4, 8),
+          materials.side
+        );
+        cornerFillet.position.set(side * (width / 2 - 0.12), 1.75, cabLen + 0.05);
+        cornerFillet.rotation.x = -0.25;
+        cabGroup.add(cornerFillet);
+      });
 
       // Dual Angled Front Windshields with Black Extruded Rubber Beading
       [-0.68, 0.68].forEach(wx => {
-        // Outer black rubber gasket frame
-        const frame = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.82, 0.06), materials.rubber);
-        frame.position.set(wx, 2.58, cabLen + 0.02);
-        frame.rotation.x = -0.14; // Sleek 8-degree rake
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(1.10, 0.84, 0.06), materials.rubber);
+        frame.position.set(wx, 2.58, cabLen + 0.03);
+        frame.rotation.x = -0.22;
         cabGroup.add(frame);
 
-        // Tinted safety glass pane
-        const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.70), materials.glass);
-        glassPane.position.set(wx, 2.58, cabLen + 0.05);
-        glassPane.rotation.x = -0.14;
+        const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(0.98, 0.72), materials.glass);
+        glassPane.position.set(wx, 2.58, cabLen + 0.065);
+        glassPane.rotation.x = -0.22;
         cabGroup.add(glassPane);
 
-        // Sun Visor / Brow Awning
-        const visor = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.06, 0.18), materials.darkSteel);
-        visor.position.set(wx, 3.02, cabLen + 0.10);
-        cabGroup.add(visor);
-
-        // Windshield Wiper Blade & Arm
         const wiperPivot = new THREE.Group();
-        wiperPivot.position.set(wx, 2.22, cabLen + 0.06);
-        const wiperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.45), materials.darkSteel);
-        wiperArm.position.set(0.08, 0.22, 0);
-        wiperArm.rotation.z = -0.35;
+        wiperPivot.position.set(wx, 2.24, cabLen + 0.12);
+        const wiperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.44), materials.darkSteel);
+        wiperArm.position.set(0.08, 0.20, 0);
+        wiperArm.rotation.z = -0.32;
         wiperPivot.add(wiperArm);
-        const wiperBlade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.44, 0.015), materials.rubber);
-        wiperBlade.position.set(0.16, 0.24, 0.02);
-        wiperBlade.rotation.z = -0.35;
+        const wiperBlade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.42, 0.015), materials.rubber);
+        wiperBlade.position.set(0.15, 0.22, 0.02);
+        wiperBlade.rotation.z = -0.32;
         wiperPivot.add(wiperBlade);
         cabGroup.add(wiperPivot);
       });
 
-      // Twin-Beam High-Intensity Headlight Cluster (WAP-7 Center Nose Nacelle)
-      const hlNacelle = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.32, 0.28), materials.darkSteel);
-      hlNacelle.position.set(0, 3.28, cabLen + 0.12);
+      // Central Vertical Windshield Mullion Post
+      const centerPost = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.92, 0.08), materials.darkSteel);
+      centerPost.position.set(0, 2.58, cabLen + 0.04);
+      centerPost.rotation.x = -0.22;
+      cabGroup.add(centerPost);
+
+      // Sun Visor / Brow Awning
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(width * 0.88, 0.08, 0.28), materials.darkSteel);
+      visor.position.set(0, 3.06, cabLen + 0.16);
+      visor.rotation.x = -0.12;
+      cabGroup.add(visor);
+
+      // Driver Side Sliding Windows & Exterior Rear-View Mirrors
+      [-1, 1].forEach(side => {
+        const winX = side * (width / 2 + 0.01);
+
+        const sideWinFrame = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.58, 0.72), materials.darkSteel);
+        sideWinFrame.position.set(winX, 2.56, cabLen - 0.72);
+        cabGroup.add(sideWinFrame);
+
+        const sideWinGlass = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.52, 0.66), materials.glass);
+        sideWinGlass.position.set(winX, 2.56, cabLen - 0.72);
+        cabGroup.add(sideWinGlass);
+
+        const dripRail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.82), materials.darkSteel);
+        dripRail.position.set(winX, 2.88, cabLen - 0.72);
+        cabGroup.add(dripRail);
+
+        const mirrorArm1 = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28).rotateZ(Math.PI / 2), materials.chrome);
+        mirrorArm1.position.set(side * (width / 2 + 0.14), 2.70, cabLen - 0.35);
+        cabGroup.add(mirrorArm1);
+
+        const mirrorArm2 = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28).rotateZ(Math.PI / 2), materials.chrome);
+        mirrorArm2.position.set(side * (width / 2 + 0.14), 2.42, cabLen - 0.35);
+        cabGroup.add(mirrorArm2);
+
+        const mirrorHousing = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.34, 0.18), materials.darkSteel);
+        mirrorHousing.position.set(side * (width / 2 + 0.28), 2.56, cabLen - 0.35);
+        mirrorHousing.rotation.y = side * -0.15;
+        cabGroup.add(mirrorHousing);
+
+        const mirrorFace = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.30), materials.chrome);
+        mirrorFace.position.set(side * (width / 2 + 0.26), 2.56, cabLen - 0.35);
+        mirrorFace.rotation.y = side > 0 ? -Math.PI / 2 - 0.15 : Math.PI / 2 + 0.15;
+        cabGroup.add(mirrorFace);
+      });
+
+      // Twin-Beam High-Intensity Headlight Cluster
+      const hlNacelle = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.34, 0.32), materials.darkSteel);
+      hlNacelle.position.set(0, 3.28, cabLen + 0.16);
       hlNacelle.castShadow = true;
       cabGroup.add(hlNacelle);
 
-      // Dual Chrome Reflector Cups & Glowing Inner Bulbs
       [-0.18, 0.18].forEach(hx => {
-        const bezel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 20).rotateX(Math.PI / 2), materials.chrome);
-        bezel.position.set(hx, 3.28, cabLen + 0.26);
+        const bezel = new THREE.Mesh(new THREE.CylinderGeometry(0.125, 0.125, 0.08, 20).rotateX(Math.PI / 2), materials.chrome);
+        bezel.position.set(hx, 3.28, cabLen + 0.30);
         cabGroup.add(bezel);
 
-        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-        bulb.position.set(hx, 3.28, cabLen + 0.28);
+        const reflector = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.06, 16).rotateX(-Math.PI / 2), materials.chrome);
+        reflector.position.set(hx, 3.28, cabLen + 0.31);
+        cabGroup.add(reflector);
+
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        bulb.position.set(hx, 3.28, cabLen + 0.33);
         cabGroup.add(bulb);
       });
 
-      // Center Amber Flasher Light (Safety Beacon above Headlights)
+      // Center Amber Flasher Light
       const flasherMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-      const flasher = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.05, 14).rotateX(Math.PI / 2), flasherMat);
-      flasher.position.set(0, 3.48, cabLen + 0.22);
+      const flasher = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.06, 14).rotateX(Math.PI / 2), flasherMat);
+      flasher.position.set(0, 3.52, cabLen + 0.24);
       cabGroup.add(flasher);
       this.flasherLamps.push(flasherMat);
 
@@ -704,7 +785,6 @@ export class TrainModel {
       acUnit.castShadow = true;
       cabGroup.add(acUnit);
 
-      // Dual Condenser Fan Exhaust Grilles on AC unit
       [-0.45, 0.45].forEach(fz => {
         const fanBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.04, 16), materials.darkSteel);
         fanBezel.position.set(0, 3.97, cabLen * 0.45 + fz);
@@ -724,26 +804,25 @@ export class TrainModel {
       bladeAnt.position.set(0.65, 3.86, cabLen * 0.15);
       cabGroup.add(bladeAnt);
 
-      // Stainless Steel Cab Corner Handrails (Vertical grab irons)
+      // Stainless Steel Cab Corner Handrails & Shunter Footboards
       [-1.54, 1.54].forEach(hx => {
         const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.6), materials.chrome);
         rail.position.set(hx, 1.85, cabLen - 0.1);
         cabGroup.add(rail);
 
-        // Lower Shunter Footboard / Step at buffer beam corner
         const step = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.04, 0.28), materials.darkSteel);
         step.position.set(hx, 0.52, cabLen + 0.15);
         cabGroup.add(step);
       });
 
-      // Twin Red Tail / Marker Lights (Lower Corners)
+      // Twin Dual-Aspect Lower Marker Lights
       [-1.15, 1.15].forEach(mx => {
-        const markerBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 14).rotateX(Math.PI / 2), materials.darkSteel);
-        markerBezel.position.set(mx, 1.25, cabLen + 0.05);
+        const markerBezel = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.05, 14).rotateX(Math.PI / 2), materials.darkSteel);
+        markerBezel.position.set(mx, 1.25, cabLen + 0.32);
         cabGroup.add(markerBezel);
 
-        const markerLens = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), new THREE.MeshBasicMaterial({ color: isFront ? 0xffffff : 0xef4444 }));
-        markerLens.position.set(mx, 1.25, cabLen + 0.07);
+        const markerLens = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ color: isFront ? 0xffffff : 0xef4444 }));
+        markerLens.position.set(mx, 1.25, cabLen + 0.34);
         cabGroup.add(markerLens);
       });
 
@@ -760,38 +839,43 @@ export class TrainModel {
       });
       cabGroup.add(hornGroup);
 
-      // Heavy Transverse Buffer Beam Girder (Pilot Beam)
+      // Heavy Transverse Buffer Beam Girder
       const bufferBeam = new THREE.Mesh(new THREE.BoxGeometry(3.18, 0.44, 0.36), materials.darkSteel);
-      bufferBeam.position.set(0, 0.95, cabLen + 0.18);
+      bufferBeam.position.set(0, 0.95, cabLen + 0.28);
       bufferBeam.castShadow = true;
       cabGroup.add(bufferBeam);
 
       // Dual Sprung Buffer Plungers & Round Buffer Heads
       [-0.95, 0.95].forEach(bx => {
         const plunger = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.34, 16).rotateX(Math.PI / 2), materials.darkSteel);
-        plunger.position.set(bx, 0.95, cabLen + 0.48);
+        plunger.position.set(bx, 0.95, cabLen + 0.58);
         cabGroup.add(plunger);
 
         const head = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 20).rotateX(Math.PI / 2), materials.darkSteel);
-        head.position.set(bx, 0.95, cabLen + 0.66);
+        head.position.set(bx, 0.95, cabLen + 0.76);
         cabGroup.add(head);
       });
 
-      // Center AAR Knuckle Coupler & Screw Coupling Hook
+      // Center CBC Knuckle Coupler & Operating Lever
       const couplerStem = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.65), materials.darkSteel);
-      couplerStem.position.set(0, 0.88, cabLen + 0.48);
+      couplerStem.position.set(0, 0.88, cabLen + 0.58);
       cabGroup.add(couplerStem);
+
       const couplerKnuckle = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.22), materials.darkSteel);
-      couplerKnuckle.position.set(0.04, 0.88, cabLen + 0.80);
+      couplerKnuckle.position.set(0.04, 0.88, cabLen + 0.90);
       cabGroup.add(couplerKnuckle);
 
-      // Twin Flexible Brake Air Hoses (Red Feed & Green Brake Pipe)
+      const uncouplingLever = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.2).rotateZ(Math.PI / 2), materials.darkSteel);
+      uncouplingLever.position.set(-0.55, 1.05, cabLen + 0.48);
+      cabGroup.add(uncouplingLever);
+
+      // Twin Flexible Brake Air Hoses
       [-0.32, 0.32].forEach((hx, hidx) => {
         const hoseColor = hidx === 0 ? 0xdc2626 : 0x16a34a;
         const hosePts = [
-          new THREE.Vector3(hx, 0.95, cabLen + 0.35),
-          new THREE.Vector3(hx * 1.1, 0.65, cabLen + 0.50),
-          new THREE.Vector3(hx * 0.7, 0.45, cabLen + 0.45)
+          new THREE.Vector3(hx, 0.95, cabLen + 0.45),
+          new THREE.Vector3(hx * 1.1, 0.65, cabLen + 0.60),
+          new THREE.Vector3(hx * 0.7, 0.45, cabLen + 0.55)
         ];
         const hoseCurve = new THREE.CatmullRomCurve3(hosePts);
         const hoseMesh = new THREE.Mesh(
@@ -803,28 +887,27 @@ export class TrainModel {
 
       // Rugged Aerodynamic Cattle Guard / Cowcatcher Plow
       const plow = new THREE.Mesh(
-        new THREE.ConeGeometry(1.55, 0.68, 4).rotateY(Math.PI / 4).scale(1.15, 0.65, 0.85),
+        new THREE.ConeGeometry(1.55, 0.70, 4).rotateY(Math.PI / 4).scale(1.15, 0.68, 0.88),
         materials.cowcatcher
       );
-      plow.position.set(0, 0.48, cabLen + 0.38);
+      plow.position.set(0, 0.48, cabLen + 0.45);
       plow.castShadow = true;
       cabGroup.add(plow);
 
       // Horizontal deflection slats on cowcatcher
-      [-0.12, 0.0, 0.12].forEach(sy => {
-        const slat = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.04, 0.12), materials.darkSteel);
-        slat.position.set(0, 0.48 + sy, cabLen + 0.52 - Math.abs(sy) * 0.2);
+      [-0.14, 0.0, 0.14].forEach(sy => {
+        const slat = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.04, 0.12), materials.darkSteel);
+        slat.position.set(0, 0.48 + sy, cabLen + 0.60 - Math.abs(sy) * 0.2);
         cabGroup.add(slat);
       });
 
       // 4 Physical High-Voltage Electric Shock Sender Devices
       // Mounted on Locomotive Front: Top-Left, Top-Right, Down-Left, Down-Right
-      // User requirement: "electric shoc sender device will be place on train engine top left - right and down left-right . this will be help in proper align to target and train"
       if (isFront) {
-        const devTL = this.createShockSenderDevice('top_left', new THREE.Vector3(-1.25, 3.32, cabLen + 0.12), new THREE.Euler(-0.03, 0.04, 0), 'Top-Left Emitter');
-        const devTR = this.createShockSenderDevice('top_right', new THREE.Vector3(1.25, 3.32, cabLen + 0.12), new THREE.Euler(-0.03, -0.04, 0), 'Top-Right Emitter');
-        const devDL = this.createShockSenderDevice('down_left', new THREE.Vector3(-1.35, 0.95, cabLen + 0.28), new THREE.Euler(0.02, 0.03, 0), 'Down-Left Emitter');
-        const devDR = this.createShockSenderDevice('down_right', new THREE.Vector3(1.35, 0.95, cabLen + 0.28), new THREE.Euler(0.02, -0.03, 0), 'Down-Right Emitter');
+        const devTL = this.createShockSenderDevice('top_left', new THREE.Vector3(-1.25, 3.32, cabLen + 0.16), new THREE.Euler(-0.03, 0.04, 0), 'Top-Left Emitter');
+        const devTR = this.createShockSenderDevice('top_right', new THREE.Vector3(1.25, 3.32, cabLen + 0.16), new THREE.Euler(-0.03, -0.04, 0), 'Top-Right Emitter');
+        const devDL = this.createShockSenderDevice('down_left', new THREE.Vector3(-1.35, 0.95, cabLen + 0.35), new THREE.Euler(0.02, 0.03, 0), 'Down-Left Emitter');
+        const devDR = this.createShockSenderDevice('down_right', new THREE.Vector3(1.35, 0.95, cabLen + 0.35), new THREE.Euler(0.02, -0.03, 0), 'Down-Right Emitter');
 
         cabGroup.add(devTL.group);
         cabGroup.add(devTR.group);
@@ -982,6 +1065,7 @@ export class TrainModel {
     const castSteel = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6, metalness: 0.7 });
     const wheelSteel = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.15, metalness: 0.95 });
     const springMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.4, metalness: 0.8 });
+    const damperMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.6 });
 
     // Bogie Main Side Frames (Heavy Fabricated Steel Beams with Curved Weight-Relief Cutouts)
     [-1.18, 1.18].forEach(x => {
@@ -995,6 +1079,17 @@ export class TrainModel {
         const trans = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.28, 0.35), darkSteel);
         trans.position.set(x * 0.85, 0.68, cz);
         bogie.add(trans);
+      });
+
+      // Secondary Flexicoil Springs & Lateral Dampers between frame & body
+      [-0.8, 0.8].forEach(sz => {
+        const secSpring = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.30, 12), springMat);
+        secSpring.position.set(x, 0.95, sz);
+        bogie.add(secSpring);
+
+        const damper = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.32, 8).rotateX(0.25), damperMat);
+        damper.position.set(x * 1.05, 0.95, sz + 0.15);
+        bogie.add(damper);
       });
     });
 
@@ -1010,6 +1105,11 @@ export class TrainModel {
       const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 1.95, 16).rotateZ(Math.PI / 2), darkSteel);
       shaft.castShadow = true;
       axleGroup.add(shaft);
+
+      // Traction Motor Casing & Gearbox on Axle
+      const tmCasing = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.42, 0.52), darkSteel);
+      tmCasing.position.set(0, 0.08, 0.28);
+      axleGroup.add(tmCasing);
 
       // Pair of Precision Steel Wheels exactly on the rail heads (x = ±0.838m)
       [-railX, railX].forEach(x => {
@@ -1040,12 +1140,17 @@ export class TrainModel {
         endCap.position.set(jbX + (x > 0 ? 0.12 : -0.12), this.wheelRadius, z);
         bogie.add(endCap);
 
-        // Dual Coil Springs per axle box
+        // Dual Primary Coil Springs per axle box with vertical hydraulic damper
         [-0.10, 0.10].forEach(sz => {
           const spring = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.26, 10), springMat);
           spring.position.set(jbX, this.wheelRadius + 0.24, z + sz);
           bogie.add(spring);
         });
+
+        // Vertical telescopic hydraulic damper on axle box
+        const axDamper = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.28, 8), damperMat);
+        axDamper.position.set(jbX + (x > 0 ? 0.08 : -0.08), this.wheelRadius + 0.24, z);
+        bogie.add(axDamper);
 
         // Brake Caliper & Brake Block clamping near wheel
         const brakeBlock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.08), darkSteel);
@@ -1153,7 +1258,7 @@ export class TrainModel {
     body.receiveShadow = true;
     group.add(body);
 
-    // Corrugated Silver Roof
+    // Corrugated Silver Roof with longitudinal ribs
     const roofCyl = new THREE.CylinderGeometry(width / 2, width / 2, length, 16, 1, false, 0, Math.PI);
     roofCyl.rotateZ(Math.PI / 2).rotateY(Math.PI / 2);
     const roof = new THREE.Mesh(roofCyl, materials.roof);
@@ -1161,12 +1266,33 @@ export class TrainModel {
     roof.scale.set(1, 0.38, 1);
     group.add(roof);
 
+    // 10 Longitudinal Corrugation Ribs along the LHB roof
+    [-1.3, -1.0, -0.7, -0.4, -0.1, 0.1, 0.4, 0.7, 1.0, 1.3].forEach(rx => {
+      const roofRib = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.025, length * 0.98), materials.roof);
+      roofRib.position.set(rx, 3.48 - Math.pow(rx / 1.5, 2) * 0.18, 0);
+      group.add(roofRib);
+    });
+
     // Vestibule Gangway Rubber Bellows (at both car ends)
     [-length / 2, length / 2].forEach(z => {
       const bellow = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 0.45), materials.darkSteel);
       bellow.position.set(0, 1.9, z);
       group.add(bellow);
+
+      const door = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.05), materials.darkSteel);
+      door.position.set(0, 1.9, z + (z > 0 ? 0.24 : -0.24));
+      group.add(door);
     });
+
+    // Realistic Under-Chassis Equipment (Bio-toilet tanks, battery crates)
+    [-length * 0.18, length * 0.18].forEach(eqZ => {
+      const bioTank = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.55, 1.8), materials.darkSteel);
+      bioTank.position.set(0, 0.45, eqZ);
+      group.add(bioTank);
+    });
+    const batteryBox = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.60, 2.8), materials.darkSteel);
+    batteryBox.position.set(0, 0.48, 0);
+    group.add(batteryBox);
 
     // 2 FIAT Bogies
     this.buildFiatBogie(group, length * 0.35);

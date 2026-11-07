@@ -57,6 +57,8 @@
   var CustomToneMapping = 5;
   var AgXToneMapping = 6;
   var NeutralToneMapping = 7;
+  var AttachedBindMode = "attached";
+  var DetachedBindMode = "detached";
   var UVMapping = 300;
   var CubeReflectionMapping = 301;
   var CubeRefractionMapping = 302;
@@ -130,6 +132,9 @@
   var SIGNED_RED_RGTC1_Format = 36284;
   var RED_GREEN_RGTC2_Format = 36285;
   var SIGNED_RED_GREEN_RGTC2_Format = 36286;
+  var LoopOnce = 2200;
+  var LoopRepeat = 2201;
+  var LoopPingPong = 2202;
   var InterpolateDiscrete = 2300;
   var InterpolateLinear = 2301;
   var InterpolateSmooth = 2302;
@@ -137,6 +142,11 @@
   var ZeroCurvatureEnding = 2400;
   var ZeroSlopeEnding = 2401;
   var WrapAroundEnding = 2402;
+  var NormalAnimationBlendMode = 2500;
+  var AdditiveAnimationBlendMode = 2501;
+  var TrianglesDrawMode = 0;
+  var TriangleStripDrawMode = 1;
+  var TriangleFanDrawMode = 2;
   var BasicDepthPacking = 3200;
   var TangentSpaceNormalMap = 0;
   var ObjectSpaceNormalMap = 1;
@@ -13337,6 +13347,195 @@
     }
     return intersection;
   }
+  var _baseVector = /* @__PURE__ */ new Vector4();
+  var _skinIndex = /* @__PURE__ */ new Vector4();
+  var _skinWeight = /* @__PURE__ */ new Vector4();
+  var _vector4 = /* @__PURE__ */ new Vector4();
+  var _matrix4 = /* @__PURE__ */ new Matrix4();
+  var _vertex = /* @__PURE__ */ new Vector3();
+  var _sphere$5 = /* @__PURE__ */ new Sphere();
+  var _inverseMatrix$2 = /* @__PURE__ */ new Matrix4();
+  var _ray$2 = /* @__PURE__ */ new Ray();
+  var SkinnedMesh = class extends Mesh {
+    /**
+     * Constructs a new skinned mesh.
+     *
+     * @param {BufferGeometry} [geometry] - The mesh geometry.
+     * @param {Material|Array<Material>} [material] - The mesh material.
+     */
+    constructor(geometry, material) {
+      super(geometry, material);
+      this.isSkinnedMesh = true;
+      this.type = "SkinnedMesh";
+      this.bindMode = AttachedBindMode;
+      this.bindMatrix = new Matrix4();
+      this.bindMatrixInverse = new Matrix4();
+      this.boundingBox = null;
+      this.boundingSphere = null;
+    }
+    /**
+     * Computes the bounding box of the skinned mesh, and updates {@link SkinnedMesh#boundingBox}.
+     * The bounding box is not automatically computed by the engine; this method must be called by your app.
+     * If the skinned mesh is animated, the bounding box should be recomputed per frame in order to reflect
+     * the current animation state.
+     */
+    computeBoundingBox() {
+      const geometry = this.geometry;
+      if (this.boundingBox === null) {
+        this.boundingBox = new Box3();
+      }
+      this.boundingBox.makeEmpty();
+      const positionAttribute = geometry.getAttribute("position");
+      for (let i = 0; i < positionAttribute.count; i++) {
+        this.getVertexPosition(i, _vertex);
+        this.boundingBox.expandByPoint(_vertex);
+      }
+    }
+    /**
+     * Computes the bounding sphere of the skinned mesh, and updates {@link SkinnedMesh#boundingSphere}.
+     * The bounding sphere is automatically computed by the engine once when it is needed, e.g., for ray casting
+     * and view frustum culling. If the skinned mesh is animated, the bounding sphere should be recomputed
+     * per frame in order to reflect the current animation state.
+     */
+    computeBoundingSphere() {
+      const geometry = this.geometry;
+      if (this.boundingSphere === null) {
+        this.boundingSphere = new Sphere();
+      }
+      this.boundingSphere.makeEmpty();
+      const positionAttribute = geometry.getAttribute("position");
+      for (let i = 0; i < positionAttribute.count; i++) {
+        this.getVertexPosition(i, _vertex);
+        this.boundingSphere.expandByPoint(_vertex);
+      }
+    }
+    copy(source, recursive) {
+      super.copy(source, recursive);
+      this.bindMode = source.bindMode;
+      this.bindMatrix.copy(source.bindMatrix);
+      this.bindMatrixInverse.copy(source.bindMatrixInverse);
+      this.skeleton = source.skeleton;
+      this.boundingBox = source.boundingBox !== null ? source.boundingBox.clone() : null;
+      this.boundingSphere = source.boundingSphere !== null ? source.boundingSphere.clone() : null;
+      return this;
+    }
+    raycast(raycaster, intersects2) {
+      const material = this.material;
+      const matrixWorld = this.matrixWorld;
+      if (material === void 0) return;
+      if (this.boundingSphere === null) this.computeBoundingSphere();
+      _sphere$5.copy(this.boundingSphere);
+      _sphere$5.applyMatrix4(matrixWorld);
+      if (raycaster.ray.intersectsSphere(_sphere$5) === false) return;
+      _inverseMatrix$2.copy(matrixWorld).invert();
+      _ray$2.copy(raycaster.ray).applyMatrix4(_inverseMatrix$2);
+      if (this.boundingBox !== null) {
+        if (_ray$2.intersectsBox(this.boundingBox) === false) return;
+      }
+      this._computeIntersections(raycaster, intersects2, _ray$2);
+    }
+    getVertexPosition(index, target) {
+      super.getVertexPosition(index, target);
+      this.applyBoneTransform(index, target);
+      return target;
+    }
+    /**
+     * Binds the given skeleton to the skinned mesh.
+     *
+     * @param {Skeleton} skeleton - The skeleton to bind.
+     * @param {Matrix4} [bindMatrix] - The bind matrix. If no bind matrix is provided,
+     * the skinned mesh's world matrix will be used instead.
+     */
+    bind(skeleton, bindMatrix) {
+      this.skeleton = skeleton;
+      if (bindMatrix === void 0) {
+        this.updateMatrixWorld(true);
+        this.skeleton.calculateInverses();
+        bindMatrix = this.matrixWorld;
+      }
+      this.bindMatrix.copy(bindMatrix);
+      this.bindMatrixInverse.copy(bindMatrix).invert();
+    }
+    /**
+     * This method sets the skinned mesh in the rest pose).
+     */
+    pose() {
+      this.skeleton.pose();
+    }
+    /**
+     * Normalizes the skin weights which are defined as a buffer attribute
+     * in the skinned mesh's geometry.
+     */
+    normalizeSkinWeights() {
+      const vector = new Vector4();
+      const skinWeight = this.geometry.attributes.skinWeight;
+      for (let i = 0, l = skinWeight.count; i < l; i++) {
+        vector.fromBufferAttribute(skinWeight, i);
+        const scale = 1 / vector.manhattanLength();
+        if (scale !== Infinity) {
+          vector.multiplyScalar(scale);
+        } else {
+          vector.set(1, 0, 0, 0);
+        }
+        skinWeight.setXYZW(i, vector.x, vector.y, vector.z, vector.w);
+      }
+    }
+    updateMatrixWorld(force) {
+      super.updateMatrixWorld(force);
+      if (this.bindMode === AttachedBindMode) {
+        this.bindMatrixInverse.copy(this.matrixWorld).invert();
+      } else if (this.bindMode === DetachedBindMode) {
+        this.bindMatrixInverse.copy(this.bindMatrix).invert();
+      } else {
+        warn("SkinnedMesh: Unrecognized bindMode: " + this.bindMode);
+      }
+    }
+    /**
+     * Applies the bone transform associated with the given index to the given
+     * vector. Can be used to transform positions or direction vectors by providing
+     * a Vector4 with 1 or 0 in the w component respectively. Returns the updated vector.
+     *
+     * @param {number} index - The vertex index.
+     * @param {Vector3|Vector4} target - The target object that is used to store the method's result.
+     * @return {Vector3|Vector4} The updated vertex attribute data.
+     */
+    applyBoneTransform(index, target) {
+      const skeleton = this.skeleton;
+      const geometry = this.geometry;
+      _skinIndex.fromBufferAttribute(geometry.attributes.skinIndex, index);
+      _skinWeight.fromBufferAttribute(geometry.attributes.skinWeight, index);
+      if (target.isVector4) {
+        _baseVector.copy(target);
+        target.set(0, 0, 0, 0);
+      } else {
+        _baseVector.set(target.x, target.y, target.z, 1);
+        target.set(0, 0, 0);
+      }
+      _baseVector.applyMatrix4(this.bindMatrix);
+      for (let i = 0; i < 4; i++) {
+        const weight = _skinWeight.getComponent(i);
+        if (weight !== 0) {
+          const boneIndex = _skinIndex.getComponent(i);
+          _matrix4.multiplyMatrices(skeleton.bones[boneIndex].matrixWorld, skeleton.boneInverses[boneIndex]);
+          target.addScaledVector(_vector4.copy(_baseVector).applyMatrix4(_matrix4), weight);
+        }
+      }
+      if (target.isVector4) {
+        target.w = _baseVector.w;
+      }
+      return target.applyMatrix4(this.bindMatrixInverse);
+    }
+  };
+  var Bone = class extends Object3D {
+    /**
+     * Constructs a new bone.
+     */
+    constructor() {
+      super();
+      this.isBone = true;
+      this.type = "Bone";
+    }
+  };
   var DataTexture = class extends Texture {
     /**
      * Constructs a new data texture.
@@ -13361,6 +13560,206 @@
       this.generateMipmaps = false;
       this.flipY = false;
       this.unpackAlignment = 1;
+    }
+  };
+  var _offsetMatrix = /* @__PURE__ */ new Matrix4();
+  var _identityMatrix = /* @__PURE__ */ new Matrix4();
+  var Skeleton = class _Skeleton {
+    /**
+     * Constructs a new skeleton.
+     *
+     * @param {Array<Bone>} [bones] - An array of bones.
+     * @param {Array<Matrix4>} [boneInverses] - An array of bone inverse matrices.
+     * If not provided, these matrices will be computed automatically via {@link Skeleton#calculateInverses}.
+     */
+    constructor(bones = [], boneInverses = []) {
+      this.uuid = generateUUID();
+      this.bones = bones.slice(0);
+      this.boneInverses = boneInverses;
+      this.boneMatrices = null;
+      this.previousBoneMatrices = null;
+      this.boneTexture = null;
+      this.previousBoneTexture = null;
+      this.init();
+    }
+    /**
+     * Initializes the skeleton. This method gets automatically called by the constructor
+     * but depending on how the skeleton is created it might be necessary to call this method
+     * manually.
+     */
+    init() {
+      const bones = this.bones;
+      const boneInverses = this.boneInverses;
+      this.boneMatrices = new Float32Array(bones.length * 16);
+      if (boneInverses.length === 0) {
+        this.calculateInverses();
+      } else {
+        if (bones.length !== boneInverses.length) {
+          warn("Skeleton: Number of inverse bone matrices does not match amount of bones.");
+          this.boneInverses = [];
+          for (let i = 0, il = this.bones.length; i < il; i++) {
+            this.boneInverses.push(new Matrix4());
+          }
+        }
+      }
+    }
+    /**
+     * Computes the bone inverse matrices. This method resets {@link Skeleton#boneInverses}
+     * and fills it with new matrices.
+     */
+    calculateInverses() {
+      this.boneInverses.length = 0;
+      for (let i = 0, il = this.bones.length; i < il; i++) {
+        const inverse = new Matrix4();
+        if (this.bones[i]) {
+          inverse.copy(this.bones[i].matrixWorld).invert();
+        }
+        this.boneInverses.push(inverse);
+      }
+    }
+    /**
+     * Resets the skeleton to the base pose.
+     */
+    pose() {
+      for (let i = 0, il = this.bones.length; i < il; i++) {
+        const bone = this.bones[i];
+        if (bone) {
+          bone.matrixWorld.copy(this.boneInverses[i]).invert();
+        }
+      }
+      for (let i = 0, il = this.bones.length; i < il; i++) {
+        const bone = this.bones[i];
+        if (bone) {
+          if (bone.parent && bone.parent.isBone) {
+            bone.matrix.copy(bone.parent.matrixWorld).invert();
+            bone.matrix.multiply(bone.matrixWorld);
+          } else {
+            bone.matrix.copy(bone.matrixWorld);
+          }
+          bone.matrix.decompose(bone.position, bone.quaternion, bone.scale);
+        }
+      }
+    }
+    /**
+     * Resets the skeleton to the base pose.
+     */
+    update() {
+      const bones = this.bones;
+      const boneInverses = this.boneInverses;
+      const boneMatrices = this.boneMatrices;
+      const boneTexture = this.boneTexture;
+      for (let i = 0, il = bones.length; i < il; i++) {
+        const matrix = bones[i] ? bones[i].matrixWorld : _identityMatrix;
+        _offsetMatrix.multiplyMatrices(matrix, boneInverses[i]);
+        _offsetMatrix.toArray(boneMatrices, i * 16);
+      }
+      if (boneTexture !== null) {
+        boneTexture.needsUpdate = true;
+      }
+    }
+    /**
+     * Returns a new skeleton with copied values from this instance.
+     *
+     * @return {Skeleton} A clone of this instance.
+     */
+    clone() {
+      return new _Skeleton(this.bones, this.boneInverses);
+    }
+    /**
+     * Computes a data texture for passing bone data to the vertex shader.
+     *
+     * @return {Skeleton} A reference of this instance.
+     */
+    computeBoneTexture() {
+      let size = Math.sqrt(this.bones.length * 4);
+      size = Math.ceil(size / 4) * 4;
+      size = Math.max(size, 4);
+      const boneMatrices = new Float32Array(size * size * 4);
+      boneMatrices.set(this.boneMatrices);
+      const boneTexture = new DataTexture(boneMatrices, size, size, RGBAFormat, FloatType);
+      boneTexture.needsUpdate = true;
+      this.boneMatrices = boneMatrices;
+      this.boneTexture = boneTexture;
+      return this;
+    }
+    /**
+     * Searches through the skeleton's bone array and returns the first with a
+     * matching name.
+     *
+     * @param {string} name - The name of the bone.
+     * @return {Bone|undefined} The found bone. `undefined` if no bone has been found.
+     */
+    getBoneByName(name) {
+      for (let i = 0, il = this.bones.length; i < il; i++) {
+        const bone = this.bones[i];
+        if (bone.name === name) {
+          return bone;
+        }
+      }
+      return void 0;
+    }
+    /**
+     * Frees the GPU-related resources allocated by this instance. Call this
+     * method whenever this instance is no longer used in your app.
+     */
+    dispose() {
+      if (this.boneTexture !== null) {
+        this.boneTexture.dispose();
+        this.boneTexture = null;
+      }
+      if (this.previousBoneTexture !== null) {
+        this.previousBoneTexture.dispose();
+        this.previousBoneTexture = null;
+      }
+    }
+    /**
+     * Setups the skeleton by the given JSON and bones.
+     *
+     * @param {Object} json - The skeleton as serialized JSON.
+     * @param {Object<string, Bone>} bones - An array of bones.
+     * @return {Skeleton} A reference of this instance.
+     */
+    fromJSON(json, bones) {
+      this.uuid = json.uuid;
+      for (let i = 0, l = json.bones.length; i < l; i++) {
+        const uuid = json.bones[i];
+        let bone = bones[uuid];
+        if (bone === void 0) {
+          warn("Skeleton: No bone found with UUID:", uuid);
+          bone = new Bone();
+        }
+        this.bones.push(bone);
+        this.boneInverses.push(new Matrix4().fromArray(json.boneInverses[i]));
+      }
+      this.init();
+      return this;
+    }
+    /**
+     * Serializes the skeleton into JSON.
+     *
+     * @return {Object} A JSON object representing the serialized skeleton.
+     * @see {@link ObjectLoader#parse}
+     */
+    toJSON() {
+      const data = {
+        metadata: {
+          version: 4.7,
+          type: "Skeleton",
+          generator: "Skeleton.toJSON"
+        },
+        bones: [],
+        boneInverses: []
+      };
+      data.uuid = this.uuid;
+      const bones = this.bones;
+      const boneInverses = this.boneInverses;
+      for (let i = 0, l = bones.length; i < l; i++) {
+        const bone = bones[i];
+        data.bones.push(bone.uuid);
+        const boneInverse = boneInverses[i];
+        data.boneInverses.push(boneInverse.toArray());
+      }
+      return data;
     }
   };
   var InstancedBufferAttribute = class extends BufferAttribute {
@@ -14138,6 +14537,51 @@
       object
     };
   }
+  var _start = /* @__PURE__ */ new Vector3();
+  var _end = /* @__PURE__ */ new Vector3();
+  var LineSegments = class extends Line {
+    /**
+     * Constructs a new line segments.
+     *
+     * @param {BufferGeometry} [geometry] - The line geometry.
+     * @param {Material|Array<Material>} [material] - The line material.
+     */
+    constructor(geometry, material) {
+      super(geometry, material);
+      this.isLineSegments = true;
+      this.type = "LineSegments";
+    }
+    computeLineDistances() {
+      const geometry = this.geometry;
+      if (geometry.index === null) {
+        const positionAttribute = geometry.attributes.position;
+        const lineDistances = [];
+        for (let i = 0, l = positionAttribute.count; i < l; i += 2) {
+          _start.fromBufferAttribute(positionAttribute, i);
+          _end.fromBufferAttribute(positionAttribute, i + 1);
+          lineDistances[i] = i === 0 ? 0 : lineDistances[i - 1];
+          lineDistances[i + 1] = lineDistances[i] + _start.distanceTo(_end);
+        }
+        geometry.setAttribute("lineDistance", new Float32BufferAttribute(lineDistances, 1));
+      } else {
+        warn("LineSegments.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+      }
+      return this;
+    }
+  };
+  var LineLoop = class extends Line {
+    /**
+     * Constructs a new line loop.
+     *
+     * @param {BufferGeometry} [geometry] - The line geometry.
+     * @param {Material|Array<Material>} [material] - The line material.
+     */
+    constructor(geometry, material) {
+      super(geometry, material);
+      this.isLineLoop = true;
+      this.type = "LineLoop";
+    }
+  };
   var PointsMaterial = class extends Material {
     /**
      * Constructs a new points material.
@@ -18595,6 +19039,64 @@
   function hasTangents(settings) {
     return settings !== void 0 && settings.inTangents !== void 0 && settings.outTangents !== void 0;
   }
+  function getKeyframeOrder(times) {
+    function compareTime(i, j) {
+      return times[i] - times[j];
+    }
+    const n = times.length;
+    const result = new Array(n);
+    for (let i = 0; i !== n; ++i) result[i] = i;
+    result.sort(compareTime);
+    return result;
+  }
+  function sortedArray(values, stride, order) {
+    const nValues = values.length;
+    const result = new values.constructor(nValues);
+    for (let i = 0, dstOffset = 0; dstOffset !== nValues; ++i) {
+      const srcOffset = order[i] * stride;
+      for (let j = 0; j !== stride; ++j) {
+        result[dstOffset++] = values[srcOffset + j];
+      }
+    }
+    return result;
+  }
+  function flattenJSON(jsonKeys, times, values, valuePropertyName) {
+    let i = 1, key = jsonKeys[0];
+    while (key !== void 0 && key[valuePropertyName] === void 0) {
+      key = jsonKeys[i++];
+    }
+    if (key === void 0) return;
+    let value = key[valuePropertyName];
+    if (value === void 0) return;
+    if (Array.isArray(value)) {
+      do {
+        value = key[valuePropertyName];
+        if (value !== void 0) {
+          times.push(key.time);
+          values.push(...value);
+        }
+        key = jsonKeys[i++];
+      } while (key !== void 0);
+    } else if (value.toArray !== void 0) {
+      do {
+        value = key[valuePropertyName];
+        if (value !== void 0) {
+          times.push(key.time);
+          value.toArray(values, values.length);
+        }
+        key = jsonKeys[i++];
+      } while (key !== void 0);
+    } else {
+      do {
+        value = key[valuePropertyName];
+        if (value !== void 0) {
+          times.push(key.time);
+          values.push(value);
+        }
+        key = jsonKeys[i++];
+      } while (key !== void 0);
+    }
+  }
   var Interpolant = class {
     /**
      * Constructs a new interpolant.
@@ -19390,6 +19892,363 @@
     }
   };
   VectorKeyframeTrack.prototype.ValueTypeName = "vector";
+  var AnimationClip = class {
+    /**
+     * Constructs a new animation clip.
+     *
+     * Note: Instead of instantiating an AnimationClip directly with the constructor, you can
+     * use the static interface of this class for creating clips. In most cases though, animation clips
+     * will automatically be created by loaders when importing animated 3D assets.
+     *
+     * @param {string} [name=''] - The clip's name.
+     * @param {number} [duration=-1] - The clip's duration in seconds. If a negative value is passed,
+     * the duration will be calculated from the passed keyframes.
+     * @param {Array<KeyframeTrack>} tracks - An array of keyframe tracks.
+     * @param {(NormalAnimationBlendMode|AdditiveAnimationBlendMode)} [blendMode=NormalAnimationBlendMode] - Defines how the animation
+     * is blended/combined when two or more animations are simultaneously played.
+     */
+    constructor(name = "", duration = -1, tracks = [], blendMode = NormalAnimationBlendMode) {
+      this.name = name;
+      this.tracks = tracks;
+      this.duration = duration;
+      this.blendMode = blendMode;
+      this.uuid = generateUUID();
+      this.userData = {};
+      if (this.duration < 0) {
+        this.resetDuration();
+      }
+    }
+    /**
+     * Factory method for creating an animation clip from the given JSON.
+     *
+     * @static
+     * @param {Object} json - The serialized animation clip.
+     * @return {AnimationClip} The new animation clip.
+     */
+    static parse(json) {
+      const tracks = [], jsonTracks = json.tracks, frameTime = 1 / (json.fps || 1);
+      for (let i = 0, n = jsonTracks.length; i !== n; ++i) {
+        tracks.push(parseKeyframeTrack(jsonTracks[i]).scale(frameTime));
+      }
+      const clip = new this(json.name, json.duration, tracks, json.blendMode);
+      clip.uuid = json.uuid;
+      clip.userData = JSON.parse(json.userData || "{}");
+      return clip;
+    }
+    /**
+     * Serializes the given animation clip into JSON.
+     *
+     * @static
+     * @param {AnimationClip} clip - The animation clip to serialize.
+     * @return {Object} The JSON object.
+     */
+    static toJSON(clip) {
+      const tracks = [], clipTracks = clip.tracks;
+      const json = {
+        "name": clip.name,
+        "duration": clip.duration,
+        "tracks": tracks,
+        "uuid": clip.uuid,
+        "blendMode": clip.blendMode,
+        "userData": JSON.stringify(clip.userData)
+      };
+      for (let i = 0, n = clipTracks.length; i !== n; ++i) {
+        tracks.push(KeyframeTrack.toJSON(clipTracks[i]));
+      }
+      return json;
+    }
+    /**
+     * Returns a new animation clip from the passed morph targets array of a
+     * geometry, taking a name and the number of frames per second.
+     *
+     * Note: The fps parameter is required, but the animation speed can be
+     * overridden via {@link AnimationAction#setDuration}.
+     *
+     * @static
+     * @param {string} name - The name of the animation clip.
+     * @param {Array<Object>} morphTargetSequence - A sequence of morph targets.
+     * @param {number} fps - The Frames-Per-Second value.
+     * @param {boolean} noLoop - Whether the clip should be no loop or not.
+     * @return {AnimationClip} The new animation clip.
+     */
+    static CreateFromMorphTargetSequence(name, morphTargetSequence, fps, noLoop) {
+      const numMorphTargets = morphTargetSequence.length;
+      const tracks = [];
+      for (let i = 0; i < numMorphTargets; i++) {
+        let times = [];
+        let values = [];
+        times.push(
+          (i + numMorphTargets - 1) % numMorphTargets,
+          i,
+          (i + 1) % numMorphTargets
+        );
+        values.push(0, 1, 0);
+        const order = getKeyframeOrder(times);
+        times = sortedArray(times, 1, order);
+        values = sortedArray(values, 1, order);
+        if (!noLoop && times[0] === 0) {
+          times.push(numMorphTargets);
+          values.push(values[0]);
+        }
+        tracks.push(
+          new NumberKeyframeTrack(
+            ".morphTargetInfluences[" + morphTargetSequence[i].name + "]",
+            times,
+            values
+          ).scale(1 / fps)
+        );
+      }
+      return new this(name, -1, tracks);
+    }
+    /**
+     * Searches for an animation clip by name, taking as its first parameter
+     * either an array of clips, or a mesh or geometry that contains an
+     * array named "animations" property.
+     *
+     * @static
+     * @param {(Array<AnimationClip>|Object3D)} objectOrClipArray - The array or object to search through.
+     * @param {string} name - The name to search for.
+     * @return {?AnimationClip} The found animation clip. Returns `null` if no clip has been found.
+     */
+    static findByName(objectOrClipArray, name) {
+      let clipArray = objectOrClipArray;
+      if (!Array.isArray(objectOrClipArray)) {
+        const o = objectOrClipArray;
+        clipArray = o.geometry && o.geometry.animations || o.animations;
+      }
+      for (let i = 0; i < clipArray.length; i++) {
+        if (clipArray[i].name === name) {
+          return clipArray[i];
+        }
+      }
+      return null;
+    }
+    /**
+     * Returns an array of new AnimationClips created from the morph target
+     * sequences of a geometry, trying to sort morph target names into
+     * animation-group-based patterns like "Walk_001, Walk_002, Run_001, Run_002...".
+     *
+     * See {@link MD2Loader#parse} as an example for how the method should be used.
+     *
+     * @static
+     * @param {Array<Object>} morphTargets - A sequence of morph targets.
+     * @param {number} fps - The Frames-Per-Second value.
+     * @param {boolean} noLoop - Whether the clip should be no loop or not.
+     * @return {Array<AnimationClip>} An array of new animation clips.
+     */
+    static CreateClipsFromMorphTargetSequences(morphTargets, fps, noLoop) {
+      const animationToMorphTargets = {};
+      const pattern = /^([\w-]*?)([\d]+)$/;
+      for (let i = 0, il = morphTargets.length; i < il; i++) {
+        const morphTarget = morphTargets[i];
+        const parts = morphTarget.name.match(pattern);
+        if (parts && parts.length > 1) {
+          const name = parts[1];
+          let animationMorphTargets = animationToMorphTargets[name];
+          if (!animationMorphTargets) {
+            animationToMorphTargets[name] = animationMorphTargets = [];
+          }
+          animationMorphTargets.push(morphTarget);
+        }
+      }
+      const clips = [];
+      for (const name in animationToMorphTargets) {
+        clips.push(this.CreateFromMorphTargetSequence(name, animationToMorphTargets[name], fps, noLoop));
+      }
+      return clips;
+    }
+    /**
+     * Sets the duration of this clip to the duration of its longest keyframe track.
+     *
+     * @return {AnimationClip} A reference to this animation clip.
+     */
+    resetDuration() {
+      const tracks = this.tracks;
+      let duration = 0;
+      for (let i = 0, n = tracks.length; i !== n; ++i) {
+        const track = this.tracks[i];
+        duration = Math.max(duration, track.times[track.times.length - 1]);
+      }
+      this.duration = duration;
+      return this;
+    }
+    /**
+     * Trims all tracks to the clip's duration.
+     *
+     * @return {AnimationClip} A reference to this animation clip.
+     */
+    trim() {
+      for (let i = 0; i < this.tracks.length; i++) {
+        this.tracks[i].trim(0, this.duration);
+      }
+      return this;
+    }
+    /**
+     * Performs minimal validation on each track in the clip. Returns `true` if all
+     * tracks are valid.
+     *
+     * @return {boolean} Whether the clip's keyframes are valid or not.
+     */
+    validate() {
+      let valid = true;
+      for (let i = 0; i < this.tracks.length; i++) {
+        valid = valid && this.tracks[i].validate();
+      }
+      return valid;
+    }
+    /**
+     * Optimizes each track by removing equivalent sequential keys (which are
+     * common in morph target sequences).
+     *
+     * @return {AnimationClip} A reference to this animation clip.
+     */
+    optimize() {
+      for (let i = 0; i < this.tracks.length; i++) {
+        this.tracks[i].optimize();
+      }
+      return this;
+    }
+    /**
+     * Returns a new animation clip with copied values from this instance.
+     *
+     * @return {AnimationClip} A clone of this instance.
+     */
+    clone() {
+      const tracks = [];
+      for (let i = 0; i < this.tracks.length; i++) {
+        tracks.push(this.tracks[i].clone());
+      }
+      const clip = new this.constructor(this.name, this.duration, tracks, this.blendMode);
+      clip.userData = JSON.parse(JSON.stringify(this.userData));
+      return clip;
+    }
+    /**
+     * Serializes this animation clip into JSON.
+     *
+     * @return {Object} The JSON object.
+     */
+    toJSON() {
+      return this.constructor.toJSON(this);
+    }
+  };
+  function getTrackTypeForValueTypeName(typeName) {
+    switch (typeName.toLowerCase()) {
+      case "scalar":
+      case "double":
+      case "float":
+      case "number":
+      case "integer":
+        return NumberKeyframeTrack;
+      case "vector":
+      case "vector2":
+      case "vector3":
+      case "vector4":
+        return VectorKeyframeTrack;
+      case "color":
+        return ColorKeyframeTrack;
+      case "quaternion":
+        return QuaternionKeyframeTrack;
+      case "bool":
+      case "boolean":
+        return BooleanKeyframeTrack;
+      case "string":
+        return StringKeyframeTrack;
+    }
+    throw new Error("THREE.KeyframeTrack: Unsupported typeName: " + typeName);
+  }
+  function parseKeyframeTrack(json) {
+    if (json.type === void 0) {
+      throw new Error("THREE.KeyframeTrack: track type undefined, can not parse");
+    }
+    const trackType = getTrackTypeForValueTypeName(json.type);
+    if (json.times === void 0) {
+      const times = [], values = [];
+      flattenJSON(json.keys, times, values, "value");
+      json.times = times;
+      json.values = values;
+    }
+    let track;
+    if (trackType.parse !== void 0) {
+      track = trackType.parse(json);
+    } else {
+      track = new trackType(json.name, json.times, json.values, json.interpolation);
+    }
+    if (hasTangents(json.settings)) {
+      track.settings = {
+        inTangents: convertArray(json.settings.inTangents, Float32Array),
+        outTangents: convertArray(json.settings.outTangents, Float32Array)
+      };
+    }
+    return track;
+  }
+  var Cache = {
+    /**
+     * Whether caching is enabled or not.
+     *
+     * @static
+     * @type {boolean}
+     * @default false
+     */
+    enabled: false,
+    /**
+     * A dictionary that holds cached files.
+     *
+     * @static
+     * @type {Object<string,Object>}
+     */
+    files: {},
+    /**
+     * Adds a cache entry with a key to reference the file. If this key already
+     * holds a file, it is overwritten.
+     *
+     * @static
+     * @param {string} key - The key to reference the cached file.
+     * @param {Object} file -  The file to be cached.
+     */
+    add: function(key, file) {
+      if (this.enabled === false) return;
+      if (isBlobURL(key)) return;
+      this.files[key] = file;
+    },
+    /**
+     * Gets the cached value for the given key.
+     *
+     * @static
+     * @param {string} key - The key to reference the cached file.
+     * @return {Object|undefined} The cached file. If the key does not exist `undefined` is returned.
+     */
+    get: function(key) {
+      if (this.enabled === false) return;
+      if (isBlobURL(key)) return;
+      return this.files[key];
+    },
+    /**
+     * Removes the cached file associated with the given key.
+     *
+     * @static
+     * @param {string} key - The key to reference the cached file.
+     */
+    remove: function(key) {
+      delete this.files[key];
+    },
+    /**
+     * Remove all values from the cache.
+     *
+     * @static
+     */
+    clear: function() {
+      this.files = {};
+    }
+  };
+  function isBlobURL(key) {
+    try {
+      const urlString = key.slice(key.indexOf(":") + 1);
+      const url = new URL(urlString);
+      return url.protocol === "blob:";
+    } catch (e) {
+      return false;
+    }
+  }
   var LoadingManager = class {
     /**
      * Constructs a new loading manager.
@@ -19633,6 +20492,313 @@
     }
   };
   Loader.DEFAULT_MATERIAL_NAME = "__DEFAULT";
+  var loading = {};
+  var HttpError = class extends Error {
+    constructor(message, response) {
+      super(message);
+      this.response = response;
+    }
+  };
+  var FileLoader = class extends Loader {
+    /**
+     * Constructs a new file loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+      this.mimeType = "";
+      this.responseType = "";
+      this._abortController = new AbortController();
+    }
+    /**
+     * Starts loading from the given URL and pass the loaded response to the `onLoad()` callback.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(any)} onLoad - Executed when the loading process has been finished.
+     * @param {onProgressCallback} [onProgress] - Executed while the loading is in progress.
+     * @param {onErrorCallback} [onError] - Executed when errors occur.
+     */
+    load(url, onLoad, onProgress, onError) {
+      if (url === void 0) url = "";
+      if (this.path !== void 0) url = this.path + url;
+      url = this.manager.resolveURL(url);
+      const cached = Cache.get(`file:${url}`);
+      if (cached !== void 0) {
+        this.manager.itemStart(url);
+        setTimeout(() => {
+          if (onLoad) onLoad(cached);
+          this.manager.itemEnd(url);
+        }, 0);
+        return;
+      }
+      if (loading[url] !== void 0) {
+        loading[url].push({
+          onLoad,
+          onProgress,
+          onError
+        });
+        return;
+      }
+      loading[url] = [];
+      loading[url].push({
+        onLoad,
+        onProgress,
+        onError
+      });
+      const req = new Request(url, {
+        headers: new Headers(this.requestHeader),
+        credentials: this.withCredentials ? "include" : "same-origin",
+        priority: this.priority,
+        cache: this.cache,
+        signal: typeof AbortSignal.any === "function" ? AbortSignal.any([this._abortController.signal, this.manager.abortController.signal]) : this._abortController.signal
+      });
+      const mimeType = this.mimeType;
+      const responseType = this.responseType;
+      fetch(req).then((response) => {
+        if (response.status === 200 || response.status === 0) {
+          if (response.status === 0) {
+            warn("FileLoader: HTTP Status 0 received.");
+          }
+          if (typeof ReadableStream === "undefined" || response.body === void 0 || response.body.getReader === void 0) {
+            return response;
+          }
+          const callbacks = loading[url];
+          const reader = response.body.getReader();
+          const contentLength = response.headers.get("X-File-Size") || response.headers.get("Content-Length");
+          const total = contentLength ? parseInt(contentLength) : 0;
+          const lengthComputable = total !== 0;
+          let loaded = 0;
+          const stream = new ReadableStream({
+            start(controller) {
+              readData();
+              function readData() {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    controller.close();
+                  } else {
+                    loaded += value.byteLength;
+                    const event = new ProgressEvent("progress", { lengthComputable, loaded, total });
+                    for (let i = 0, il = callbacks.length; i < il; i++) {
+                      const callback = callbacks[i];
+                      if (callback.onProgress) callback.onProgress(event);
+                    }
+                    controller.enqueue(value);
+                    readData();
+                  }
+                }, (e) => {
+                  controller.error(e);
+                });
+              }
+            }
+          });
+          return new Response(stream);
+        } else {
+          throw new HttpError(`fetch for "${response.url}" responded with ${response.status}: ${response.statusText}`, response);
+        }
+      }).then((response) => {
+        switch (responseType) {
+          case "arraybuffer":
+            return response.arrayBuffer();
+          case "blob":
+            return response.blob();
+          case "document":
+            return response.text().then((text) => {
+              const parser = new DOMParser();
+              return parser.parseFromString(text, mimeType);
+            });
+          case "json":
+            return response.json();
+          default:
+            if (mimeType === "") {
+              return response.text();
+            } else {
+              const re = /charset="?([^;"\s]*)"?/i;
+              const exec = re.exec(mimeType);
+              const label = exec && exec[1] ? exec[1].toLowerCase() : void 0;
+              const decoder = new TextDecoder(label);
+              return response.arrayBuffer().then((ab) => decoder.decode(ab));
+            }
+        }
+      }).then((data) => {
+        Cache.add(`file:${url}`, data);
+        const callbacks = loading[url];
+        delete loading[url];
+        for (let i = 0, il = callbacks.length; i < il; i++) {
+          const callback = callbacks[i];
+          if (callback.onLoad) callback.onLoad(data);
+        }
+      }).catch((err) => {
+        const callbacks = loading[url];
+        if (callbacks === void 0) {
+          this.manager.itemError(url);
+          throw err;
+        }
+        delete loading[url];
+        for (let i = 0, il = callbacks.length; i < il; i++) {
+          const callback = callbacks[i];
+          if (callback.onError) callback.onError(err);
+        }
+        this.manager.itemError(url);
+      }).finally(() => {
+        this.manager.itemEnd(url);
+      });
+      this.manager.itemStart(url);
+    }
+    /**
+     * Sets the expected response type.
+     *
+     * @param {('arraybuffer'|'blob'|'document'|'json'|'')} value - The response type.
+     * @return {FileLoader} A reference to this file loader.
+     */
+    setResponseType(value) {
+      this.responseType = value;
+      return this;
+    }
+    /**
+     * Sets the expected mime type of the loaded file.
+     *
+     * @param {string} value - The mime type.
+     * @return {FileLoader} A reference to this file loader.
+     */
+    setMimeType(value) {
+      this.mimeType = value;
+      return this;
+    }
+    /**
+     * Aborts ongoing fetch requests.
+     *
+     * @return {FileLoader} A reference to this instance.
+     */
+    abort() {
+      this._abortController.abort();
+      this._abortController = new AbortController();
+      return this;
+    }
+  };
+  var _loading = /* @__PURE__ */ new WeakMap();
+  var ImageLoader = class extends Loader {
+    /**
+     * Constructs a new image loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+    }
+    /**
+     * Starts loading from the given URL and passes the loaded image
+     * to the `onLoad()` callback. The method also returns a new `Image` object which can
+     * directly be used for texture creation. If you do it this way, the texture
+     * may pop up in your scene once the respective loading process is finished.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(Image)} onLoad - Executed when the loading process has been finished.
+     * @param {onProgressCallback} onProgress - Unsupported in this loader.
+     * @param {onErrorCallback} onError - Executed when errors occur.
+     * @return {Image} The image.
+     */
+    load(url, onLoad, onProgress, onError) {
+      if (this.path !== void 0) url = this.path + url;
+      url = this.manager.resolveURL(url);
+      const scope = this;
+      const cached = Cache.get(`image:${url}`);
+      if (cached !== void 0) {
+        if (cached.complete === true) {
+          scope.manager.itemStart(url);
+          setTimeout(function() {
+            if (onLoad) onLoad(cached);
+            scope.manager.itemEnd(url);
+          }, 0);
+        } else {
+          let arr = _loading.get(cached);
+          if (arr === void 0) {
+            arr = [];
+            _loading.set(cached, arr);
+          }
+          arr.push({ onLoad, onError });
+        }
+        return cached;
+      }
+      const image = createElementNS("img");
+      function onImageLoad() {
+        removeEventListeners();
+        if (onLoad) onLoad(this);
+        const callbacks = _loading.get(this) || [];
+        for (let i = 0; i < callbacks.length; i++) {
+          const callback = callbacks[i];
+          if (callback.onLoad) callback.onLoad(this);
+        }
+        _loading.delete(this);
+        scope.manager.itemEnd(url);
+      }
+      function onImageError(event) {
+        removeEventListeners();
+        if (onError) onError(event);
+        Cache.remove(`image:${url}`);
+        const callbacks = _loading.get(this) || [];
+        for (let i = 0; i < callbacks.length; i++) {
+          const callback = callbacks[i];
+          if (callback.onError) callback.onError(event);
+        }
+        _loading.delete(this);
+        scope.manager.itemError(url);
+        scope.manager.itemEnd(url);
+      }
+      function removeEventListeners() {
+        image.removeEventListener("load", onImageLoad, false);
+        image.removeEventListener("error", onImageError, false);
+      }
+      image.addEventListener("load", onImageLoad, false);
+      image.addEventListener("error", onImageError, false);
+      if (url.slice(0, 5) !== "data:") {
+        if (this.crossOrigin !== void 0) image.crossOrigin = this.crossOrigin;
+      }
+      Cache.add(`image:${url}`, image);
+      scope.manager.itemStart(url);
+      image.fetchPriority = this.priority;
+      image.src = url;
+      return image;
+    }
+  };
+  var TextureLoader = class extends Loader {
+    /**
+     * Constructs a new texture loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+    }
+    /**
+     * Starts loading from the given URL and pass the fully loaded texture
+     * to the `onLoad()` callback. The method also returns a new texture object which can
+     * directly be used for material creation. If you do it this way, the texture
+     * may pop up in your scene once the respective loading process is finished.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(Texture)} [onLoad] - Executed when the loading process has been finished.
+     * @param {onProgressCallback} [onProgress] - Unsupported in this loader.
+     * @param {onErrorCallback} [onError] - Executed when errors occur.
+     * @return {Texture} The texture.
+     */
+    load(url, onLoad, onProgress, onError) {
+      const texture = new Texture();
+      const loader = new ImageLoader(this.manager);
+      loader.setPriority(this.priority);
+      loader.setCache(this.cache);
+      loader.setCrossOrigin(this.crossOrigin);
+      loader.setPath(this.path);
+      loader.load(url, function(image) {
+        texture.image = image;
+        texture.needsUpdate = true;
+        if (onLoad !== void 0) {
+          onLoad(texture);
+        }
+      }, onProgress, onError);
+      return texture;
+    }
+  };
   var Light = class extends Object3D {
     /**
      * Registers the node class that `WebGPURenderer` uses to shade lights of this type.
@@ -20531,6 +21697,142 @@
       this.type = "AmbientLight";
     }
   };
+  var LoaderUtils = class {
+    /**
+     * Extracts the base URL from the given URL.
+     *
+     * @param {string} url -The URL to extract the base URL from.
+     * @return {string} The extracted base URL.
+     */
+    static extractUrlBase(url) {
+      const index = url.lastIndexOf("/");
+      if (index === -1) return "./";
+      return url.slice(0, index + 1);
+    }
+    /**
+     * Resolves relative URLs against the given path. Absolute paths, data urls,
+     * and blob URLs will be returned as is. Invalid URLs will return an empty
+     * string.
+     *
+     * @param {string} url -The URL to resolve.
+     * @param {string} path - The base path for relative URLs to be resolved against.
+     * @return {string} The resolved URL.
+     */
+    static resolveURL(url, path) {
+      if (typeof url !== "string" || url === "") return "";
+      if (/^https?:\/\//i.test(path) && /^\//.test(url)) {
+        path = path.replace(/(^https?:\/\/[^\/]+).*/i, "$1");
+      }
+      if (/^(https?:)?\/\//i.test(url)) return url;
+      if (/^data:.*,.*$/i.test(url)) return url;
+      if (/^blob:.*$/i.test(url)) return url;
+      return path + url;
+    }
+  };
+  var _errorMap = /* @__PURE__ */ new WeakMap();
+  var ImageBitmapLoader = class extends Loader {
+    /**
+     * Constructs a new image bitmap loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+      this.isImageBitmapLoader = true;
+      if (typeof createImageBitmap === "undefined") {
+        warn("ImageBitmapLoader: createImageBitmap() not supported.");
+      }
+      if (typeof fetch === "undefined") {
+        warn("ImageBitmapLoader: fetch() not supported.");
+      }
+      this.options = { premultiplyAlpha: "none" };
+      this._abortController = new AbortController();
+    }
+    /**
+     * Sets the given loader options. The structure of the object must match the `options` parameter of
+     * [createImageBitmap](https://developer.mozilla.org/en-US/docs/Web/API/Window/createImageBitmap).
+     *
+     * Note: When caching is enabled, the cache key is based on the URL only. Loading the same URL with
+     * different options will return the cached result of the first request.
+     *
+     * @param {Object} options - The loader options to set.
+     * @return {ImageBitmapLoader} A reference to this image bitmap loader.
+     */
+    setOptions(options) {
+      this.options = options;
+      return this;
+    }
+    /**
+     * Starts loading from the given URL and pass the loaded image bitmap to the `onLoad()` callback.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(ImageBitmap)} onLoad - Executed when the loading process has been finished.
+     * @param {onProgressCallback} onProgress - Unsupported in this loader.
+     * @param {onErrorCallback} onError - Executed when errors occur.
+     */
+    load(url, onLoad, onProgress, onError) {
+      if (url === void 0) url = "";
+      if (this.path !== void 0) url = this.path + url;
+      url = this.manager.resolveURL(url);
+      const scope = this;
+      const cached = Cache.get(`image-bitmap:${url}`);
+      if (cached !== void 0) {
+        scope.manager.itemStart(url);
+        if (cached.then) {
+          cached.then((imageBitmap) => {
+            if (_errorMap.has(cached) === true) {
+              if (onError) onError(_errorMap.get(cached));
+              scope.manager.itemError(url);
+              scope.manager.itemEnd(url);
+            } else {
+              if (onLoad) onLoad(imageBitmap);
+              scope.manager.itemEnd(url);
+            }
+          });
+          return;
+        }
+        setTimeout(function() {
+          if (onLoad) onLoad(cached);
+          scope.manager.itemEnd(url);
+        }, 0);
+        return;
+      }
+      const fetchOptions = {};
+      fetchOptions.credentials = this.withCredentials || this.crossOrigin !== "anonymous" ? "include" : "same-origin";
+      fetchOptions.headers = this.requestHeader;
+      fetchOptions.priority = this.priority;
+      fetchOptions.cache = this.cache;
+      fetchOptions.signal = typeof AbortSignal.any === "function" ? AbortSignal.any([this._abortController.signal, this.manager.abortController.signal]) : this._abortController.signal;
+      const promise = fetch(url, fetchOptions).then(function(res) {
+        return res.blob();
+      }).then(function(blob) {
+        return createImageBitmap(blob, Object.assign({}, scope.options, { colorSpaceConversion: "none" }));
+      }).then(function(imageBitmap) {
+        Cache.add(`image-bitmap:${url}`, imageBitmap);
+        if (onLoad) onLoad(imageBitmap);
+        scope.manager.itemEnd(url);
+        return imageBitmap;
+      }).catch(function(e) {
+        if (onError) onError(e);
+        _errorMap.set(promise, e);
+        Cache.remove(`image-bitmap:${url}`);
+        scope.manager.itemError(url);
+        scope.manager.itemEnd(url);
+      });
+      Cache.add(`image-bitmap:${url}`, promise);
+      scope.manager.itemStart(url);
+    }
+    /**
+     * Aborts ongoing fetch requests.
+     *
+     * @return {ImageBitmapLoader} A reference to this instance.
+     */
+    abort() {
+      this._abortController.abort();
+      this._abortController = new AbortController();
+      return this;
+    }
+  };
   var fov = -90;
   var aspect = 1;
   var CubeCamera = class extends Object3D {
@@ -20672,6 +21974,182 @@
       this.isMultiViewCamera = false;
       this.cameras = array;
       this.perCameraFrustumCulled = false;
+    }
+  };
+  var PropertyMixer = class {
+    /**
+     * Constructs a new property mixer.
+     *
+     * @param {PropertyBinding} binding - The property binding.
+     * @param {string} typeName - The keyframe track type name.
+     * @param {number} valueSize - The keyframe track value size.
+     */
+    constructor(binding, typeName, valueSize) {
+      this.binding = binding;
+      this.valueSize = valueSize;
+      let mixFunction, mixFunctionAdditive, setIdentity;
+      switch (typeName) {
+        case "quaternion":
+          mixFunction = this._slerp;
+          mixFunctionAdditive = this._slerpAdditive;
+          setIdentity = this._setAdditiveIdentityQuaternion;
+          this.buffer = new Float64Array(valueSize * 6);
+          this._workIndex = 5;
+          break;
+        case "string":
+        case "bool":
+          mixFunction = this._select;
+          mixFunctionAdditive = this._select;
+          setIdentity = this._setAdditiveIdentityOther;
+          this.buffer = new Array(valueSize * 5);
+          break;
+        default:
+          mixFunction = this._lerp;
+          mixFunctionAdditive = this._lerpAdditive;
+          setIdentity = this._setAdditiveIdentityNumeric;
+          this.buffer = new Float64Array(valueSize * 5);
+      }
+      this._mixBufferRegion = mixFunction;
+      this._mixBufferRegionAdditive = mixFunctionAdditive;
+      this._setIdentity = setIdentity;
+      this._origIndex = 3;
+      this._addIndex = 4;
+      this.cumulativeWeight = 0;
+      this.cumulativeWeightAdditive = 0;
+      this.useCount = 0;
+      this.referenceCount = 0;
+    }
+    /**
+     * Accumulates data in the `incoming` region into `accu<i>`.
+     *
+     * @param {number} accuIndex - The accumulation index.
+     * @param {number} weight - The weight.
+     */
+    accumulate(accuIndex, weight) {
+      const buffer = this.buffer, stride = this.valueSize, offset = accuIndex * stride + stride;
+      let currentWeight = this.cumulativeWeight;
+      if (currentWeight === 0) {
+        for (let i = 0; i !== stride; ++i) {
+          buffer[offset + i] = buffer[i];
+        }
+        currentWeight = weight;
+      } else {
+        currentWeight += weight;
+        const mix = weight / currentWeight;
+        this._mixBufferRegion(buffer, offset, 0, mix, stride);
+      }
+      this.cumulativeWeight = currentWeight;
+    }
+    /**
+     * Accumulates data in the `incoming` region into `add`.
+     *
+     * @param {number} weight - The weight.
+     */
+    accumulateAdditive(weight) {
+      const buffer = this.buffer, stride = this.valueSize, offset = stride * this._addIndex;
+      if (this.cumulativeWeightAdditive === 0) {
+        this._setIdentity();
+      }
+      this._mixBufferRegionAdditive(buffer, offset, 0, weight, stride);
+      this.cumulativeWeightAdditive += weight;
+    }
+    /**
+     * Applies the state of `accu<i>` to the binding when accus differ.
+     *
+     * @param {number} accuIndex - The accumulation index.
+     */
+    apply(accuIndex) {
+      const stride = this.valueSize, buffer = this.buffer, offset = accuIndex * stride + stride, weight = this.cumulativeWeight, weightAdditive = this.cumulativeWeightAdditive, binding = this.binding;
+      this.cumulativeWeight = 0;
+      this.cumulativeWeightAdditive = 0;
+      if (weight < 1) {
+        const originalValueOffset = stride * this._origIndex;
+        this._mixBufferRegion(
+          buffer,
+          offset,
+          originalValueOffset,
+          1 - weight,
+          stride
+        );
+      }
+      if (weightAdditive > 0) {
+        this._mixBufferRegionAdditive(buffer, offset, this._addIndex * stride, 1, stride);
+      }
+      for (let i = stride, e = stride + stride; i !== e; ++i) {
+        if (buffer[i] !== buffer[i + stride]) {
+          binding.setValue(buffer, offset);
+          break;
+        }
+      }
+    }
+    /**
+     * Remembers the state of the bound property and copy it to both accus.
+     */
+    saveOriginalState() {
+      const binding = this.binding;
+      const buffer = this.buffer, stride = this.valueSize, originalValueOffset = stride * this._origIndex;
+      binding.getValue(buffer, originalValueOffset);
+      for (let i = stride, e = originalValueOffset; i !== e; ++i) {
+        buffer[i] = buffer[originalValueOffset + i % stride];
+      }
+      this._setIdentity();
+      this.cumulativeWeight = 0;
+      this.cumulativeWeightAdditive = 0;
+    }
+    /**
+     * Applies the state previously taken via {@link PropertyMixer#saveOriginalState} to the binding.
+     */
+    restoreOriginalState() {
+      const originalValueOffset = this.valueSize * 3;
+      this.binding.setValue(this.buffer, originalValueOffset);
+    }
+    // internals
+    _setAdditiveIdentityNumeric() {
+      const startIndex = this._addIndex * this.valueSize;
+      const endIndex = startIndex + this.valueSize;
+      for (let i = startIndex; i < endIndex; i++) {
+        this.buffer[i] = 0;
+      }
+    }
+    _setAdditiveIdentityQuaternion() {
+      this._setAdditiveIdentityNumeric();
+      this.buffer[this._addIndex * this.valueSize + 3] = 1;
+    }
+    _setAdditiveIdentityOther() {
+      const startIndex = this._origIndex * this.valueSize;
+      const targetIndex = this._addIndex * this.valueSize;
+      for (let i = 0; i < this.valueSize; i++) {
+        this.buffer[targetIndex + i] = this.buffer[startIndex + i];
+      }
+    }
+    // mix functions
+    _select(buffer, dstOffset, srcOffset, t, stride) {
+      if (t >= 0.5) {
+        for (let i = 0; i !== stride; ++i) {
+          buffer[dstOffset + i] = buffer[srcOffset + i];
+        }
+      }
+    }
+    _slerp(buffer, dstOffset, srcOffset, t) {
+      Quaternion.slerpFlat(buffer, dstOffset, buffer, dstOffset, buffer, srcOffset, t);
+    }
+    _slerpAdditive(buffer, dstOffset, srcOffset, t, stride) {
+      const workOffset = this._workIndex * stride;
+      Quaternion.multiplyQuaternionsFlat(buffer, workOffset, buffer, dstOffset, buffer, srcOffset);
+      Quaternion.slerpFlat(buffer, dstOffset, buffer, dstOffset, buffer, workOffset, t);
+    }
+    _lerp(buffer, dstOffset, srcOffset, t, stride) {
+      const s = 1 - t;
+      for (let i = 0; i !== stride; ++i) {
+        const j = dstOffset + i;
+        buffer[j] = buffer[j] * s + buffer[srcOffset + i] * t;
+      }
+    }
+    _lerpAdditive(buffer, dstOffset, srcOffset, t, stride) {
+      for (let i = 0; i !== stride; ++i) {
+        const j = dstOffset + i;
+        buffer[j] = buffer[j] + buffer[srcOffset + i] * t;
+      }
     }
   };
   var _RESERVED_CHARS_RE = "\\[\\]\\.:\\/";
@@ -21099,7 +22577,947 @@
       PropertyBinding.prototype._setValue_fromArray_setMatrixWorldNeedsUpdate
     ]
   ];
+  var AnimationAction = class {
+    /**
+     * Constructs a new animation action.
+     *
+     * @param {AnimationMixer} mixer - The mixer that is controlled by this action.
+     * @param {AnimationClip} clip - The animation clip that holds the actual keyframes.
+     * @param {?Object3D} [localRoot=null] - The root object on which this action is performed.
+     * @param {(NormalAnimationBlendMode|AdditiveAnimationBlendMode)} [blendMode] - The blend mode.
+     */
+    constructor(mixer, clip, localRoot = null, blendMode = clip.blendMode) {
+      this._mixer = mixer;
+      this._clip = clip;
+      this._localRoot = localRoot;
+      this.blendMode = blendMode;
+      const tracks = clip.tracks, nTracks = tracks.length, interpolants = new Array(nTracks);
+      const interpolantSettings = {
+        endingStart: ZeroCurvatureEnding,
+        endingEnd: ZeroCurvatureEnding
+      };
+      for (let i = 0; i !== nTracks; ++i) {
+        const interpolant = tracks[i].createInterpolant(null);
+        interpolants[i] = interpolant;
+        interpolant.settings = interpolantSettings;
+      }
+      this._interpolantSettings = interpolantSettings;
+      this._interpolants = interpolants;
+      this._propertyBindings = new Array(nTracks);
+      this._cacheIndex = null;
+      this._byClipCacheIndex = null;
+      this._timeScaleInterpolant = null;
+      this._restoreTimeScale = null;
+      this._weightInterpolant = null;
+      this.loop = LoopRepeat;
+      this._loopCount = -1;
+      this._startTime = null;
+      this.time = 0;
+      this.timeScale = 1;
+      this._effectiveTimeScale = 1;
+      this.weight = 1;
+      this._effectiveWeight = 1;
+      this.repetitions = Infinity;
+      this.paused = false;
+      this.enabled = true;
+      this.clampWhenFinished = false;
+      this.zeroSlopeAtStart = true;
+      this.zeroSlopeAtEnd = true;
+    }
+    /**
+     * Starts the playback of the animation.
+     *
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    play() {
+      this._mixer._activateAction(this);
+      return this;
+    }
+    /**
+     * Stops the playback of the animation.
+     *
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    stop() {
+      this._mixer._deactivateAction(this);
+      return this.reset();
+    }
+    /**
+     * Resets the playback of the animation.
+     *
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    reset() {
+      this.paused = false;
+      this.enabled = true;
+      this.time = 0;
+      this._loopCount = -1;
+      this._startTime = null;
+      return this.stopFading().stopWarping();
+    }
+    /**
+     * Returns `true` if the animation is running.
+     *
+     * @return {boolean} Whether the animation is running or not.
+     */
+    isRunning() {
+      return this.enabled && !this.paused && this.timeScale !== 0 && this._startTime === null && this._mixer._isActiveAction(this);
+    }
+    /**
+     * Returns `true` when {@link AnimationAction#play} has been called.
+     *
+     * @return {boolean} Whether the animation is scheduled or not.
+     */
+    isScheduled() {
+      return this._mixer._isActiveAction(this);
+    }
+    /**
+     * Defines the time when the animation should start.
+     *
+     * @param {number} time - The start time in seconds.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    startAt(time) {
+      this._startTime = time;
+      return this;
+    }
+    /**
+     * Configures the loop settings for this action.
+     *
+     * @param {(LoopRepeat|LoopOnce|LoopPingPong)} mode - The loop mode.
+     * @param {number} repetitions - The number of repetitions.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    setLoop(mode, repetitions) {
+      this.loop = mode;
+      this.repetitions = repetitions;
+      return this;
+    }
+    /**
+     * Sets the effective weight of this action.
+     *
+     * An action has no effect and thus an effective weight of zero when the
+     * action is disabled.
+     *
+     * @param {number} weight - The weight to set.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    setEffectiveWeight(weight) {
+      this.weight = weight;
+      this._effectiveWeight = this.enabled ? weight : 0;
+      return this.stopFading();
+    }
+    /**
+     * Returns the effective weight of this action.
+     *
+     * @return {number} The effective weight.
+     */
+    getEffectiveWeight() {
+      return this._effectiveWeight;
+    }
+    /**
+     * Fades the animation in by increasing its weight gradually from `0` to `1`,
+     * within the passed time interval.
+     *
+     * @param {number} duration - The duration of the fade.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    fadeIn(duration) {
+      return this._scheduleFading(duration, 0, 1);
+    }
+    /**
+     * Fades the animation out by decreasing its weight gradually from `1` to `0`,
+     * within the passed time interval.
+     *
+     * @param {number} duration - The duration of the fade.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    fadeOut(duration) {
+      return this._scheduleFading(duration, 1, 0);
+    }
+    /**
+     * Causes this action to fade in and the given action to fade out,
+     * within the passed time interval.
+     *
+     * @param {AnimationAction} fadeOutAction - The animation action to fade out.
+     * @param {number} duration - The duration of the fade.
+     * @param {boolean} [warp=false] - Whether warping should be used or not.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    crossFadeFrom(fadeOutAction, duration, warp = false) {
+      fadeOutAction.fadeOut(duration);
+      this.fadeIn(duration);
+      if (warp === true) {
+        const fadeInDuration = this._clip.duration, fadeOutDuration = fadeOutAction._clip.duration, startEndRatio = fadeOutDuration / fadeInDuration, endStartRatio = fadeInDuration / fadeOutDuration;
+        fadeOutAction._restoreTimeScale = fadeOutAction.timeScale;
+        this._restoreTimeScale = this.timeScale;
+        fadeOutAction.warp(1, startEndRatio, duration);
+        this.warp(endStartRatio, 1, duration);
+      }
+      return this;
+    }
+    /**
+     * Causes this action to fade out and the given action to fade in,
+     * within the passed time interval.
+     *
+     * @param {AnimationAction} fadeInAction - The animation action to fade in.
+     * @param {number} duration - The duration of the fade.
+     * @param {boolean} [warp=false] - Whether warping should be used or not.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    crossFadeTo(fadeInAction, duration, warp = false) {
+      return fadeInAction.crossFadeFrom(this, duration, warp);
+    }
+    /**
+     * Stops any fading which is applied to this action.
+     *
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    stopFading() {
+      const weightInterpolant = this._weightInterpolant;
+      if (weightInterpolant !== null) {
+        this._weightInterpolant = null;
+        this._mixer._takeBackControlInterpolant(weightInterpolant);
+      }
+      return this;
+    }
+    /**
+     * Sets the effective time scale of this action.
+     *
+     * An action has no effect and thus an effective time scale of zero when the
+     * action is paused.
+     *
+     * @param {number} timeScale - The time scale to set.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    setEffectiveTimeScale(timeScale) {
+      this.timeScale = timeScale;
+      this._effectiveTimeScale = this.paused ? 0 : timeScale;
+      return this.stopWarping();
+    }
+    /**
+     * Returns the effective time scale of this action.
+     *
+     * @return {number} The effective time scale.
+     */
+    getEffectiveTimeScale() {
+      return this._effectiveTimeScale;
+    }
+    /**
+     * Sets the duration for a single loop of this action.
+     *
+     * @param {number} duration - The duration to set.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    setDuration(duration) {
+      this.timeScale = this._clip.duration / duration;
+      return this.stopWarping();
+    }
+    /**
+     * Synchronizes this action with the passed other action.
+     *
+     * @param {AnimationAction} action - The action to sync with.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    syncWith(action) {
+      this.time = action.time;
+      this.timeScale = action.timeScale;
+      return this.stopWarping();
+    }
+    /**
+     * Decelerates this animation's speed to `0` within the passed time interval.
+     *
+     * @param {number} duration - The duration.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    halt(duration) {
+      return this.warp(this._effectiveTimeScale, 0, duration);
+    }
+    /**
+     * Changes the playback speed, within the passed time interval, by modifying
+     * {@link AnimationAction#timeScale} gradually from `startTimeScale` to
+     * `endTimeScale`.
+     *
+     * @param {number} startTimeScale - The start time scale.
+     * @param {number} endTimeScale - The end time scale.
+     * @param {number} duration - The duration.
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    warp(startTimeScale, endTimeScale, duration) {
+      const mixer = this._mixer, now = mixer.time, timeScale = this.timeScale;
+      let interpolant = this._timeScaleInterpolant;
+      if (interpolant === null) {
+        interpolant = mixer._lendControlInterpolant();
+        this._timeScaleInterpolant = interpolant;
+      }
+      const times = interpolant.parameterPositions, values = interpolant.sampleValues;
+      times[0] = now;
+      times[1] = now + duration;
+      values[0] = startTimeScale / timeScale;
+      values[1] = endTimeScale / timeScale;
+      return this;
+    }
+    /**
+     * Stops any scheduled warping which is applied to this action.
+     *
+     * @return {AnimationAction} A reference to this animation action.
+     */
+    stopWarping() {
+      const timeScaleInterpolant = this._timeScaleInterpolant;
+      if (timeScaleInterpolant !== null) {
+        this._timeScaleInterpolant = null;
+        this._mixer._takeBackControlInterpolant(timeScaleInterpolant);
+      }
+      this._restoreTimeScale = null;
+      return this;
+    }
+    /**
+     * Returns the animation mixer of this animation action.
+     *
+     * @return {AnimationMixer} The animation mixer.
+     */
+    getMixer() {
+      return this._mixer;
+    }
+    /**
+     * Returns the animation clip of this animation action.
+     *
+     * @return {AnimationClip} The animation clip.
+     */
+    getClip() {
+      return this._clip;
+    }
+    /**
+     * Returns the root object of this animation action.
+     *
+     * @return {Object3D} The root object.
+     */
+    getRoot() {
+      return this._localRoot || this._mixer._root;
+    }
+    // Internal
+    _update(time, deltaTime, timeDirection, accuIndex) {
+      if (!this.enabled) {
+        this._updateWeight(time);
+        return;
+      }
+      const startTime = this._startTime;
+      if (startTime !== null) {
+        const timeRunning = (time - startTime) * timeDirection;
+        if (timeRunning < 0 || timeDirection === 0) {
+          deltaTime = 0;
+        } else {
+          this._startTime = null;
+          deltaTime = timeDirection * timeRunning;
+        }
+      }
+      deltaTime *= this._updateTimeScale(time);
+      const clipTime = this._updateTime(deltaTime);
+      const weight = this._updateWeight(time);
+      if (weight > 0) {
+        const interpolants = this._interpolants;
+        const propertyMixers = this._propertyBindings;
+        switch (this.blendMode) {
+          case AdditiveAnimationBlendMode:
+            for (let j = 0, m = interpolants.length; j !== m; ++j) {
+              interpolants[j].evaluate(clipTime);
+              propertyMixers[j].accumulateAdditive(weight);
+            }
+            break;
+          case NormalAnimationBlendMode:
+          default:
+            for (let j = 0, m = interpolants.length; j !== m; ++j) {
+              interpolants[j].evaluate(clipTime);
+              propertyMixers[j].accumulate(accuIndex, weight);
+            }
+        }
+      }
+    }
+    _updateWeight(time) {
+      let weight = 0;
+      if (this.enabled) {
+        weight = this.weight;
+        const interpolant = this._weightInterpolant;
+        if (interpolant !== null) {
+          const interpolantValue = interpolant.evaluate(time)[0];
+          weight *= interpolantValue;
+          if (time > interpolant.parameterPositions[1]) {
+            this.stopFading();
+            if (interpolantValue === 0) {
+              this.enabled = false;
+            }
+          }
+        }
+      }
+      this._effectiveWeight = weight;
+      return weight;
+    }
+    _updateTimeScale(time) {
+      let timeScale = 0;
+      if (!this.paused) {
+        timeScale = this.timeScale;
+        const interpolant = this._timeScaleInterpolant;
+        if (interpolant !== null) {
+          const interpolantValue = interpolant.evaluate(time)[0];
+          timeScale *= interpolantValue;
+          if (time > interpolant.parameterPositions[1]) {
+            if (timeScale === 0) {
+              this.paused = true;
+            } else {
+              if (this._restoreTimeScale !== null) {
+                timeScale = this._restoreTimeScale;
+              }
+              this.timeScale = timeScale;
+            }
+            this.stopWarping();
+          }
+        }
+      }
+      this._effectiveTimeScale = timeScale;
+      return timeScale;
+    }
+    _updateTime(deltaTime) {
+      const duration = this._clip.duration;
+      const loop = this.loop;
+      let time = this.time + deltaTime;
+      let loopCount = this._loopCount;
+      const pingPong = loop === LoopPingPong;
+      if (deltaTime === 0) {
+        if (loopCount === -1) return time;
+        return pingPong && (loopCount & 1) === 1 ? duration - time : time;
+      }
+      if (loop === LoopOnce) {
+        if (loopCount === -1) {
+          this._loopCount = 0;
+          this._setEndings(true, true, false);
+        }
+        handle_stop: {
+          if (time >= duration) {
+            time = duration;
+          } else if (time < 0) {
+            time = 0;
+          } else {
+            this.time = time;
+            break handle_stop;
+          }
+          if (this.clampWhenFinished) this.paused = true;
+          else this.enabled = false;
+          this.time = time;
+          this._mixer.dispatchEvent({
+            type: "finished",
+            action: this,
+            direction: deltaTime < 0 ? -1 : 1
+          });
+        }
+      } else {
+        if (loopCount === -1) {
+          if (deltaTime >= 0) {
+            loopCount = 0;
+            this._setEndings(true, this.repetitions === 0, pingPong);
+          } else {
+            this._setEndings(this.repetitions === 0, true, pingPong);
+          }
+        }
+        if (time >= duration || time < 0) {
+          const loopDelta = Math.floor(time / duration);
+          time -= duration * loopDelta;
+          loopCount += Math.abs(loopDelta);
+          const pending = this.repetitions - loopCount;
+          if (pending <= 0) {
+            if (this.clampWhenFinished) this.paused = true;
+            else this.enabled = false;
+            time = deltaTime > 0 ? duration : 0;
+            this.time = time;
+            this._mixer.dispatchEvent({
+              type: "finished",
+              action: this,
+              direction: deltaTime > 0 ? 1 : -1
+            });
+          } else {
+            if (pending === 1) {
+              const atStart = deltaTime < 0;
+              this._setEndings(atStart, !atStart, pingPong);
+            } else {
+              this._setEndings(false, false, pingPong);
+            }
+            this._loopCount = loopCount;
+            this.time = time;
+            this._mixer.dispatchEvent({
+              type: "loop",
+              action: this,
+              loopDelta
+            });
+          }
+        } else {
+          this._loopCount = loopCount;
+          this.time = time;
+        }
+        if (pingPong && (loopCount & 1) === 1) {
+          return duration - time;
+        }
+      }
+      return time;
+    }
+    _setEndings(atStart, atEnd, pingPong) {
+      const settings = this._interpolantSettings;
+      if (pingPong) {
+        settings.endingStart = ZeroSlopeEnding;
+        settings.endingEnd = ZeroSlopeEnding;
+      } else {
+        if (atStart) {
+          settings.endingStart = this.zeroSlopeAtStart ? ZeroSlopeEnding : ZeroCurvatureEnding;
+        } else {
+          settings.endingStart = WrapAroundEnding;
+        }
+        if (atEnd) {
+          settings.endingEnd = this.zeroSlopeAtEnd ? ZeroSlopeEnding : ZeroCurvatureEnding;
+        } else {
+          settings.endingEnd = WrapAroundEnding;
+        }
+      }
+    }
+    _scheduleFading(duration, weightNow, weightThen) {
+      const mixer = this._mixer, now = mixer.time;
+      let interpolant = this._weightInterpolant;
+      if (interpolant === null) {
+        interpolant = mixer._lendControlInterpolant();
+        this._weightInterpolant = interpolant;
+      }
+      const times = interpolant.parameterPositions, values = interpolant.sampleValues;
+      times[0] = now;
+      values[0] = weightNow;
+      times[1] = now + duration;
+      values[1] = weightThen;
+      return this;
+    }
+  };
   var _controlInterpolantsResultBuffer = new Float32Array(1);
+  var AnimationMixer = class extends EventDispatcher {
+    /**
+     * Constructs a new animation mixer.
+     *
+     * @param {Object3D} root - The object whose animations shall be played by this mixer.
+     */
+    constructor(root) {
+      super();
+      this._root = root;
+      this._initMemoryManager();
+      this._accuIndex = 0;
+      this.time = 0;
+      this.timeScale = 1;
+      if (typeof __THREE_DEVTOOLS__ !== "undefined") {
+        __THREE_DEVTOOLS__.dispatchEvent(new CustomEvent("observe", { detail: this }));
+      }
+    }
+    _bindAction(action, prototypeAction) {
+      const root = action._localRoot || this._root, tracks = action._clip.tracks, nTracks = tracks.length, bindings = action._propertyBindings, interpolants = action._interpolants, rootUuid = root.uuid, bindingsByRoot = this._bindingsByRootAndName;
+      let bindingsByName = bindingsByRoot[rootUuid];
+      if (bindingsByName === void 0) {
+        bindingsByName = {};
+        bindingsByRoot[rootUuid] = bindingsByName;
+      }
+      for (let i = 0; i !== nTracks; ++i) {
+        const track = tracks[i], trackName = track.name;
+        let binding = bindingsByName[trackName];
+        if (binding !== void 0) {
+          ++binding.referenceCount;
+          bindings[i] = binding;
+        } else {
+          binding = bindings[i];
+          if (binding !== void 0) {
+            if (binding._cacheIndex === null) {
+              ++binding.referenceCount;
+              this._addInactiveBinding(binding, rootUuid, trackName);
+            }
+            continue;
+          }
+          const path = prototypeAction && prototypeAction._propertyBindings[i].binding.parsedPath;
+          binding = new PropertyMixer(
+            PropertyBinding.create(root, trackName, path),
+            track.ValueTypeName,
+            track.getValueSize()
+          );
+          ++binding.referenceCount;
+          this._addInactiveBinding(binding, rootUuid, trackName);
+          bindings[i] = binding;
+        }
+        interpolants[i].resultBuffer = binding.buffer;
+      }
+    }
+    _activateAction(action) {
+      if (!this._isActiveAction(action)) {
+        if (action._cacheIndex === null) {
+          const rootUuid = (action._localRoot || this._root).uuid, clipUuid = action._clip.uuid, actionsForClip = this._actionsByClip[clipUuid];
+          this._bindAction(
+            action,
+            actionsForClip && actionsForClip.knownActions[0]
+          );
+          this._addInactiveAction(action, clipUuid, rootUuid);
+        }
+        const bindings = action._propertyBindings;
+        for (let i = 0, n = bindings.length; i !== n; ++i) {
+          const binding = bindings[i];
+          if (binding.useCount++ === 0) {
+            this._lendBinding(binding);
+            binding.saveOriginalState();
+          }
+        }
+        this._lendAction(action);
+      }
+    }
+    _deactivateAction(action) {
+      if (this._isActiveAction(action)) {
+        const bindings = action._propertyBindings;
+        for (let i = 0, n = bindings.length; i !== n; ++i) {
+          const binding = bindings[i];
+          if (--binding.useCount === 0) {
+            binding.restoreOriginalState();
+            this._takeBackBinding(binding);
+          }
+        }
+        this._takeBackAction(action);
+      }
+    }
+    // Memory manager
+    _initMemoryManager() {
+      this._actions = [];
+      this._nActiveActions = 0;
+      this._actionsByClip = {};
+      this._bindings = [];
+      this._nActiveBindings = 0;
+      this._bindingsByRootAndName = {};
+      this._controlInterpolants = [];
+      this._nActiveControlInterpolants = 0;
+      const scope = this;
+      this.stats = {
+        actions: {
+          get total() {
+            return scope._actions.length;
+          },
+          get inUse() {
+            return scope._nActiveActions;
+          }
+        },
+        bindings: {
+          get total() {
+            return scope._bindings.length;
+          },
+          get inUse() {
+            return scope._nActiveBindings;
+          }
+        },
+        controlInterpolants: {
+          get total() {
+            return scope._controlInterpolants.length;
+          },
+          get inUse() {
+            return scope._nActiveControlInterpolants;
+          }
+        }
+      };
+    }
+    // Memory management for AnimationAction objects
+    _isActiveAction(action) {
+      const index = action._cacheIndex;
+      return index !== null && index < this._nActiveActions;
+    }
+    _addInactiveAction(action, clipUuid, rootUuid) {
+      const actions = this._actions, actionsByClip = this._actionsByClip;
+      let actionsForClip = actionsByClip[clipUuid];
+      if (actionsForClip === void 0) {
+        actionsForClip = {
+          knownActions: [action],
+          actionByRoot: {}
+        };
+        action._byClipCacheIndex = 0;
+        actionsByClip[clipUuid] = actionsForClip;
+      } else {
+        const knownActions = actionsForClip.knownActions;
+        action._byClipCacheIndex = knownActions.length;
+        knownActions.push(action);
+      }
+      action._cacheIndex = actions.length;
+      actions.push(action);
+      actionsForClip.actionByRoot[rootUuid] = action;
+    }
+    _removeInactiveAction(action) {
+      const actions = this._actions, lastInactiveAction = actions[actions.length - 1], cacheIndex = action._cacheIndex;
+      lastInactiveAction._cacheIndex = cacheIndex;
+      actions[cacheIndex] = lastInactiveAction;
+      actions.pop();
+      action._cacheIndex = null;
+      const clipUuid = action._clip.uuid, actionsByClip = this._actionsByClip, actionsForClip = actionsByClip[clipUuid], knownActionsForClip = actionsForClip.knownActions, lastKnownAction = knownActionsForClip[knownActionsForClip.length - 1], byClipCacheIndex = action._byClipCacheIndex;
+      lastKnownAction._byClipCacheIndex = byClipCacheIndex;
+      knownActionsForClip[byClipCacheIndex] = lastKnownAction;
+      knownActionsForClip.pop();
+      action._byClipCacheIndex = null;
+      const actionByRoot = actionsForClip.actionByRoot, rootUuid = (action._localRoot || this._root).uuid;
+      delete actionByRoot[rootUuid];
+      if (knownActionsForClip.length === 0) {
+        delete actionsByClip[clipUuid];
+      }
+      this._removeInactiveBindingsForAction(action);
+    }
+    _removeInactiveBindingsForAction(action) {
+      const bindings = action._propertyBindings;
+      for (let i = 0, n = bindings.length; i !== n; ++i) {
+        const binding = bindings[i];
+        if (--binding.referenceCount === 0) {
+          this._removeInactiveBinding(binding);
+        }
+      }
+    }
+    _lendAction(action) {
+      const actions = this._actions, prevIndex = action._cacheIndex, lastActiveIndex = this._nActiveActions++, firstInactiveAction = actions[lastActiveIndex];
+      action._cacheIndex = lastActiveIndex;
+      actions[lastActiveIndex] = action;
+      firstInactiveAction._cacheIndex = prevIndex;
+      actions[prevIndex] = firstInactiveAction;
+    }
+    _takeBackAction(action) {
+      const actions = this._actions, prevIndex = action._cacheIndex, firstInactiveIndex = --this._nActiveActions, lastActiveAction = actions[firstInactiveIndex];
+      action._cacheIndex = firstInactiveIndex;
+      actions[firstInactiveIndex] = action;
+      lastActiveAction._cacheIndex = prevIndex;
+      actions[prevIndex] = lastActiveAction;
+    }
+    // Memory management for PropertyMixer objects
+    _addInactiveBinding(binding, rootUuid, trackName) {
+      const bindingsByRoot = this._bindingsByRootAndName, bindings = this._bindings;
+      let bindingByName = bindingsByRoot[rootUuid];
+      if (bindingByName === void 0) {
+        bindingByName = {};
+        bindingsByRoot[rootUuid] = bindingByName;
+      }
+      bindingByName[trackName] = binding;
+      binding._cacheIndex = bindings.length;
+      bindings.push(binding);
+    }
+    _removeInactiveBinding(binding) {
+      const bindings = this._bindings, propBinding = binding.binding, rootUuid = propBinding.rootNode.uuid, trackName = propBinding.path, bindingsByRoot = this._bindingsByRootAndName, bindingByName = bindingsByRoot[rootUuid], lastInactiveBinding = bindings[bindings.length - 1], cacheIndex = binding._cacheIndex;
+      lastInactiveBinding._cacheIndex = cacheIndex;
+      bindings[cacheIndex] = lastInactiveBinding;
+      bindings.pop();
+      delete bindingByName[trackName];
+      if (Object.keys(bindingByName).length === 0) {
+        delete bindingsByRoot[rootUuid];
+      }
+    }
+    _lendBinding(binding) {
+      const bindings = this._bindings, prevIndex = binding._cacheIndex, lastActiveIndex = this._nActiveBindings++, firstInactiveBinding = bindings[lastActiveIndex];
+      binding._cacheIndex = lastActiveIndex;
+      bindings[lastActiveIndex] = binding;
+      firstInactiveBinding._cacheIndex = prevIndex;
+      bindings[prevIndex] = firstInactiveBinding;
+    }
+    _takeBackBinding(binding) {
+      const bindings = this._bindings, prevIndex = binding._cacheIndex, firstInactiveIndex = --this._nActiveBindings, lastActiveBinding = bindings[firstInactiveIndex];
+      binding._cacheIndex = firstInactiveIndex;
+      bindings[firstInactiveIndex] = binding;
+      lastActiveBinding._cacheIndex = prevIndex;
+      bindings[prevIndex] = lastActiveBinding;
+    }
+    // Memory management of Interpolants for weight and time scale
+    _lendControlInterpolant() {
+      const interpolants = this._controlInterpolants, lastActiveIndex = this._nActiveControlInterpolants++;
+      let interpolant = interpolants[lastActiveIndex];
+      if (interpolant === void 0) {
+        interpolant = new LinearInterpolant(
+          new Float32Array(2),
+          new Float32Array(2),
+          1,
+          _controlInterpolantsResultBuffer
+        );
+        interpolant.__cacheIndex = lastActiveIndex;
+        interpolants[lastActiveIndex] = interpolant;
+      }
+      return interpolant;
+    }
+    _takeBackControlInterpolant(interpolant) {
+      const interpolants = this._controlInterpolants, prevIndex = interpolant.__cacheIndex, firstInactiveIndex = --this._nActiveControlInterpolants, lastActiveInterpolant = interpolants[firstInactiveIndex];
+      interpolant.__cacheIndex = firstInactiveIndex;
+      interpolants[firstInactiveIndex] = interpolant;
+      lastActiveInterpolant.__cacheIndex = prevIndex;
+      interpolants[prevIndex] = lastActiveInterpolant;
+    }
+    /**
+     * Returns an instance of {@link AnimationAction} for the passed clip.
+     *
+     * If an action fitting the clip and root parameters doesn't yet exist, it
+     * will be created by this method. Calling this method several times with the
+     * same clip and root parameters always returns the same action.
+     *
+     * @param {AnimationClip|string} clip - An animation clip or alternatively the name of the animation clip.
+     * @param {Object3D} [optionalRoot] - An alternative root object.
+     * @param {(NormalAnimationBlendMode|AdditiveAnimationBlendMode)} [blendMode] - The blend mode.
+     * @return {?AnimationAction} The animation action.
+     */
+    clipAction(clip, optionalRoot, blendMode) {
+      const root = optionalRoot || this._root, rootUuid = root.uuid;
+      let clipObject = typeof clip === "string" ? AnimationClip.findByName(root, clip) : clip;
+      const clipUuid = clipObject !== null ? clipObject.uuid : clip;
+      const actionsForClip = this._actionsByClip[clipUuid];
+      let prototypeAction = null;
+      if (blendMode === void 0) {
+        if (clipObject !== null) {
+          blendMode = clipObject.blendMode;
+        } else {
+          blendMode = NormalAnimationBlendMode;
+        }
+      }
+      if (actionsForClip !== void 0) {
+        const existingAction = actionsForClip.actionByRoot[rootUuid];
+        if (existingAction !== void 0 && existingAction.blendMode === blendMode) {
+          return existingAction;
+        }
+        prototypeAction = actionsForClip.knownActions[0];
+        if (clipObject === null)
+          clipObject = prototypeAction._clip;
+      }
+      if (clipObject === null) return null;
+      const newAction = new AnimationAction(this, clipObject, optionalRoot, blendMode);
+      this._bindAction(newAction, prototypeAction);
+      this._addInactiveAction(newAction, clipUuid, rootUuid);
+      return newAction;
+    }
+    /**
+     * Returns an existing animation action for the passed clip.
+     *
+     * @param {AnimationClip|string} clip - An animation clip or alternatively the name of the animation clip.
+     * @param {Object3D} [optionalRoot] - An alternative root object.
+     * @return {?AnimationAction} The animation action. Returns `null` if no action was found.
+     */
+    existingAction(clip, optionalRoot) {
+      const root = optionalRoot || this._root, rootUuid = root.uuid, clipObject = typeof clip === "string" ? AnimationClip.findByName(root, clip) : clip, clipUuid = clipObject ? clipObject.uuid : clip, actionsForClip = this._actionsByClip[clipUuid];
+      if (actionsForClip !== void 0) {
+        return actionsForClip.actionByRoot[rootUuid] || null;
+      }
+      return null;
+    }
+    /**
+     * Deactivates all previously scheduled actions on this mixer.
+     *
+     * @return {AnimationMixer} A reference to this animation mixer.
+     */
+    stopAllAction() {
+      const actions = this._actions, nActions = this._nActiveActions;
+      for (let i = nActions - 1; i >= 0; --i) {
+        actions[i].stop();
+      }
+      return this;
+    }
+    /**
+     * Advances the global mixer time and updates the animation.
+     *
+     * This is usually done in the render loop by passing the delta
+     * time from {@link Clock} or {@link Timer}.
+     *
+     * @param {number} deltaTime - The delta time in seconds.
+     * @return {AnimationMixer} A reference to this animation mixer.
+     */
+    update(deltaTime) {
+      deltaTime *= this.timeScale;
+      const actions = this._actions, nActions = this._nActiveActions, time = this.time += deltaTime, timeDirection = Math.sign(deltaTime), accuIndex = this._accuIndex ^= 1;
+      for (let i = 0; i !== nActions; ++i) {
+        const action = actions[i];
+        action._update(time, deltaTime, timeDirection, accuIndex);
+      }
+      const bindings = this._bindings, nBindings = this._nActiveBindings;
+      for (let i = 0; i !== nBindings; ++i) {
+        bindings[i].apply(accuIndex);
+      }
+      return this;
+    }
+    /**
+     * Sets the global mixer to a specific time and updates the animation accordingly.
+     *
+     * This is useful when you need to jump to an exact time in an animation. The
+     * input parameter will be scaled by {@link AnimationMixer#timeScale}
+     *
+     * @param {number} time - The time to set in seconds.
+     * @return {AnimationMixer} A reference to this animation mixer.
+     */
+    setTime(time) {
+      this.time = 0;
+      for (let i = 0; i < this._actions.length; i++) {
+        this._actions[i].time = 0;
+      }
+      return this.update(time);
+    }
+    /**
+     * Returns this mixer's root object.
+     *
+     * @return {Object3D} The mixer's root object.
+     */
+    getRoot() {
+      return this._root;
+    }
+    /**
+     * Deallocates all memory resources for a clip. Before using this method make
+     * sure to call {@link AnimationAction#stop} for all related actions.
+     *
+     * @param {AnimationClip} clip - The clip to uncache.
+     */
+    uncacheClip(clip) {
+      const actions = this._actions, clipUuid = clip.uuid, actionsByClip = this._actionsByClip, actionsForClip = actionsByClip[clipUuid];
+      if (actionsForClip !== void 0) {
+        const actionsToRemove = actionsForClip.knownActions;
+        for (let i = 0, n = actionsToRemove.length; i !== n; ++i) {
+          const action = actionsToRemove[i];
+          this._deactivateAction(action);
+          const cacheIndex = action._cacheIndex, lastInactiveAction = actions[actions.length - 1];
+          action._cacheIndex = null;
+          action._byClipCacheIndex = null;
+          lastInactiveAction._cacheIndex = cacheIndex;
+          actions[cacheIndex] = lastInactiveAction;
+          actions.pop();
+          this._removeInactiveBindingsForAction(action);
+        }
+        delete actionsByClip[clipUuid];
+      }
+    }
+    /**
+     * Deallocates all memory resources for a root object. Before using this
+     * method make sure to call {@link AnimationAction#stop} for all related
+     * actions or alternatively {@link AnimationMixer#stopAllAction} when the
+     * mixer operates on a single root.
+     *
+     * @param {Object3D} root - The root object to uncache.
+     */
+    uncacheRoot(root) {
+      const rootUuid = root.uuid, actionsByClip = this._actionsByClip;
+      for (const clipUuid in actionsByClip) {
+        const actionByRoot = actionsByClip[clipUuid].actionByRoot, action = actionByRoot[rootUuid];
+        if (action !== void 0) {
+          this._deactivateAction(action);
+          this._removeInactiveAction(action);
+        }
+      }
+      const bindingsByRoot = this._bindingsByRootAndName, bindingByName = bindingsByRoot[rootUuid];
+      if (bindingByName !== void 0) {
+        for (const trackName in bindingByName) {
+          const binding = bindingByName[trackName];
+          binding.restoreOriginalState();
+          this._removeInactiveBinding(binding);
+        }
+      }
+    }
+    /**
+     * Deallocates all memory resources for an action. The action is identified by the
+     * given clip and an optional root object. Before using this method make
+     * sure to call {@link AnimationAction#stop} to deactivate the action.
+     *
+     * @param {AnimationClip|string} clip - An animation clip or alternatively the name of the animation clip.
+     * @param {Object3D} [optionalRoot] - An alternative root object.
+     */
+    uncacheAction(clip, optionalRoot) {
+      const action = this.existingAction(clip, optionalRoot);
+      if (action !== null) {
+        this._deactivateAction(action);
+        this._removeInactiveAction(action);
+      }
+    }
+  };
   var Clock = class {
     /**
      * Constructs a new clock.
@@ -31308,7 +33726,7 @@ void main() {
       let _localClippingEnabled = false;
       const _projScreenMatrix3 = new Matrix4();
       const _vector3 = new Vector3();
-      const _vector4 = new Vector4();
+      const _vector42 = new Vector4();
       const _emptyScene = { background: null, fog: null, environment: null, overrideMaterial: null, isScene: true };
       let _renderBackground = false;
       function getTargetPixelRatio() {
@@ -31962,12 +34380,12 @@ void main() {
             const frustum = camera.isArrayCamera ? _frustumArray : _frustum;
             if (!object.frustumCulled || object.intersectsFrustum(frustum)) {
               if (sortObjects) {
-                _vector4.setFromMatrixPosition(object.matrixWorld).applyMatrix4(_projScreenMatrix3);
+                _vector42.setFromMatrixPosition(object.matrixWorld).applyMatrix4(_projScreenMatrix3);
               }
               const geometry = objects.update(object);
               const material = object.material;
               if (material.visible) {
-                currentRenderList.push(object, geometry, material, groupOrder, _vector4.z, null, camera);
+                currentRenderList.push(object, geometry, material, groupOrder, _vector42.z, null, camera);
               }
             }
           } else if (object.isMesh || object.isLine || object.isPoints) {
@@ -31978,12 +34396,12 @@ void main() {
               if (sortObjects) {
                 if (object.boundingSphere !== void 0) {
                   if (object.boundingSphere === null) object.computeBoundingSphere();
-                  _vector4.copy(object.boundingSphere.center);
+                  _vector42.copy(object.boundingSphere.center);
                 } else {
                   if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
-                  _vector4.copy(geometry.boundingSphere.center);
+                  _vector42.copy(geometry.boundingSphere.center);
                 }
-                _vector4.applyMatrix4(object.matrixWorld).applyMatrix4(_projScreenMatrix3);
+                _vector42.applyMatrix4(object.matrixWorld).applyMatrix4(_projScreenMatrix3);
               }
               if (Array.isArray(material)) {
                 const groups = geometry.groups;
@@ -31991,11 +34409,11 @@ void main() {
                   const group = groups[i];
                   const groupMaterial = material[group.materialIndex];
                   if (groupMaterial && groupMaterial.visible) {
-                    currentRenderList.push(object, geometry, groupMaterial, groupOrder, _vector4.z, group, camera);
+                    currentRenderList.push(object, geometry, groupMaterial, groupOrder, _vector42.z, group, camera);
                   }
                 }
               } else if (material.visible) {
-                currentRenderList.push(object, geometry, material, groupOrder, _vector4.z, null, camera);
+                currentRenderList.push(object, geometry, material, groupOrder, _vector42.z, null, camera);
               }
             }
           }
@@ -34711,7 +37129,11 @@ void main() {
       ctxSign.font = "bold 54px sans-serif";
       ctxSign.fillText("\u0938\u0941\u0930\u0902\u0917 \u0938\u0902. \u0966\u096A  |  TUNNEL NO. 04", 512, 134);
       ctxSign.font = "bold 28px sans-serif";
-      ctxSign.fillText("\u0932\u0902\u092C\u093E\u0908 : 466 \u092E\u0940.  |  LENGTH : 466 M  \u2022  \u0918\u093E\u091F \u0916\u0902\u0921 (GHAT SECTION)", 512, 198);
+      ctxSign.fillText(
+        "\u0932\u0902\u092C\u093E\u0908 : 466 \u092E\u0940.  |  LENGTH : 466 M  \u2022  \u0918\u093E\u091F \u0916\u0902\u0921 (GHAT SECTION)",
+        512,
+        198
+      );
       const portalSignTex = new CanvasTexture(canvasSign);
       const canvasArch = document.createElement("canvas");
       canvasArch.width = 512;
@@ -34781,7 +37203,11 @@ void main() {
       ctxStB.font = "bold 44px sans-serif";
       ctxStB.fillText("\u0631\u062A\u0644\u0627\u0645 \u062C\u0646\u06A9\u0634\u0646", 512, 295);
       ctxStB.font = "bold 24px sans-serif";
-      ctxStB.fillText("\u0938\u092E\u0941\u0926\u094D\u0930 \u0924\u0932 \u0938\u0947 \u090A\u0902\u091A\u093E\u0908 : \u096A\u096F\u0969.\u0968\u096C \u092E\u0940.  \u2022  HEIGHT ABOVE MEAN SEA LEVEL : 493.26 M", 512, 345);
+      ctxStB.fillText(
+        "\u0938\u092E\u0941\u0926\u094D\u0930 \u0924\u0932 \u0938\u0947 \u090A\u0902\u091A\u093E\u0908 : \u096A\u096F\u0969.\u0968\u096C \u092E\u0940.  \u2022  HEIGHT ABOVE MEAN SEA LEVEL : 493.26 M",
+        512,
+        345
+      );
       const stationBoardTex = new CanvasTexture(canvasStBoard);
       const canvasBldg = document.createElement("canvas");
       canvasBldg.width = 512;
@@ -34931,7 +37357,12 @@ void main() {
         new Vector3(-200, 0, -300)
         // Return loop
       ];
-      this.curve = new CatmullRomCurve3(waypoints, true, "centripetal", 0.25);
+      this.curve = new CatmullRomCurve3(
+        waypoints,
+        true,
+        "centripetal",
+        0.25
+      );
       this.totalLength = this.curve.getLength();
     }
     // ---------------------------------------------------------
@@ -35000,7 +37431,10 @@ void main() {
           indices.push(curr + 1, next, next + 1);
         }
       }
-      ballastGeo.setAttribute("position", new Float32BufferAttribute(positions, 3));
+      ballastGeo.setAttribute(
+        "position",
+        new Float32BufferAttribute(positions, 3)
+      );
       ballastGeo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
       ballastGeo.setIndex(indices);
       ballastGeo.computeVertexNormals();
@@ -35030,7 +37464,11 @@ void main() {
         metalness: 0.92
       });
       const sleeperGeo = new BoxGeometry(2.65, 0.22, 0.28);
-      const instancedSleepers = new InstancedMesh(sleeperGeo, sleeperMat, divisions * 2);
+      const instancedSleepers = new InstancedMesh(
+        sleeperGeo,
+        sleeperMat,
+        divisions * 2
+      );
       instancedSleepers.castShadow = true;
       instancedSleepers.receiveShadow = true;
       instancedSleepers.frustumCulled = false;
@@ -35053,16 +37491,24 @@ void main() {
         dummy.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
         dummy.updateMatrix();
         instancedSleepers.setMatrixAt(instanceIdx++, dummy.matrix);
-        t1RailL.push(t1Center.clone().add(normal.clone().multiplyScalar(-railHalfGauge)).setY(t1Center.y + this.railHeight));
-        t1RailR.push(t1Center.clone().add(normal.clone().multiplyScalar(railHalfGauge)).setY(t1Center.y + this.railHeight));
+        t1RailL.push(
+          t1Center.clone().add(normal.clone().multiplyScalar(-railHalfGauge)).setY(t1Center.y + this.railHeight)
+        );
+        t1RailR.push(
+          t1Center.clone().add(normal.clone().multiplyScalar(railHalfGauge)).setY(t1Center.y + this.railHeight)
+        );
         const t2Center = pt.clone().add(normal.clone().multiplyScalar(this.trackOffset / 2));
         dummy.position.copy(t2Center);
         dummy.position.y += 0.2;
         dummy.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
         dummy.updateMatrix();
         instancedSleepers.setMatrixAt(instanceIdx++, dummy.matrix);
-        t2RailL.push(t2Center.clone().add(normal.clone().multiplyScalar(-railHalfGauge)).setY(t2Center.y + this.railHeight));
-        t2RailR.push(t2Center.clone().add(normal.clone().multiplyScalar(railHalfGauge)).setY(t2Center.y + this.railHeight));
+        t2RailL.push(
+          t2Center.clone().add(normal.clone().multiplyScalar(-railHalfGauge)).setY(t2Center.y + this.railHeight)
+        );
+        t2RailR.push(
+          t2Center.clone().add(normal.clone().multiplyScalar(railHalfGauge)).setY(t2Center.y + this.railHeight)
+        );
       }
       instancedSleepers.instanceMatrix.needsUpdate = true;
       this.trackGroup.add(instancedSleepers);
@@ -35083,9 +37529,20 @@ void main() {
     // Overhead Catenary (OHE 25 kV AC)
     // ---------------------------------------------------------
     buildOHECatenary() {
-      const oheMastMat = new MeshStandardMaterial({ color: 6583435, roughness: 0.4, metalness: 0.6 });
-      const wireMat = new MeshStandardMaterial({ color: 14251782, roughness: 0.2, metalness: 0.9 });
-      const insMat = new MeshStandardMaterial({ color: 7877903, roughness: 0.3 });
+      const oheMastMat = new MeshStandardMaterial({
+        color: 6583435,
+        roughness: 0.4,
+        metalness: 0.6
+      });
+      const wireMat = new MeshStandardMaterial({
+        color: 14251782,
+        roughness: 0.2,
+        metalness: 0.9
+      });
+      const insMat = new MeshStandardMaterial({
+        color: 7877903,
+        roughness: 0.3
+      });
       const mastSpacing = 48;
       const mastCount = Math.floor(this.totalLength / mastSpacing);
       const contactWire1 = [];
@@ -35103,16 +37560,28 @@ void main() {
           const mastGroup = new Group();
           const mastPos = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
           mastGroup.position.copy(mastPos);
-          mastGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-          const pole = new Mesh(new BoxGeometry(0.18, 7.2, 0.18), oheMastMat);
+          mastGroup.quaternion.setFromUnitVectors(
+            new Vector3(0, 0, 1),
+            tangent
+          );
+          const pole = new Mesh(
+            new BoxGeometry(0.18, 7.2, 0.18),
+            oheMastMat
+          );
           pole.position.y = 3.6;
           pole.castShadow = true;
           mastGroup.add(pole);
-          const arm = new Mesh(new BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1), oheMastMat);
+          const arm = new Mesh(
+            new BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1),
+            oheMastMat
+          );
           arm.position.set((this.trackOffset + 3.4) / 2 - 0.2, 6.2, 0);
           mastGroup.add(arm);
           [2.6, 2.6 + this.trackOffset].forEach((x) => {
-            const ins = new Mesh(new CylinderGeometry(0.05, 0.05, 0.35, 8), insMat);
+            const ins = new Mesh(
+              new CylinderGeometry(0.05, 0.05, 0.35, 8),
+              insMat
+            );
             ins.position.set(x, 5.8, 0);
             mastGroup.add(ins);
           });
@@ -35274,7 +37743,10 @@ void main() {
             new MeshStandardMaterial({ color: 2042167, roughness: 0.9 })
           );
           nicheMesh.position.copy(nichePos);
-          nicheMesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+          nicheMesh.quaternion.setFromUnitVectors(
+            new Vector3(0, 0, 1),
+            tangent
+          );
           nicheMesh.frustumCulled = false;
           tunnelGroup.add(nicheMesh);
           const frameMesh = new Mesh(
@@ -35282,7 +37754,10 @@ void main() {
             new MeshBasicMaterial({ color: 16436245 })
           );
           frameMesh.position.copy(pt).add(normal.clone().multiplyScalar(side * (wHalf - 0.05))).setY(pt.y + 1.2);
-          frameMesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+          frameMesh.quaternion.setFromUnitVectors(
+            new Vector3(0, 0, 1),
+            tangent
+          );
           frameMesh.frustumCulled = false;
           tunnelGroup.add(frameMesh);
         }
@@ -35296,7 +37771,10 @@ void main() {
           tIndices.push(c + 1, n + 1, n);
         }
       }
-      tunnelGeo.setAttribute("position", new Float32BufferAttribute(tPos, 3));
+      tunnelGeo.setAttribute(
+        "position",
+        new Float32BufferAttribute(tPos, 3)
+      );
       tunnelGeo.setAttribute("uv", new Float32BufferAttribute(tUVs, 2));
       tunnelGeo.setIndex(tIndices);
       tunnelGeo.computeVertexNormals();
@@ -35398,7 +37876,10 @@ void main() {
             cInd.push(top2, bot2, bot1);
           }
         }
-        capGeo.setAttribute("position", new Float32BufferAttribute(cPos, 3));
+        capGeo.setAttribute(
+          "position",
+          new Float32BufferAttribute(cPos, 3)
+        );
         capGeo.setAttribute("uv", new Float32BufferAttribute(cUVs, 2));
         capGeo.setIndex(cInd);
         capGeo.computeVertexNormals();
@@ -35446,7 +37927,10 @@ void main() {
         const portalGroup = new Group();
         portalGroup.position.copy(pt);
         const lookDir = isExit ? tangent.clone() : tangent.clone().negate();
-        portalGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), lookDir);
+        portalGroup.quaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          lookDir
+        );
         const portalShape = new Shape();
         const pWidthHalf = 11;
         const pHeight = 13.8;
@@ -35482,7 +37966,10 @@ void main() {
         ringShape.moveTo(-rOuter, 0);
         ringShape.lineTo(-rOuter, wallH);
         for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-          ringShape.lineTo(Math.cos(a) * rOuter, wallH + Math.sin(a) * (archH - wallH + 0.85));
+          ringShape.lineTo(
+            Math.cos(a) * rOuter,
+            wallH + Math.sin(a) * (archH - wallH + 0.85)
+          );
         }
         ringShape.lineTo(rOuter, 0);
         ringShape.closePath();
@@ -35490,23 +37977,35 @@ void main() {
         ringHole.moveTo(-wHalf, 0);
         ringHole.lineTo(-wHalf, wallH);
         for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-          ringHole.lineTo(Math.cos(a) * wHalf, wallH + Math.sin(a) * (archH - wallH));
+          ringHole.lineTo(
+            Math.cos(a) * wHalf,
+            wallH + Math.sin(a) * (archH - wallH)
+          );
         }
         ringHole.lineTo(wHalf, 0);
         ringHole.closePath();
         ringShape.holes.push(ringHole);
-        const ringGeo = new ExtrudeGeometry(ringShape, { depth: 0.18, bevelEnabled: false });
+        const ringGeo = new ExtrudeGeometry(ringShape, {
+          depth: 0.18,
+          bevelEnabled: false
+        });
         const ringMesh = new Mesh(ringGeo, archStripeMat);
         ringMesh.position.z = 1.5;
         ringMesh.frustumCulled = false;
         portalGroup.add(ringMesh);
-        const parapet = new Mesh(new BoxGeometry(23, 0.85, 3.4), portalMasonryMat);
+        const parapet = new Mesh(
+          new BoxGeometry(23, 0.85, 3.4),
+          portalMasonryMat
+        );
         parapet.position.set(0, 14.2, 0);
         parapet.castShadow = true;
         parapet.frustumCulled = false;
         portalGroup.add(parapet);
         [-11.2, 11.2].forEach((px2) => {
-          const pillar = new Mesh(new BoxGeometry(1.6, 1.4, 3.6), portalMasonryMat);
+          const pillar = new Mesh(
+            new BoxGeometry(1.6, 1.4, 3.6),
+            portalMasonryMat
+          );
           pillar.position.set(px2, 14.8, 0);
           pillar.castShadow = true;
           portalGroup.add(pillar);
@@ -35518,30 +38017,49 @@ void main() {
             const tHeight = 12 - tier * 3.2;
             const tZ = -3 - tier * 5.2;
             const tX = wx + sideSign * (1.8 + tier * 2.2);
-            const wing = new Mesh(new BoxGeometry(2.4, tHeight, tLen), portalMasonryMat);
+            const wing = new Mesh(
+              new BoxGeometry(2.4, tHeight, tLen),
+              portalMasonryMat
+            );
             wing.position.set(tX, tHeight / 2, tZ);
             wing.rotation.y = sideSign * -0.38;
             wing.castShadow = true;
             wing.frustumCulled = false;
             portalGroup.add(wing);
-            const cap = new Mesh(new BoxGeometry(2.8, 0.45, tLen + 0.4), portalMasonryMat);
+            const cap = new Mesh(
+              new BoxGeometry(2.8, 0.45, tLen + 0.4),
+              portalMasonryMat
+            );
             cap.position.set(tX, tHeight + 0.22, tZ);
             cap.rotation.y = sideSign * -0.38;
             cap.castShadow = true;
             portalGroup.add(cap);
           }
         });
-        const signBoard = new Mesh(new BoxGeometry(10.5, 2.4, 0.18), signMat);
+        const signBoard = new Mesh(
+          new BoxGeometry(10.5, 2.4, 0.18),
+          signMat
+        );
         signBoard.position.set(0, 10.6, 1.55);
         signBoard.castShadow = true;
         signBoard.frustumCulled = false;
         portalGroup.add(signBoard);
-        const catBracketMat = new MeshStandardMaterial({ color: 4674921, metalness: 0.8, roughness: 0.3 });
-        const bracketArm = new Mesh(new BoxGeometry(11, 0.16, 0.16), catBracketMat);
+        const catBracketMat = new MeshStandardMaterial({
+          color: 4674921,
+          metalness: 0.8,
+          roughness: 0.3
+        });
+        const bracketArm = new Mesh(
+          new BoxGeometry(11, 0.16, 0.16),
+          catBracketMat
+        );
         bracketArm.position.set(0, 6.4, 1.45);
         portalGroup.add(bracketArm);
         [-this.trackOffset / 2, this.trackOffset / 2].forEach((cx) => {
-          const ins = new Mesh(new CylinderGeometry(0.08, 0.08, 0.5, 8), new MeshStandardMaterial({ color: 7877903 }));
+          const ins = new Mesh(
+            new CylinderGeometry(0.08, 0.08, 0.5, 8),
+            new MeshStandardMaterial({ color: 7877903 })
+          );
           ins.position.set(cx, 6, 1.45);
           portalGroup.add(ins);
         });
@@ -35557,9 +38075,18 @@ void main() {
     // Indian Flora (Coconut Palms & Banyan Trees)
     // ---------------------------------------------------------
     buildIndianTrees() {
-      const trunkMat = new MeshStandardMaterial({ color: 4533023, roughness: 0.9 });
-      const foliageMat1 = new MeshStandardMaterial({ color: 1793568, roughness: 0.75 });
-      const foliageMat2 = new MeshStandardMaterial({ color: 3046706, roughness: 0.75 });
+      const trunkMat = new MeshStandardMaterial({
+        color: 4533023,
+        roughness: 0.9
+      });
+      const foliageMat1 = new MeshStandardMaterial({
+        color: 1793568,
+        roughness: 0.75
+      });
+      const foliageMat2 = new MeshStandardMaterial({
+        color: 3046706,
+        roughness: 0.75
+      });
       const treeGroup = new Group();
       const up = new Vector3(0, 1, 0);
       for (let i = 0; i < 150; i++) {
@@ -35576,28 +38103,49 @@ void main() {
         const isPalm = i % 3 === 0;
         if (isPalm) {
           const pHeight = 8.5 + i % 4 * 1.5;
-          const trunk = new Mesh(new CylinderGeometry(0.18, 0.32, pHeight, 8), trunkMat);
+          const trunk = new Mesh(
+            new CylinderGeometry(0.18, 0.32, pHeight, 8),
+            trunkMat
+          );
           trunk.position.y = pHeight / 2;
           trunk.rotation.z = (Math.random() - 0.5) * 0.12;
           tree.add(trunk);
           for (let f = 0; f < 8; f++) {
             const fAngle = f / 8 * Math.PI * 2;
-            const frond = new Mesh(new BoxGeometry(0.35, 0.08, 3.2), foliageMat1);
-            frond.position.set(Math.cos(fAngle) * 1.4, pHeight + 0.2, Math.sin(fAngle) * 1.4);
+            const frond = new Mesh(
+              new BoxGeometry(0.35, 0.08, 3.2),
+              foliageMat1
+            );
+            frond.position.set(
+              Math.cos(fAngle) * 1.4,
+              pHeight + 0.2,
+              Math.sin(fAngle) * 1.4
+            );
             frond.rotation.y = fAngle;
             frond.rotation.x = 0.35;
             tree.add(frond);
           }
         } else {
           const scale = 1 + i % 4 * 0.25;
-          const trunk = new Mesh(new CylinderGeometry(0.25 * scale, 0.45 * scale, 4 * scale, 7), trunkMat);
+          const trunk = new Mesh(
+            new CylinderGeometry(
+              0.25 * scale,
+              0.45 * scale,
+              4 * scale,
+              7
+            ),
+            trunkMat
+          );
           trunk.position.y = 2 * scale;
           trunk.castShadow = true;
           tree.add(trunk);
           const folMat = i % 2 === 0 ? foliageMat1 : foliageMat2;
           for (let layer = 0; layer < 3; layer++) {
             const rad = (2.2 - layer * 0.45) * scale;
-            const leafCluster = new Mesh(new DodecahedronGeometry(rad, 1), folMat);
+            const leafCluster = new Mesh(
+              new DodecahedronGeometry(rad, 1),
+              folMat
+            );
             leafCluster.position.set(
               (Math.random() - 0.5) * 0.4 * scale,
               (3.6 + layer * 1.3) * scale,
@@ -35788,14 +38336,23 @@ void main() {
           });
           if (i % 3 === 0) {
             const colPos = pt.clone().add(normal.clone().multiplyScalar(centerRidge)).setY(pt.y + 1.05);
-            const col = new Mesh(new BoxGeometry(0.35, 4.3, 0.35), steelMat);
+            const col = new Mesh(
+              new BoxGeometry(0.35, 4.3, 0.35),
+              steelMat
+            );
             col.position.copy(colPos).setY(colPos.y + 2.15);
             col.castShadow = true;
             col.frustumCulled = false;
             stGroup.add(col);
-            const trussArm = new Mesh(new BoxGeometry(7.8, 0.15, 0.15), steelMat);
+            const trussArm = new Mesh(
+              new BoxGeometry(7.8, 0.15, 0.15),
+              steelMat
+            );
             trussArm.position.copy(colPos).setY(colPos.y + 3.8);
-            trussArm.quaternion.setFromUnitVectors(new Vector3(1, 0, 0), normal);
+            trussArm.quaternion.setFromUnitVectors(
+              new Vector3(1, 0, 0),
+              normal
+            );
             trussArm.frustumCulled = false;
             stGroup.add(trussArm);
             const lightBar = new Mesh(
@@ -35803,18 +38360,33 @@ void main() {
               new MeshBasicMaterial({ color: 16776171 })
             );
             lightBar.position.copy(colPos).setY(colPos.y + 3.5);
-            lightBar.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+            lightBar.quaternion.setFromUnitVectors(
+              new Vector3(0, 0, 1),
+              tangent
+            );
             lightBar.frustumCulled = false;
             stGroup.add(lightBar);
             if (isPlatform1 && i > 2 && i < canopySteps - 2) {
-              const coachNames = ["LOCO", "GEN", "S1", "B1", "B2", "B3", "A1", "H1"];
+              const coachNames = [
+                "LOCO",
+                "GEN",
+                "S1",
+                "B1",
+                "B2",
+                "B3",
+                "A1",
+                "H1"
+              ];
               const cName = coachNames[(i / 3 - 1) % coachNames.length];
               const coachBox = new Mesh(
                 new BoxGeometry(0.65, 0.45, 0.95),
                 new MeshBasicMaterial({ color: 592139 })
               );
               coachBox.position.copy(colPos).setY(colPos.y + 3.2).add(normal.clone().multiplyScalar(3.2));
-              coachBox.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
+              coachBox.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                tangent
+              );
               coachBox.frustumCulled = false;
               stGroup.add(coachBox);
               const cLed = new Mesh(
@@ -35822,7 +38394,10 @@ void main() {
                 new MeshBasicMaterial({ color: 16096779 })
               );
               cLed.position.copy(coachBox.position).add(normal.clone().multiplyScalar(0.34));
-              cLed.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), normal);
+              cLed.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                normal
+              );
               cLed.frustumCulled = false;
               stGroup.add(cLed);
             }
@@ -35862,30 +38437,45 @@ void main() {
       fobGroup.position.copy(fobPt);
       fobGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fobTang);
       const fobBridgeSpan = 16;
-      const fobFloor = new Mesh(new BoxGeometry(fobBridgeSpan, 0.35, 3.2), fobSteelMat);
+      const fobFloor = new Mesh(
+        new BoxGeometry(fobBridgeSpan, 0.35, 3.2),
+        fobSteelMat
+      );
       fobFloor.position.set(0, 7.3, 0);
       fobFloor.castShadow = true;
       fobFloor.frustumCulled = false;
       fobGroup.add(fobFloor);
       [-1.5, 1.5].forEach((fz) => {
-        const truss = new Mesh(new BoxGeometry(fobBridgeSpan, 1.8, 0.12), fobSteelMat);
+        const truss = new Mesh(
+          new BoxGeometry(fobBridgeSpan, 1.8, 0.12),
+          fobSteelMat
+        );
         truss.position.set(0, 8.2, fz);
         truss.castShadow = true;
         truss.frustumCulled = false;
         fobGroup.add(truss);
       });
-      const fobRoof = new Mesh(new BoxGeometry(fobBridgeSpan + 0.4, 0.15, 3.6), canopyMat);
+      const fobRoof = new Mesh(
+        new BoxGeometry(fobBridgeSpan + 0.4, 0.15, 3.6),
+        canopyMat
+      );
       fobRoof.position.set(0, 9.4, 0);
       fobRoof.castShadow = true;
       fobRoof.frustumCulled = false;
       fobGroup.add(fobRoof);
-      const fobNamePlate = new Mesh(new BoxGeometry(6.5, 1.4, 0.12), stBoardMat);
+      const fobNamePlate = new Mesh(
+        new BoxGeometry(6.5, 1.4, 0.12),
+        stBoardMat
+      );
       fobNamePlate.position.set(0, 8.4, 1.6);
       fobNamePlate.castShadow = true;
       fobNamePlate.frustumCulled = false;
       fobGroup.add(fobNamePlate);
       [-7.5, 7.5].forEach((tx) => {
-        const tower2 = new Mesh(new BoxGeometry(1.4, 6.3, 2.6), steelMat);
+        const tower2 = new Mesh(
+          new BoxGeometry(1.4, 6.3, 2.6),
+          steelMat
+        );
         tower2.position.set(tx, 4.15, 0);
         tower2.castShadow = true;
         tower2.frustumCulled = false;
@@ -35894,13 +38484,19 @@ void main() {
         for (let s = 0; s < stepCount; s++) {
           const stepY = 7.1 - s / stepCount * 6;
           const stepZ = 1.8 + s * 0.72;
-          const step = new Mesh(new BoxGeometry(2.2, 0.22, 0.75), fobSteelMat);
+          const step = new Mesh(
+            new BoxGeometry(2.2, 0.22, 0.75),
+            fobSteelMat
+          );
           step.position.set(tx, stepY, stepZ);
           step.castShadow = true;
           step.frustumCulled = false;
           fobGroup.add(step);
         }
-        const rail = new Mesh(new BoxGeometry(0.1, 0.1, 13.5), fobSteelMat);
+        const rail = new Mesh(
+          new BoxGeometry(0.1, 0.1, 13.5),
+          fobSteelMat
+        );
         rail.position.set(tx - 1.15, 4.8, 7.5);
         rail.rotation.x = -0.42;
         fobGroup.add(rail);
@@ -35912,43 +38508,70 @@ void main() {
       stGroup.add(fobGroup);
       const bldgGroup = new Group();
       bldgGroup.position.copy(fobPt);
-      bldgGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fobTang);
-      const mainBldg = new Mesh(new BoxGeometry(16, 14.5, 84), buildingMat);
+      bldgGroup.quaternion.setFromUnitVectors(
+        new Vector3(0, 0, 1),
+        fobTang
+      );
+      const mainBldg = new Mesh(
+        new BoxGeometry(16, 14.5, 84),
+        buildingMat
+      );
       mainBldg.position.set(-19.5, 7.25, 0);
       mainBldg.castShadow = true;
       mainBldg.receiveShadow = true;
       mainBldg.frustumCulled = false;
       bldgGroup.add(mainBldg);
-      const porticoMat = new MeshStandardMaterial({ color: 16708551, roughness: 0.6 });
-      const portico = new Mesh(new BoxGeometry(4.2, 10, 24), porticoMat);
+      const porticoMat = new MeshStandardMaterial({
+        color: 16708551,
+        roughness: 0.6
+      });
+      const portico = new Mesh(
+        new BoxGeometry(4.2, 10, 24),
+        porticoMat
+      );
       portico.position.set(-11.4, 5, 0);
       portico.castShadow = true;
       portico.frustumCulled = false;
       bldgGroup.add(portico);
-      const tower = new Mesh(new BoxGeometry(9, 24, 9), buildingMat);
+      const tower = new Mesh(
+        new BoxGeometry(9, 24, 9),
+        buildingMat
+      );
       tower.position.set(-19.5, 12, 0);
       tower.castShadow = true;
       tower.frustumCulled = false;
       bldgGroup.add(tower);
-      const crown = new Mesh(new BoxGeometry(10.2, 1.4, 10.2), porticoMat);
+      const crown = new Mesh(
+        new BoxGeometry(10.2, 1.4, 10.2),
+        porticoMat
+      );
       crown.position.set(-19.5, 24.2, 0);
       crown.castShadow = true;
       crown.frustumCulled = false;
       bldgGroup.add(crown);
-      const pole = new Mesh(new CylinderGeometry(0.08, 0.12, 6.5, 8), steelMat);
+      const pole = new Mesh(
+        new CylinderGeometry(0.08, 0.12, 6.5, 8),
+        steelMat
+      );
       pole.position.set(-19.5, 27.5, 0);
       bldgGroup.add(pole);
       const flagMat = new MeshBasicMaterial({ color: 16347926 });
       const flag = new Mesh(new PlaneGeometry(2.4, 1.4), flagMat);
       flag.position.set(-19.5, 29.5, 1.2);
       bldgGroup.add(flag);
-      const clockDial = new Mesh(new PlaneGeometry(4.2, 4.2), clockMat);
+      const clockDial = new Mesh(
+        new PlaneGeometry(4.2, 4.2),
+        clockMat
+      );
       clockDial.position.set(-14.9, 19.5, 0);
       clockDial.rotation.y = Math.PI / 2;
       clockDial.frustumCulled = false;
       bldgGroup.add(clockDial);
       const roofSignMat = new MeshBasicMaterial({ color: 14427686 });
-      const roofSignBoard = new Mesh(new BoxGeometry(0.3, 1.8, 38), roofSignMat);
+      const roofSignBoard = new Mesh(
+        new BoxGeometry(0.3, 1.8, 38),
+        roofSignMat
+      );
       roofSignBoard.position.set(-11.6, 15.4, 0);
       roofSignBoard.castShadow = true;
       roofSignBoard.frustumCulled = false;
@@ -35961,22 +38584,34 @@ void main() {
         const bTang = this.curve.getTangentAt(bU).normalize();
         const bNorm = new Vector3().crossVectors(bTang, up).normalize();
         const bPos1 = bPt.clone().add(bNorm.clone().multiplyScalar(-7.6)).setY(bPt.y + 1.05);
-        const bPost1 = new Mesh(new CylinderGeometry(0.08, 0.08, 2.8, 8), steelMat);
+        const bPost1 = new Mesh(
+          new CylinderGeometry(0.08, 0.08, 2.8, 8),
+          steelMat
+        );
         bPost1.position.copy(bPos1).setY(bPos1.y + 1.4);
         bPost1.frustumCulled = false;
         stGroup.add(bPost1);
-        const bBoard1 = new Mesh(new BoxGeometry(0.12, 1.8, 4.8), stBoardMat);
+        const bBoard1 = new Mesh(
+          new BoxGeometry(0.12, 1.8, 4.8),
+          stBoardMat
+        );
         bBoard1.position.copy(bPos1).setY(bPos1.y + 2.4);
         bBoard1.quaternion.setFromUnitVectors(new Vector3(1, 0, 0), bNorm);
         bBoard1.castShadow = true;
         bBoard1.frustumCulled = false;
         stGroup.add(bBoard1);
         const bPos2 = bPt.clone().add(bNorm.clone().multiplyScalar(7.6)).setY(bPt.y + 1.05);
-        const bPost2 = new Mesh(new CylinderGeometry(0.08, 0.08, 2.8, 8), steelMat);
+        const bPost2 = new Mesh(
+          new CylinderGeometry(0.08, 0.08, 2.8, 8),
+          steelMat
+        );
         bPost2.position.copy(bPos2).setY(bPos2.y + 1.4);
         bPost2.frustumCulled = false;
         stGroup.add(bPost2);
-        const bBoard2 = new Mesh(new BoxGeometry(0.12, 1.8, 4.8), stBoardMat);
+        const bBoard2 = new Mesh(
+          new BoxGeometry(0.12, 1.8, 4.8),
+          stBoardMat
+        );
         bBoard2.position.copy(bPos2).setY(bPos2.y + 2.4);
         bBoard2.quaternion.setFromUnitVectors(new Vector3(1, 0, 0), bNorm);
         bBoard2.castShadow = true;
@@ -35988,31 +38623,49 @@ void main() {
         const dPt = this.curve.getPointAt(dU);
         const dTang = this.curve.getTangentAt(dU).normalize();
         const dNorm = new Vector3().crossVectors(dTang, up).normalize();
-        const depScreen = new Mesh(new BoxGeometry(0.2, 1.1, 4.2), trainInfoMat);
+        const depScreen = new Mesh(
+          new BoxGeometry(0.2, 1.1, 4.2),
+          trainInfoMat
+        );
         depScreen.position.copy(dPt).add(dNorm.clone().multiplyScalar(-7.6)).setY(dPt.y + 4.2);
-        depScreen.quaternion.setFromUnitVectors(new Vector3(1, 0, 0), dNorm);
+        depScreen.quaternion.setFromUnitVectors(
+          new Vector3(1, 0, 0),
+          dNorm
+        );
         depScreen.frustumCulled = false;
         stGroup.add(depScreen);
       });
-      const irctcMat = new MeshStandardMaterial({ color: 165063, roughness: 0.5 });
+      const irctcMat = new MeshStandardMaterial({
+        color: 165063,
+        roughness: 0.5
+      });
       [-0.014, 0.014].forEach((uOffset, kIdx) => {
         const kU = stCenterProg + uOffset;
         const kPt = this.curve.getPointAt(kU);
         const kTang = this.curve.getTangentAt(kU).normalize();
         const kNorm = new Vector3().crossVectors(kTang, up).normalize();
         const kPos = kPt.clone().add(kNorm.clone().multiplyScalar(kIdx === 0 ? -9.5 : 9.5)).setY(kPt.y + 1.05);
-        const kiosk = new Mesh(new BoxGeometry(2.4, 2.6, 4.5), irctcMat);
+        const kiosk = new Mesh(
+          new BoxGeometry(2.4, 2.6, 4.5),
+          irctcMat
+        );
         kiosk.position.copy(kPos).setY(kPos.y + 1.3);
         kiosk.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), kTang);
         kiosk.castShadow = true;
         kiosk.frustumCulled = false;
         stGroup.add(kiosk);
-        const awning = new Mesh(new BoxGeometry(2.8, 0.25, 4.8), new MeshStandardMaterial({ color: 16436245 }));
+        const awning = new Mesh(
+          new BoxGeometry(2.8, 0.25, 4.8),
+          new MeshStandardMaterial({ color: 16436245 })
+        );
         awning.position.copy(kPos).setY(kPos.y + 2.6);
         awning.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), kTang);
         stGroup.add(awning);
       });
-      const benchWoodMat = new MeshStandardMaterial({ color: 7877903, roughness: 0.7 });
+      const benchWoodMat = new MeshStandardMaterial({
+        color: 7877903,
+        roughness: 0.7
+      });
       for (let b = 0; b < 10; b++) {
         const bU = stCenterProg - 0.018 + b / 9 * 0.036;
         const bPt = this.curve.getPointAt(bU);
@@ -36020,27 +38673,42 @@ void main() {
         const bNorm = new Vector3().crossVectors(bTang, up).normalize();
         [-7.6, 7.6].forEach((bx) => {
           const benchPos = bPt.clone().add(bNorm.clone().multiplyScalar(bx)).setY(bPt.y + 1.05);
-          const bench = new Mesh(new BoxGeometry(0.7, 0.45, 2.2), benchWoodMat);
+          const bench = new Mesh(
+            new BoxGeometry(0.7, 0.45, 2.2),
+            benchWoodMat
+          );
           bench.position.copy(benchPos).setY(benchPos.y + 0.25);
           bench.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), bTang);
           bench.castShadow = true;
           bench.frustumCulled = false;
           stGroup.add(bench);
-          const benchBack = new Mesh(new BoxGeometry(0.1, 0.5, 2.2), benchWoodMat);
+          const benchBack = new Mesh(
+            new BoxGeometry(0.1, 0.5, 2.2),
+            benchWoodMat
+          );
           benchBack.position.copy(benchPos).add(bNorm.clone().multiplyScalar(bx > 0 ? 0.3 : -0.3)).setY(benchPos.y + 0.6);
-          benchBack.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), bTang);
+          benchBack.quaternion.setFromUnitVectors(
+            new Vector3(0, 0, 1),
+            bTang
+          );
           stGroup.add(benchBack);
         });
       }
       const mastPt = this.curve.getPointAt(stCenterProg);
       const mastNorm = new Vector3().crossVectors(this.curve.getTangentAt(stCenterProg).normalize(), up).normalize();
       const mastPos = mastPt.clone().add(mastNorm.clone().multiplyScalar(16)).setY(0);
-      const highMast = new Mesh(new CylinderGeometry(0.35, 0.75, 25, 8), steelMat);
+      const highMast = new Mesh(
+        new CylinderGeometry(0.35, 0.75, 25, 8),
+        steelMat
+      );
       highMast.position.copy(mastPos).setY(12.5);
       highMast.castShadow = true;
       highMast.frustumCulled = false;
       stGroup.add(highMast);
-      const lightRing = new Mesh(new TorusGeometry(1.8, 0.15, 8, 16), steelMat);
+      const lightRing = new Mesh(
+        new TorusGeometry(1.8, 0.15, 8, 16),
+        steelMat
+      );
       lightRing.rotation.x = Math.PI / 2;
       lightRing.position.copy(mastPos).setY(24.5);
       stGroup.add(lightRing);
@@ -36053,11 +38721,17 @@ void main() {
         const fU = stCenterProg - fenceSpan / 2 + f / fenceSteps * fenceSpan;
         const fPt = this.curve.getPointAt(fU);
         const fTang = this.curve.getTangentAt(fU).normalize();
-        const fPost = new Mesh(new CylinderGeometry(0.04, 0.04, 1.2, 6), steelMat);
+        const fPost = new Mesh(
+          new CylinderGeometry(0.04, 0.04, 1.2, 6),
+          steelMat
+        );
         fPost.position.copy(fPt).setY(fPt.y + 0.6);
         fPost.frustumCulled = false;
         stGroup.add(fPost);
-        const fBar = new Mesh(new BoxGeometry(0.06, 0.06, 4.8), steelMat);
+        const fBar = new Mesh(
+          new BoxGeometry(0.06, 0.06, 4.8),
+          steelMat
+        );
         fBar.position.copy(fPt).setY(fPt.y + 0.9);
         fBar.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fTang);
         fBar.frustumCulled = false;
@@ -36074,14 +38748,29 @@ void main() {
       const crossPt = this.curve.getPointAt(this.crossingProgress);
       const tangent = this.curve.getTangentAt(this.crossingProgress).normalize();
       crossGroup.position.copy(crossPt);
-      crossGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-      const roadMat = new MeshStandardMaterial({ color: 2042167, roughness: 0.9 });
-      const barrierMat = new MeshStandardMaterial({ color: 16436245, roughness: 0.4 });
-      const road = new Mesh(new BoxGeometry(26, 0.12, 8), roadMat);
+      crossGroup.quaternion.setFromUnitVectors(
+        new Vector3(0, 0, 1),
+        tangent
+      );
+      const roadMat = new MeshStandardMaterial({
+        color: 2042167,
+        roughness: 0.9
+      });
+      const barrierMat = new MeshStandardMaterial({
+        color: 16436245,
+        roughness: 0.4
+      });
+      const road = new Mesh(
+        new BoxGeometry(26, 0.12, 8),
+        roadMat
+      );
       road.position.y = 0.06;
       crossGroup.add(road);
       [-5.5, 5.5].forEach((x) => {
-        const arm = new Mesh(new BoxGeometry(7, 0.15, 0.12), barrierMat);
+        const arm = new Mesh(
+          new BoxGeometry(7, 0.15, 0.12),
+          barrierMat
+        );
         arm.position.set(x > 0 ? -3.5 : 3.5, 1.1, x > 0 ? 4.5 : -4.5);
         crossGroup.add(arm);
       });
@@ -36100,11 +38789,20 @@ void main() {
         const normal = new Vector3().crossVectors(tangent, up).normalize();
         const sigGroup = new Group();
         sigGroup.position.copy(pt).add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.4));
-        sigGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-        const post = new Mesh(new CylinderGeometry(0.08, 0.08, 4.8, 8), new MeshStandardMaterial({ color: 10265519 }));
+        sigGroup.quaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          tangent
+        );
+        const post = new Mesh(
+          new CylinderGeometry(0.08, 0.08, 4.8, 8),
+          new MeshStandardMaterial({ color: 10265519 })
+        );
         post.position.y = 2.4;
         sigGroup.add(post);
-        const sigBox = new Mesh(new BoxGeometry(0.42, 1.3, 0.28), new MeshStandardMaterial({ color: 273 }));
+        const sigBox = new Mesh(
+          new BoxGeometry(0.42, 1.3, 0.28),
+          new MeshStandardMaterial({ color: 273 })
+        );
         sigBox.position.set(0, 4.2, 0);
         sigGroup.add(sigBox);
         const lamps = {};
@@ -36140,12 +38838,15 @@ void main() {
         Object.keys(sig.lamps).forEach((k) => {
           sig.lamps[k].mesh.material.color.setHex(546);
         });
-        if (aspect2 === "green") sig.lamps.green.mesh.material.color.setHex(sig.lamps.green.color);
-        else if (aspect2 === "yellow") sig.lamps.yellow1.mesh.material.color.setHex(sig.lamps.yellow1.color);
+        if (aspect2 === "green")
+          sig.lamps.green.mesh.material.color.setHex(sig.lamps.green.color);
+        else if (aspect2 === "yellow")
+          sig.lamps.yellow1.mesh.material.color.setHex(sig.lamps.yellow1.color);
         else if (aspect2 === "double_yellow") {
           sig.lamps.yellow1.mesh.material.color.setHex(sig.lamps.yellow1.color);
           sig.lamps.yellow2.mesh.material.color.setHex(sig.lamps.yellow2.color);
-        } else if (aspect2 === "red") sig.lamps.red.mesh.material.color.setHex(sig.lamps.red.color);
+        } else if (aspect2 === "red")
+          sig.lamps.red.mesh.material.color.setHex(sig.lamps.red.color);
       });
     }
     buildMileposts() {
@@ -36158,8 +38859,14 @@ void main() {
         const normal = new Vector3().crossVectors(tangent, up).normalize();
         const postGroup = new Group();
         postGroup.position.copy(pt).add(normal.clone().multiplyScalar(this.trackOffset / 2 + 2.5));
-        postGroup.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), tangent);
-        const stone = new Mesh(new BoxGeometry(0.28, 0.85, 0.18), postMat);
+        postGroup.quaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          tangent
+        );
+        const stone = new Mesh(
+          new BoxGeometry(0.28, 0.85, 0.18),
+          postMat
+        );
         stone.position.y = 0.42;
         postGroup.add(stone);
         this.trackGroup.add(postGroup);
@@ -37914,6 +40621,11 @@ void main() {
       roofCenterMesh.position.set(0, 3.4, 0);
       roofCenterMesh.scale.set(1, 0.38, 1);
       group.add(roofCenterMesh);
+      [-1.1, -0.6, 0.6, 1.1].forEach((rx) => {
+        const rib = new Mesh(new BoxGeometry(0.04, 0.05, centerLen), materials.roof);
+        rib.position.set(rx, 3.52, 0);
+        group.add(rib);
+      });
       [-3.8, -1.2, 1.2, 3.8].forEach((rz) => {
         const hood = new Mesh(new BoxGeometry(1.6, 0.22, 1.8), materials.darkSteel);
         hood.position.set(0, 3.65, rz);
@@ -37946,51 +40658,111 @@ void main() {
         cabRoof.position.set(0, 3.4, cabLen / 2);
         cabRoof.scale.set(1, 0.38, 1);
         cabGroup.add(cabRoof);
-        const noseWedge = new Mesh(
-          new ConeGeometry(width / 2, 0.9, 4).rotateY(Math.PI / 4).scale(1, 1, 0.5),
+        const bonnetWidth = width * 0.96;
+        const bonnetDeck = new Mesh(
+          new BoxGeometry(bonnetWidth, 0.08, 0.52),
           materials.front
         );
-        noseWedge.position.set(0, 2.5, cabLen + 0.12);
-        cabGroup.add(noseWedge);
+        bonnetDeck.position.set(0, 1.66, cabLen + 0.22);
+        bonnetDeck.rotation.x = -0.52;
+        bonnetDeck.castShadow = true;
+        cabGroup.add(bonnetDeck);
+        const prowRidge = new Mesh(
+          new BoxGeometry(0.12, 0.06, 0.54),
+          materials.front
+        );
+        prowRidge.position.set(0, 1.68, cabLen + 0.23);
+        prowRidge.rotation.x = -0.52;
+        cabGroup.add(prowRidge);
+        const noseFace = new Mesh(
+          new BoxGeometry(bonnetWidth, 0.58, 0.16),
+          materials.front
+        );
+        noseFace.position.set(0, 1.32, cabLen + 0.32);
+        noseFace.castShadow = true;
+        cabGroup.add(noseFace);
+        [-1, 1].forEach((side) => {
+          const cornerFillet = new Mesh(
+            new CylinderGeometry(0.22, 0.22, 1.4, 8),
+            materials.side
+          );
+          cornerFillet.position.set(side * (width / 2 - 0.12), 1.75, cabLen + 0.05);
+          cornerFillet.rotation.x = -0.25;
+          cabGroup.add(cornerFillet);
+        });
         [-0.68, 0.68].forEach((wx) => {
-          const frame = new Mesh(new BoxGeometry(1.08, 0.82, 0.06), materials.rubber);
-          frame.position.set(wx, 2.58, cabLen + 0.02);
-          frame.rotation.x = -0.14;
+          const frame = new Mesh(new BoxGeometry(1.1, 0.84, 0.06), materials.rubber);
+          frame.position.set(wx, 2.58, cabLen + 0.03);
+          frame.rotation.x = -0.22;
           cabGroup.add(frame);
-          const glassPane = new Mesh(new PlaneGeometry(0.96, 0.7), materials.glass);
-          glassPane.position.set(wx, 2.58, cabLen + 0.05);
-          glassPane.rotation.x = -0.14;
+          const glassPane = new Mesh(new PlaneGeometry(0.98, 0.72), materials.glass);
+          glassPane.position.set(wx, 2.58, cabLen + 0.065);
+          glassPane.rotation.x = -0.22;
           cabGroup.add(glassPane);
-          const visor = new Mesh(new BoxGeometry(1.08, 0.06, 0.18), materials.darkSteel);
-          visor.position.set(wx, 3.02, cabLen + 0.1);
-          cabGroup.add(visor);
           const wiperPivot = new Group();
-          wiperPivot.position.set(wx, 2.22, cabLen + 0.06);
-          const wiperArm = new Mesh(new CylinderGeometry(0.012, 0.012, 0.45), materials.darkSteel);
-          wiperArm.position.set(0.08, 0.22, 0);
-          wiperArm.rotation.z = -0.35;
+          wiperPivot.position.set(wx, 2.24, cabLen + 0.12);
+          const wiperArm = new Mesh(new CylinderGeometry(0.012, 0.012, 0.44), materials.darkSteel);
+          wiperArm.position.set(0.08, 0.2, 0);
+          wiperArm.rotation.z = -0.32;
           wiperPivot.add(wiperArm);
-          const wiperBlade = new Mesh(new BoxGeometry(0.02, 0.44, 0.015), materials.rubber);
-          wiperBlade.position.set(0.16, 0.24, 0.02);
-          wiperBlade.rotation.z = -0.35;
+          const wiperBlade = new Mesh(new BoxGeometry(0.02, 0.42, 0.015), materials.rubber);
+          wiperBlade.position.set(0.15, 0.22, 0.02);
+          wiperBlade.rotation.z = -0.32;
           wiperPivot.add(wiperBlade);
           cabGroup.add(wiperPivot);
         });
-        const hlNacelle = new Mesh(new BoxGeometry(0.72, 0.32, 0.28), materials.darkSteel);
-        hlNacelle.position.set(0, 3.28, cabLen + 0.12);
+        const centerPost = new Mesh(new BoxGeometry(0.14, 0.92, 0.08), materials.darkSteel);
+        centerPost.position.set(0, 2.58, cabLen + 0.04);
+        centerPost.rotation.x = -0.22;
+        cabGroup.add(centerPost);
+        const visor = new Mesh(new BoxGeometry(width * 0.88, 0.08, 0.28), materials.darkSteel);
+        visor.position.set(0, 3.06, cabLen + 0.16);
+        visor.rotation.x = -0.12;
+        cabGroup.add(visor);
+        [-1, 1].forEach((side) => {
+          const winX = side * (width / 2 + 0.01);
+          const sideWinFrame = new Mesh(new BoxGeometry(0.04, 0.58, 0.72), materials.darkSteel);
+          sideWinFrame.position.set(winX, 2.56, cabLen - 0.72);
+          cabGroup.add(sideWinFrame);
+          const sideWinGlass = new Mesh(new BoxGeometry(0.02, 0.52, 0.66), materials.glass);
+          sideWinGlass.position.set(winX, 2.56, cabLen - 0.72);
+          cabGroup.add(sideWinGlass);
+          const dripRail = new Mesh(new BoxGeometry(0.08, 0.03, 0.82), materials.darkSteel);
+          dripRail.position.set(winX, 2.88, cabLen - 0.72);
+          cabGroup.add(dripRail);
+          const mirrorArm1 = new Mesh(new CylinderGeometry(0.012, 0.012, 0.28).rotateZ(Math.PI / 2), materials.chrome);
+          mirrorArm1.position.set(side * (width / 2 + 0.14), 2.7, cabLen - 0.35);
+          cabGroup.add(mirrorArm1);
+          const mirrorArm2 = new Mesh(new CylinderGeometry(0.012, 0.012, 0.28).rotateZ(Math.PI / 2), materials.chrome);
+          mirrorArm2.position.set(side * (width / 2 + 0.14), 2.42, cabLen - 0.35);
+          cabGroup.add(mirrorArm2);
+          const mirrorHousing = new Mesh(new BoxGeometry(0.04, 0.34, 0.18), materials.darkSteel);
+          mirrorHousing.position.set(side * (width / 2 + 0.28), 2.56, cabLen - 0.35);
+          mirrorHousing.rotation.y = side * -0.15;
+          cabGroup.add(mirrorHousing);
+          const mirrorFace = new Mesh(new PlaneGeometry(0.16, 0.3), materials.chrome);
+          mirrorFace.position.set(side * (width / 2 + 0.26), 2.56, cabLen - 0.35);
+          mirrorFace.rotation.y = side > 0 ? -Math.PI / 2 - 0.15 : Math.PI / 2 + 0.15;
+          cabGroup.add(mirrorFace);
+        });
+        const hlNacelle = new Mesh(new BoxGeometry(0.74, 0.34, 0.32), materials.darkSteel);
+        hlNacelle.position.set(0, 3.28, cabLen + 0.16);
         hlNacelle.castShadow = true;
         cabGroup.add(hlNacelle);
         [-0.18, 0.18].forEach((hx) => {
-          const bezel = new Mesh(new CylinderGeometry(0.12, 0.12, 0.06, 20).rotateX(Math.PI / 2), materials.chrome);
-          bezel.position.set(hx, 3.28, cabLen + 0.26);
+          const bezel = new Mesh(new CylinderGeometry(0.125, 0.125, 0.08, 20).rotateX(Math.PI / 2), materials.chrome);
+          bezel.position.set(hx, 3.28, cabLen + 0.3);
           cabGroup.add(bezel);
-          const bulb = new Mesh(new SphereGeometry(0.085, 16, 12), new MeshBasicMaterial({ color: 16777215 }));
-          bulb.position.set(hx, 3.28, cabLen + 0.28);
+          const reflector = new Mesh(new ConeGeometry(0.1, 0.06, 16).rotateX(-Math.PI / 2), materials.chrome);
+          reflector.position.set(hx, 3.28, cabLen + 0.31);
+          cabGroup.add(reflector);
+          const bulb = new Mesh(new SphereGeometry(0.05, 12, 10), new MeshBasicMaterial({ color: 16777215 }));
+          bulb.position.set(hx, 3.28, cabLen + 0.33);
           cabGroup.add(bulb);
         });
         const flasherMat = new MeshBasicMaterial({ color: 16096779 });
-        const flasher = new Mesh(new CylinderGeometry(0.055, 0.055, 0.05, 14).rotateX(Math.PI / 2), flasherMat);
-        flasher.position.set(0, 3.48, cabLen + 0.22);
+        const flasher = new Mesh(new CylinderGeometry(0.06, 0.06, 0.06, 14).rotateX(Math.PI / 2), flasherMat);
+        flasher.position.set(0, 3.52, cabLen + 0.24);
         cabGroup.add(flasher);
         this.flasherLamps.push(flasherMat);
         const acUnit = new Mesh(new BoxGeometry(1.4, 0.28, 1.8), new MeshStandardMaterial({ color: 14870768, roughness: 0.35, metalness: 0.3 }));
@@ -38020,11 +40792,11 @@ void main() {
           cabGroup.add(step);
         });
         [-1.15, 1.15].forEach((mx) => {
-          const markerBezel = new Mesh(new CylinderGeometry(0.06, 0.06, 0.04, 14).rotateX(Math.PI / 2), materials.darkSteel);
-          markerBezel.position.set(mx, 1.25, cabLen + 0.05);
+          const markerBezel = new Mesh(new CylinderGeometry(0.07, 0.07, 0.05, 14).rotateX(Math.PI / 2), materials.darkSteel);
+          markerBezel.position.set(mx, 1.25, cabLen + 0.32);
           cabGroup.add(markerBezel);
-          const markerLens = new Mesh(new SphereGeometry(0.045, 10, 8), new MeshBasicMaterial({ color: isFront ? 16777215 : 15680580 }));
-          markerLens.position.set(mx, 1.25, cabLen + 0.07);
+          const markerLens = new Mesh(new SphereGeometry(0.05, 10, 8), new MeshBasicMaterial({ color: isFront ? 16777215 : 15680580 }));
+          markerLens.position.set(mx, 1.25, cabLen + 0.34);
           cabGroup.add(markerLens);
         });
         const hornGroup = new Group();
@@ -38039,29 +40811,32 @@ void main() {
         });
         cabGroup.add(hornGroup);
         const bufferBeam = new Mesh(new BoxGeometry(3.18, 0.44, 0.36), materials.darkSteel);
-        bufferBeam.position.set(0, 0.95, cabLen + 0.18);
+        bufferBeam.position.set(0, 0.95, cabLen + 0.28);
         bufferBeam.castShadow = true;
         cabGroup.add(bufferBeam);
         [-0.95, 0.95].forEach((bx) => {
           const plunger = new Mesh(new CylinderGeometry(0.12, 0.12, 0.34, 16).rotateX(Math.PI / 2), materials.darkSteel);
-          plunger.position.set(bx, 0.95, cabLen + 0.48);
+          plunger.position.set(bx, 0.95, cabLen + 0.58);
           cabGroup.add(plunger);
           const head = new Mesh(new CylinderGeometry(0.24, 0.24, 0.06, 20).rotateX(Math.PI / 2), materials.darkSteel);
-          head.position.set(bx, 0.95, cabLen + 0.66);
+          head.position.set(bx, 0.95, cabLen + 0.76);
           cabGroup.add(head);
         });
         const couplerStem = new Mesh(new BoxGeometry(0.24, 0.24, 0.65), materials.darkSteel);
-        couplerStem.position.set(0, 0.88, cabLen + 0.48);
+        couplerStem.position.set(0, 0.88, cabLen + 0.58);
         cabGroup.add(couplerStem);
         const couplerKnuckle = new Mesh(new BoxGeometry(0.28, 0.28, 0.22), materials.darkSteel);
-        couplerKnuckle.position.set(0.04, 0.88, cabLen + 0.8);
+        couplerKnuckle.position.set(0.04, 0.88, cabLen + 0.9);
         cabGroup.add(couplerKnuckle);
+        const uncouplingLever = new Mesh(new CylinderGeometry(0.015, 0.015, 1.2).rotateZ(Math.PI / 2), materials.darkSteel);
+        uncouplingLever.position.set(-0.55, 1.05, cabLen + 0.48);
+        cabGroup.add(uncouplingLever);
         [-0.32, 0.32].forEach((hx, hidx) => {
           const hoseColor = hidx === 0 ? 14427686 : 1483594;
           const hosePts = [
-            new Vector3(hx, 0.95, cabLen + 0.35),
-            new Vector3(hx * 1.1, 0.65, cabLen + 0.5),
-            new Vector3(hx * 0.7, 0.45, cabLen + 0.45)
+            new Vector3(hx, 0.95, cabLen + 0.45),
+            new Vector3(hx * 1.1, 0.65, cabLen + 0.6),
+            new Vector3(hx * 0.7, 0.45, cabLen + 0.55)
           ];
           const hoseCurve = new CatmullRomCurve3(hosePts);
           const hoseMesh = new Mesh(
@@ -38071,22 +40846,22 @@ void main() {
           cabGroup.add(hoseMesh);
         });
         const plow = new Mesh(
-          new ConeGeometry(1.55, 0.68, 4).rotateY(Math.PI / 4).scale(1.15, 0.65, 0.85),
+          new ConeGeometry(1.55, 0.7, 4).rotateY(Math.PI / 4).scale(1.15, 0.68, 0.88),
           materials.cowcatcher
         );
-        plow.position.set(0, 0.48, cabLen + 0.38);
+        plow.position.set(0, 0.48, cabLen + 0.45);
         plow.castShadow = true;
         cabGroup.add(plow);
-        [-0.12, 0, 0.12].forEach((sy) => {
-          const slat = new Mesh(new BoxGeometry(2.3, 0.04, 0.12), materials.darkSteel);
-          slat.position.set(0, 0.48 + sy, cabLen + 0.52 - Math.abs(sy) * 0.2);
+        [-0.14, 0, 0.14].forEach((sy) => {
+          const slat = new Mesh(new BoxGeometry(2.35, 0.04, 0.12), materials.darkSteel);
+          slat.position.set(0, 0.48 + sy, cabLen + 0.6 - Math.abs(sy) * 0.2);
           cabGroup.add(slat);
         });
         if (isFront) {
-          const devTL = this.createShockSenderDevice("top_left", new Vector3(-1.25, 3.32, cabLen + 0.12), new Euler(-0.03, 0.04, 0), "Top-Left Emitter");
-          const devTR = this.createShockSenderDevice("top_right", new Vector3(1.25, 3.32, cabLen + 0.12), new Euler(-0.03, -0.04, 0), "Top-Right Emitter");
-          const devDL = this.createShockSenderDevice("down_left", new Vector3(-1.35, 0.95, cabLen + 0.28), new Euler(0.02, 0.03, 0), "Down-Left Emitter");
-          const devDR = this.createShockSenderDevice("down_right", new Vector3(1.35, 0.95, cabLen + 0.28), new Euler(0.02, -0.03, 0), "Down-Right Emitter");
+          const devTL = this.createShockSenderDevice("top_left", new Vector3(-1.25, 3.32, cabLen + 0.16), new Euler(-0.03, 0.04, 0), "Top-Left Emitter");
+          const devTR = this.createShockSenderDevice("top_right", new Vector3(1.25, 3.32, cabLen + 0.16), new Euler(-0.03, -0.04, 0), "Top-Right Emitter");
+          const devDL = this.createShockSenderDevice("down_left", new Vector3(-1.35, 0.95, cabLen + 0.35), new Euler(0.02, 0.03, 0), "Down-Left Emitter");
+          const devDR = this.createShockSenderDevice("down_right", new Vector3(1.35, 0.95, cabLen + 0.35), new Euler(0.02, -0.03, 0), "Down-Right Emitter");
           cabGroup.add(devTL.group);
           cabGroup.add(devTR.group);
           cabGroup.add(devDL.group);
@@ -38202,6 +40977,7 @@ void main() {
       const castSteel = new MeshStandardMaterial({ color: 3359061, roughness: 0.6, metalness: 0.7 });
       const wheelSteel = new MeshStandardMaterial({ color: 14870768, roughness: 0.15, metalness: 0.95 });
       const springMat = new MeshStandardMaterial({ color: 4674921, roughness: 0.4, metalness: 0.8 });
+      const damperMat = new MeshStandardMaterial({ color: 165063, roughness: 0.3, metalness: 0.6 });
       [-1.18, 1.18].forEach((x) => {
         const beam = new Mesh(new BoxGeometry(0.18, 0.38, 4.6), castSteel);
         beam.position.set(x, 0.68, 0);
@@ -38212,6 +40988,14 @@ void main() {
           trans.position.set(x * 0.85, 0.68, cz);
           bogie.add(trans);
         });
+        [-0.8, 0.8].forEach((sz) => {
+          const secSpring = new Mesh(new CylinderGeometry(0.09, 0.09, 0.3, 12), springMat);
+          secSpring.position.set(x, 0.95, sz);
+          bogie.add(secSpring);
+          const damper = new Mesh(new CylinderGeometry(0.03, 0.03, 0.32, 8).rotateX(0.25), damperMat);
+          damper.position.set(x * 1.05, 0.95, sz + 0.15);
+          bogie.add(damper);
+        });
       });
       const axleSpacing = [-1.6, 0, 1.6];
       const railX = 0.838;
@@ -38221,6 +41005,9 @@ void main() {
         const shaft = new Mesh(new CylinderGeometry(0.085, 0.085, 1.95, 16).rotateZ(Math.PI / 2), darkSteel);
         shaft.castShadow = true;
         axleGroup.add(shaft);
+        const tmCasing = new Mesh(new BoxGeometry(0.55, 0.42, 0.52), darkSteel);
+        tmCasing.position.set(0, 0.08, 0.28);
+        axleGroup.add(tmCasing);
         [-railX, railX].forEach((x) => {
           const wheel = new Mesh(new CylinderGeometry(this.wheelRadius, this.wheelRadius, 0.13, 24).rotateZ(Math.PI / 2), wheelSteel);
           wheel.position.x = x;
@@ -38243,6 +41030,9 @@ void main() {
             spring.position.set(jbX, this.wheelRadius + 0.24, z + sz);
             bogie.add(spring);
           });
+          const axDamper = new Mesh(new CylinderGeometry(0.022, 0.022, 0.28, 8), damperMat);
+          axDamper.position.set(jbX + (x > 0 ? 0.08 : -0.08), this.wheelRadius + 0.24, z);
+          bogie.add(axDamper);
           const brakeBlock = new Mesh(new BoxGeometry(0.08, 0.16, 0.08), darkSteel);
           brakeBlock.position.set(x, this.wheelRadius, z + 0.38);
           bogie.add(brakeBlock);
@@ -38338,11 +41128,27 @@ void main() {
       roof.position.y = 3.32;
       roof.scale.set(1, 0.38, 1);
       group.add(roof);
+      [-1.3, -1, -0.7, -0.4, -0.1, 0.1, 0.4, 0.7, 1, 1.3].forEach((rx) => {
+        const roofRib = new Mesh(new BoxGeometry(0.03, 0.025, length * 0.98), materials.roof);
+        roofRib.position.set(rx, 3.48 - Math.pow(rx / 1.5, 2) * 0.18, 0);
+        group.add(roofRib);
+      });
       [-length / 2, length / 2].forEach((z) => {
         const bellow = new Mesh(new BoxGeometry(1.6, 2.2, 0.45), materials.darkSteel);
         bellow.position.set(0, 1.9, z);
         group.add(bellow);
+        const door = new Mesh(new BoxGeometry(0.8, 1.8, 0.05), materials.darkSteel);
+        door.position.set(0, 1.9, z + (z > 0 ? 0.24 : -0.24));
+        group.add(door);
       });
+      [-length * 0.18, length * 0.18].forEach((eqZ) => {
+        const bioTank = new Mesh(new BoxGeometry(1.4, 0.55, 1.8), materials.darkSteel);
+        bioTank.position.set(0, 0.45, eqZ);
+        group.add(bioTank);
+      });
+      const batteryBox = new Mesh(new BoxGeometry(2.4, 0.6, 2.8), materials.darkSteel);
+      batteryBox.position.set(0, 0.48, 0);
+      group.add(batteryBox);
       this.buildFiatBogie(group, length * 0.35);
       this.buildFiatBogie(group, -length * 0.35);
       this.buildCoachSideShockMechanisms(group, length, width, coachIndex);
@@ -39658,6 +42464,2707 @@ void main() {
     }
   };
 
+  // node_modules/three/examples/jsm/utils/BufferGeometryUtils.js
+  function toTrianglesDrawMode(geometry, drawMode) {
+    if (drawMode === TrianglesDrawMode) {
+      console.warn("THREE.BufferGeometryUtils.toTrianglesDrawMode(): Geometry already defined as triangles.");
+      return geometry;
+    }
+    if (drawMode === TriangleFanDrawMode || drawMode === TriangleStripDrawMode) {
+      let index = geometry.getIndex();
+      if (index === null) {
+        const indices = [];
+        const position = geometry.getAttribute("position");
+        if (position !== void 0) {
+          for (let i = 0; i < position.count; i++) {
+            indices.push(i);
+          }
+          geometry.setIndex(indices);
+          index = geometry.getIndex();
+        } else {
+          console.error("THREE.BufferGeometryUtils.toTrianglesDrawMode(): Undefined position attribute. Processing not possible.");
+          return geometry;
+        }
+      }
+      const numberOfTriangles = index.count - 2;
+      const newIndices = [];
+      if (drawMode === TriangleFanDrawMode) {
+        for (let i = 1; i <= numberOfTriangles; i++) {
+          newIndices.push(index.getX(0));
+          newIndices.push(index.getX(i));
+          newIndices.push(index.getX(i + 1));
+        }
+      } else {
+        for (let i = 0; i < numberOfTriangles; i++) {
+          if (i % 2 === 0) {
+            newIndices.push(index.getX(i));
+            newIndices.push(index.getX(i + 1));
+            newIndices.push(index.getX(i + 2));
+          } else {
+            newIndices.push(index.getX(i + 2));
+            newIndices.push(index.getX(i + 1));
+            newIndices.push(index.getX(i));
+          }
+        }
+      }
+      if (newIndices.length / 3 !== numberOfTriangles) {
+        console.error("THREE.BufferGeometryUtils.toTrianglesDrawMode(): Unable to generate correct amount of triangles.");
+      }
+      geometry.setIndex(newIndices);
+      geometry.clearGroups();
+      return geometry;
+    } else {
+      console.error("THREE.BufferGeometryUtils.toTrianglesDrawMode(): Unknown draw mode:", drawMode);
+      return geometry;
+    }
+  }
+
+  // node_modules/three/examples/jsm/utils/SkeletonUtils.js
+  function clone(source) {
+    const sourceLookup = /* @__PURE__ */ new Map();
+    const cloneLookup = /* @__PURE__ */ new Map();
+    const clone2 = source.clone();
+    parallelTraverse(source, clone2, function(sourceNode, clonedNode) {
+      sourceLookup.set(clonedNode, sourceNode);
+      cloneLookup.set(sourceNode, clonedNode);
+    });
+    clone2.traverse(function(node) {
+      if (!node.isSkinnedMesh) return;
+      const clonedMesh = node;
+      const sourceMesh = sourceLookup.get(node);
+      const sourceBones = sourceMesh.skeleton.bones;
+      clonedMesh.skeleton = sourceMesh.skeleton.clone();
+      clonedMesh.bindMatrix.copy(sourceMesh.bindMatrix);
+      clonedMesh.skeleton.bones = sourceBones.map(function(bone) {
+        return cloneLookup.get(bone);
+      });
+      clonedMesh.bind(clonedMesh.skeleton, clonedMesh.bindMatrix);
+    });
+    return clone2;
+  }
+  function parallelTraverse(a, b, callback) {
+    callback(a, b);
+    for (let i = 0; i < a.children.length; i++) {
+      parallelTraverse(a.children[i], b.children[i], callback);
+    }
+  }
+
+  // node_modules/three/examples/jsm/loaders/GLTFLoader.js
+  var GLTFLoader = class extends Loader {
+    /**
+     * Constructs a new glTF loader.
+     *
+     * @param {LoadingManager} [manager] - The loading manager.
+     */
+    constructor(manager) {
+      super(manager);
+      this.dracoLoader = null;
+      this.ktx2Loader = null;
+      this.meshoptDecoder = null;
+      this.pluginCallbacks = [];
+      this.register(function(parser) {
+        return new GLTFMaterialsClearcoatExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsDiffuseRoughnessExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsDispersionExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFTextureBasisUExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFTextureWebPExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFTextureAVIFExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsSheenExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsTransmissionExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsVolumeExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsIorExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsEmissiveStrengthExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsSpecularExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsIridescenceExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsAnisotropyExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMaterialsBumpExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFLightsExtension(parser);
+      });
+      this.register(function(parser) {
+        return new GLTFMeshoptCompression(parser, EXTENSIONS.EXT_MESHOPT_COMPRESSION);
+      });
+      this.register(function(parser) {
+        return new GLTFMeshoptCompression(parser, EXTENSIONS.KHR_MESHOPT_COMPRESSION);
+      });
+      this.register(function(parser) {
+        return new GLTFMeshGpuInstancing(parser);
+      });
+    }
+    /**
+     * Starts loading from the given URL and passes the loaded glTF asset
+     * to the `onLoad()` callback.
+     *
+     * @param {string} url - The path/URL of the file to be loaded. This can also be a data URI.
+     * @param {function(GLTFLoader~LoadObject)} onLoad - Executed when the loading process has been finished.
+     * @param {onProgressCallback} onProgress - Executed while the loading is in progress.
+     * @param {onErrorCallback} onError - Executed when errors occur.
+     */
+    load(url, onLoad, onProgress, onError) {
+      const scope = this;
+      let resourcePath;
+      if (this.resourcePath !== "") {
+        resourcePath = this.resourcePath;
+      } else if (this.path !== "") {
+        const relativeUrl = LoaderUtils.extractUrlBase(url);
+        resourcePath = LoaderUtils.resolveURL(relativeUrl, this.path);
+      } else {
+        resourcePath = LoaderUtils.extractUrlBase(url);
+      }
+      this.manager.itemStart(url);
+      const _onError = function(e) {
+        if (onError) {
+          onError(e);
+        } else {
+          console.error(e);
+        }
+        scope.manager.itemError(url);
+        scope.manager.itemEnd(url);
+      };
+      const loader = new FileLoader(this.manager);
+      loader.setPriority(this.priority);
+      loader.setCache(this.cache);
+      loader.setPath(this.path);
+      loader.setResponseType("arraybuffer");
+      loader.setRequestHeader(this.requestHeader);
+      loader.setWithCredentials(this.withCredentials);
+      loader.load(url, function(data) {
+        try {
+          scope.parse(data, resourcePath, function(gltf) {
+            onLoad(gltf);
+            scope.manager.itemEnd(url);
+          }, _onError);
+        } catch (e) {
+          _onError(e);
+        }
+      }, onProgress, _onError);
+    }
+    /**
+     * Sets the given Draco loader to this loader. Required for decoding assets
+     * compressed with the `KHR_draco_mesh_compression` extension.
+     *
+     * @param {DRACOLoader} dracoLoader - The Draco loader to set.
+     * @return {GLTFLoader} A reference to this loader.
+     */
+    setDRACOLoader(dracoLoader) {
+      this.dracoLoader = dracoLoader;
+      return this;
+    }
+    /**
+     * Sets the given KTX2 loader to this loader. Required for loading KTX2
+     * compressed textures.
+     *
+     * @param {KTX2Loader} ktx2Loader - The KTX2 loader to set.
+     * @return {GLTFLoader} A reference to this loader.
+     */
+    setKTX2Loader(ktx2Loader) {
+      this.ktx2Loader = ktx2Loader;
+      return this;
+    }
+    /**
+     * Sets the given meshopt decoder. Required for decoding assets
+     * compressed with the `EXT_meshopt_compression` extension.
+     *
+     * @param {Object} meshoptDecoder - The meshopt decoder to set.
+     * @return {GLTFLoader} A reference to this loader.
+     */
+    setMeshoptDecoder(meshoptDecoder) {
+      this.meshoptDecoder = meshoptDecoder;
+      return this;
+    }
+    /**
+     * Registers a plugin callback. This API is internally used to implement the various
+     * glTF extensions but can also used by third-party code to add additional logic
+     * to the loader.
+     *
+     * @param {function(parser:GLTFParser)} callback - The callback function to register.
+     * @return {GLTFLoader} A reference to this loader.
+     */
+    register(callback) {
+      if (this.pluginCallbacks.indexOf(callback) === -1) {
+        this.pluginCallbacks.push(callback);
+      }
+      return this;
+    }
+    /**
+     * Unregisters a plugin callback.
+     *
+     * @param {Function} callback - The callback function to unregister.
+     * @return {GLTFLoader} A reference to this loader.
+     */
+    unregister(callback) {
+      if (this.pluginCallbacks.indexOf(callback) !== -1) {
+        this.pluginCallbacks.splice(this.pluginCallbacks.indexOf(callback), 1);
+      }
+      return this;
+    }
+    /**
+     * Parses the given glTF data and returns the resulting group.
+     *
+     * @param {string|ArrayBuffer} data - The raw glTF data.
+     * @param {string} path - The URL base path.
+     * @param {function(GLTFLoader~LoadObject)} onLoad - Executed when the loading process has been finished.
+     * @param {onErrorCallback} onError - Executed when errors occur.
+     */
+    parse(data, path, onLoad, onError) {
+      let json;
+      const extensions = {};
+      const plugins = {};
+      const textDecoder = new TextDecoder();
+      if (typeof data === "string") {
+        json = JSON.parse(data);
+      } else if (data instanceof ArrayBuffer) {
+        const magic = textDecoder.decode(new Uint8Array(data, 0, 4));
+        if (magic === BINARY_EXTENSION_HEADER_MAGIC) {
+          try {
+            extensions[EXTENSIONS.KHR_BINARY_GLTF] = new GLTFBinaryExtension(data);
+          } catch (error2) {
+            if (onError) onError(error2);
+            return;
+          }
+          json = JSON.parse(extensions[EXTENSIONS.KHR_BINARY_GLTF].content);
+        } else {
+          json = JSON.parse(textDecoder.decode(data));
+        }
+      } else {
+        json = data;
+      }
+      if (json.asset === void 0 || json.asset.version[0] < 2) {
+        if (onError) onError(new Error("THREE.GLTFLoader: Unsupported asset. glTF versions >=2.0 are supported."));
+        return;
+      }
+      const parser = new GLTFParser(json, {
+        path: path || this.resourcePath || "",
+        crossOrigin: this.crossOrigin,
+        priority: this.priority,
+        cache: this.cache,
+        withCredentials: this.withCredentials,
+        requestHeader: this.requestHeader,
+        manager: this.manager,
+        ktx2Loader: this.ktx2Loader,
+        meshoptDecoder: this.meshoptDecoder
+      });
+      parser.fileLoader.setRequestHeader(this.requestHeader);
+      for (let i = 0; i < this.pluginCallbacks.length; i++) {
+        const plugin = this.pluginCallbacks[i](parser);
+        if (!plugin.name) console.error("THREE.GLTFLoader: Invalid plugin found: missing name");
+        plugins[plugin.name] = plugin;
+        extensions[plugin.name] = true;
+      }
+      if (json.extensionsUsed) {
+        for (let i = 0; i < json.extensionsUsed.length; ++i) {
+          const extensionName = json.extensionsUsed[i];
+          const extensionsRequired = json.extensionsRequired || [];
+          switch (extensionName) {
+            case EXTENSIONS.KHR_MATERIALS_UNLIT:
+              extensions[extensionName] = new GLTFMaterialsUnlitExtension();
+              break;
+            case EXTENSIONS.KHR_DRACO_MESH_COMPRESSION:
+              extensions[extensionName] = new GLTFDracoMeshCompressionExtension(json, this.dracoLoader);
+              break;
+            case EXTENSIONS.KHR_TEXTURE_TRANSFORM:
+              extensions[extensionName] = new GLTFTextureTransformExtension();
+              break;
+            case EXTENSIONS.KHR_MESH_QUANTIZATION:
+              extensions[extensionName] = new GLTFMeshQuantizationExtension();
+              break;
+            default:
+              if (extensionsRequired.indexOf(extensionName) >= 0 && plugins[extensionName] === void 0) {
+                console.warn('THREE.GLTFLoader: Unknown extension "' + extensionName + '".');
+              }
+          }
+        }
+      }
+      parser.setExtensions(extensions);
+      parser.setPlugins(plugins);
+      parser.parse(onLoad, onError);
+    }
+    /**
+     * Async version of {@link GLTFLoader#parse}.
+     *
+     * @async
+     * @param {string|ArrayBuffer} data - The raw glTF data.
+     * @param {string} path - The URL base path.
+     * @return {Promise<GLTFLoader~LoadObject>} A Promise that resolves with the loaded glTF when the parsing has been finished.
+     */
+    parseAsync(data, path) {
+      const scope = this;
+      return new Promise(function(resolve, reject) {
+        scope.parse(data, path, resolve, reject);
+      });
+    }
+  };
+  function GLTFRegistry() {
+    let objects = {};
+    return {
+      get: function(key) {
+        return objects[key];
+      },
+      add: function(key, object) {
+        objects[key] = object;
+      },
+      remove: function(key) {
+        delete objects[key];
+      },
+      removeAll: function() {
+        objects = {};
+      }
+    };
+  }
+  function getMaterialExtension(parser, materialIndex, extensionName) {
+    const materialDef = parser.json.materials[materialIndex];
+    if (materialDef.extensions && materialDef.extensions[extensionName]) {
+      return materialDef.extensions[extensionName];
+    }
+    return null;
+  }
+  var EXTENSIONS = {
+    KHR_BINARY_GLTF: "KHR_binary_glTF",
+    KHR_DRACO_MESH_COMPRESSION: "KHR_draco_mesh_compression",
+    KHR_LIGHTS_PUNCTUAL: "KHR_lights_punctual",
+    KHR_MATERIALS_CLEARCOAT: "KHR_materials_clearcoat",
+    KHR_MATERIALS_DIFFUSE_ROUGHNESS: "KHR_materials_diffuse_roughness",
+    KHR_MATERIALS_DISPERSION: "KHR_materials_dispersion",
+    KHR_MATERIALS_IOR: "KHR_materials_ior",
+    KHR_MATERIALS_SHEEN: "KHR_materials_sheen",
+    KHR_MATERIALS_SPECULAR: "KHR_materials_specular",
+    KHR_MATERIALS_TRANSMISSION: "KHR_materials_transmission",
+    KHR_MATERIALS_IRIDESCENCE: "KHR_materials_iridescence",
+    KHR_MATERIALS_ANISOTROPY: "KHR_materials_anisotropy",
+    KHR_MATERIALS_UNLIT: "KHR_materials_unlit",
+    KHR_MATERIALS_VOLUME: "KHR_materials_volume",
+    KHR_TEXTURE_BASISU: "KHR_texture_basisu",
+    KHR_TEXTURE_TRANSFORM: "KHR_texture_transform",
+    KHR_MESH_QUANTIZATION: "KHR_mesh_quantization",
+    KHR_MATERIALS_EMISSIVE_STRENGTH: "KHR_materials_emissive_strength",
+    EXT_MATERIALS_BUMP: "EXT_materials_bump",
+    EXT_TEXTURE_WEBP: "EXT_texture_webp",
+    EXT_TEXTURE_AVIF: "EXT_texture_avif",
+    EXT_MESHOPT_COMPRESSION: "EXT_meshopt_compression",
+    KHR_MESHOPT_COMPRESSION: "KHR_meshopt_compression",
+    EXT_MESH_GPU_INSTANCING: "EXT_mesh_gpu_instancing"
+  };
+  var GLTFLightsExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_LIGHTS_PUNCTUAL;
+      this.cache = { refs: {}, uses: {} };
+    }
+    _markDefs() {
+      const parser = this.parser;
+      const nodeDefs = this.parser.json.nodes || [];
+      for (let nodeIndex = 0, nodeLength = nodeDefs.length; nodeIndex < nodeLength; nodeIndex++) {
+        const nodeDef = nodeDefs[nodeIndex];
+        if (nodeDef.extensions && nodeDef.extensions[this.name] && nodeDef.extensions[this.name].light !== void 0) {
+          parser._addNodeRef(this.cache, nodeDef.extensions[this.name].light);
+        }
+      }
+    }
+    _loadLight(lightIndex) {
+      const parser = this.parser;
+      const cacheKey = "light:" + lightIndex;
+      let dependency = parser.cache.get(cacheKey);
+      if (dependency) return dependency;
+      const json = parser.json;
+      const extensions = json.extensions && json.extensions[this.name] || {};
+      const lightDefs = extensions.lights || [];
+      const lightDef = lightDefs[lightIndex];
+      let lightNode;
+      const color = new Color(16777215);
+      if (lightDef.color !== void 0) color.setRGB(lightDef.color[0], lightDef.color[1], lightDef.color[2], LinearSRGBColorSpace);
+      const range = lightDef.range !== void 0 ? lightDef.range : 0;
+      switch (lightDef.type) {
+        case "directional":
+          lightNode = new DirectionalLight(color);
+          lightNode.target.position.set(0, 0, -1);
+          lightNode.add(lightNode.target);
+          break;
+        case "point":
+          lightNode = new PointLight(color);
+          lightNode.distance = range;
+          break;
+        case "spot":
+          lightNode = new SpotLight(color);
+          lightNode.distance = range;
+          lightDef.spot = lightDef.spot || {};
+          lightDef.spot.innerConeAngle = lightDef.spot.innerConeAngle !== void 0 ? lightDef.spot.innerConeAngle : 0;
+          lightDef.spot.outerConeAngle = lightDef.spot.outerConeAngle !== void 0 ? lightDef.spot.outerConeAngle : Math.PI / 4;
+          lightNode.angle = lightDef.spot.outerConeAngle;
+          lightNode.penumbra = 1 - lightDef.spot.innerConeAngle / lightDef.spot.outerConeAngle;
+          lightNode.target.position.set(0, 0, -1);
+          lightNode.add(lightNode.target);
+          break;
+        default:
+          throw new Error("THREE.GLTFLoader: Unexpected light type: " + lightDef.type);
+      }
+      lightNode.position.set(0, 0, 0);
+      assignExtrasToUserData(lightNode, lightDef);
+      if (lightDef.intensity !== void 0) lightNode.intensity = lightDef.intensity;
+      lightNode.name = parser.createUniqueName(lightDef.name || "light_" + lightIndex);
+      dependency = Promise.resolve(lightNode);
+      parser.cache.add(cacheKey, dependency);
+      return dependency;
+    }
+    getDependency(type, index) {
+      if (type !== "light") return;
+      return this._loadLight(index);
+    }
+    createNodeAttachment(nodeIndex) {
+      const self2 = this;
+      const parser = this.parser;
+      const json = parser.json;
+      const nodeDef = json.nodes[nodeIndex];
+      const lightDef = nodeDef.extensions && nodeDef.extensions[this.name] || {};
+      const lightIndex = lightDef.light;
+      if (lightIndex === void 0) return null;
+      return this._loadLight(lightIndex).then(function(light) {
+        return parser._getNodeRef(self2.cache, lightIndex, light);
+      });
+    }
+  };
+  var GLTFMaterialsUnlitExtension = class {
+    constructor() {
+      this.name = EXTENSIONS.KHR_MATERIALS_UNLIT;
+    }
+    getMaterialType() {
+      return MeshBasicMaterial;
+    }
+    extendParams(materialParams, materialDef, parser) {
+      const pending = [];
+      materialParams.color = new Color(1, 1, 1);
+      materialParams.opacity = 1;
+      const metallicRoughness = materialDef.pbrMetallicRoughness;
+      if (metallicRoughness) {
+        if (Array.isArray(metallicRoughness.baseColorFactor)) {
+          const array = metallicRoughness.baseColorFactor;
+          materialParams.color.setRGB(array[0], array[1], array[2], LinearSRGBColorSpace);
+          materialParams.opacity = array[3];
+        }
+        if (metallicRoughness.baseColorTexture !== void 0) {
+          pending.push(parser.assignTexture(materialParams, "map", metallicRoughness.baseColorTexture, SRGBColorSpace));
+        }
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsEmissiveStrengthExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_EMISSIVE_STRENGTH;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      if (extension.emissiveStrength !== void 0) {
+        materialParams.emissiveIntensity = extension.emissiveStrength;
+      }
+      return Promise.resolve();
+    }
+  };
+  var GLTFMaterialsClearcoatExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_CLEARCOAT;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      if (extension.clearcoatFactor !== void 0) {
+        materialParams.clearcoat = extension.clearcoatFactor;
+      }
+      if (extension.clearcoatTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "clearcoatMap", extension.clearcoatTexture));
+      }
+      if (extension.clearcoatRoughnessFactor !== void 0) {
+        materialParams.clearcoatRoughness = extension.clearcoatRoughnessFactor;
+      }
+      if (extension.clearcoatRoughnessTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "clearcoatRoughnessMap", extension.clearcoatRoughnessTexture));
+      }
+      if (extension.clearcoatNormalTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "clearcoatNormalMap", extension.clearcoatNormalTexture));
+        if (extension.clearcoatNormalTexture.scale !== void 0) {
+          const scale = extension.clearcoatNormalTexture.scale;
+          materialParams.clearcoatNormalScale = new Vector2(scale, scale);
+        }
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsDiffuseRoughnessExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_DIFFUSE_ROUGHNESS;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      materialParams.diffuseRoughness = extension.diffuseRoughnessFactor !== void 0 ? extension.diffuseRoughnessFactor : 0;
+      if (extension.diffuseRoughnessTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "diffuseRoughnessMap", extension.diffuseRoughnessTexture));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsDispersionExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_DISPERSION;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      materialParams.dispersion = extension.dispersion !== void 0 ? extension.dispersion : 0;
+      return Promise.resolve();
+    }
+  };
+  var GLTFMaterialsIridescenceExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_IRIDESCENCE;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      if (extension.iridescenceFactor !== void 0) {
+        materialParams.iridescence = extension.iridescenceFactor;
+      }
+      if (extension.iridescenceTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "iridescenceMap", extension.iridescenceTexture));
+      }
+      if (extension.iridescenceIor !== void 0) {
+        materialParams.iridescenceIOR = extension.iridescenceIor;
+      }
+      if (extension.iridescenceThicknessMinimum !== void 0) {
+        materialParams.iridescenceThicknessMinimum = extension.iridescenceThicknessMinimum;
+      }
+      if (extension.iridescenceThicknessMaximum !== void 0) {
+        materialParams.iridescenceThicknessMaximum = extension.iridescenceThicknessMaximum;
+      }
+      if (extension.iridescenceThicknessTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "iridescenceThicknessMap", extension.iridescenceThicknessTexture));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsSheenExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_SHEEN;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      materialParams.sheenColor = new Color(0, 0, 0);
+      materialParams.sheenRoughness = 0;
+      materialParams.sheen = 1;
+      if (extension.sheenColorFactor !== void 0) {
+        const colorFactor = extension.sheenColorFactor;
+        materialParams.sheenColor.setRGB(colorFactor[0], colorFactor[1], colorFactor[2], LinearSRGBColorSpace);
+      }
+      if (extension.sheenRoughnessFactor !== void 0) {
+        materialParams.sheenRoughness = extension.sheenRoughnessFactor;
+      }
+      if (extension.sheenColorTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "sheenColorMap", extension.sheenColorTexture, SRGBColorSpace));
+      }
+      if (extension.sheenRoughnessTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "sheenRoughnessMap", extension.sheenRoughnessTexture));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsTransmissionExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_TRANSMISSION;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      if (extension.transmissionFactor !== void 0) {
+        materialParams.transmission = extension.transmissionFactor;
+      }
+      if (extension.transmissionTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "transmissionMap", extension.transmissionTexture));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsVolumeExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_VOLUME;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      materialParams.thickness = extension.thicknessFactor !== void 0 ? extension.thicknessFactor : 0;
+      if (extension.thicknessTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "thicknessMap", extension.thicknessTexture));
+      }
+      materialParams.attenuationDistance = extension.attenuationDistance || Infinity;
+      const colorArray = extension.attenuationColor || [1, 1, 1];
+      materialParams.attenuationColor = new Color().setRGB(colorArray[0], colorArray[1], colorArray[2], LinearSRGBColorSpace);
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsIorExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_IOR;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      materialParams.ior = extension.ior !== void 0 ? extension.ior : 1.5;
+      if (materialParams.ior === 0) materialParams.ior = 1e3;
+      return Promise.resolve();
+    }
+  };
+  var GLTFMaterialsSpecularExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_SPECULAR;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      materialParams.specularIntensity = extension.specularFactor !== void 0 ? extension.specularFactor : 1;
+      if (extension.specularTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "specularIntensityMap", extension.specularTexture));
+      }
+      const colorArray = extension.specularColorFactor || [1, 1, 1];
+      materialParams.specularColor = new Color().setRGB(colorArray[0], colorArray[1], colorArray[2], LinearSRGBColorSpace);
+      if (extension.specularColorTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "specularColorMap", extension.specularColorTexture, SRGBColorSpace));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsBumpExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.EXT_MATERIALS_BUMP;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      materialParams.bumpScale = extension.bumpFactor !== void 0 ? extension.bumpFactor : 1;
+      if (extension.bumpTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "bumpMap", extension.bumpTexture));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFMaterialsAnisotropyExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_MATERIALS_ANISOTROPY;
+    }
+    getMaterialType(materialIndex) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      return extension !== null ? MeshPhysicalMaterial : null;
+    }
+    extendMaterialParams(materialIndex, materialParams) {
+      const extension = getMaterialExtension(this.parser, materialIndex, this.name);
+      if (extension === null) return Promise.resolve();
+      const pending = [];
+      if (extension.anisotropyStrength !== void 0) {
+        materialParams.anisotropy = extension.anisotropyStrength;
+      }
+      if (extension.anisotropyRotation !== void 0) {
+        materialParams.anisotropyRotation = extension.anisotropyRotation;
+      }
+      if (extension.anisotropyTexture !== void 0) {
+        pending.push(this.parser.assignTexture(materialParams, "anisotropyMap", extension.anisotropyTexture));
+      }
+      return Promise.all(pending);
+    }
+  };
+  var GLTFTextureBasisUExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.KHR_TEXTURE_BASISU;
+    }
+    loadTexture(textureIndex) {
+      const parser = this.parser;
+      const json = parser.json;
+      const textureDef = json.textures[textureIndex];
+      if (!textureDef.extensions || !textureDef.extensions[this.name]) {
+        return null;
+      }
+      const extension = textureDef.extensions[this.name];
+      const loader = parser.options.ktx2Loader;
+      if (!loader) {
+        if (json.extensionsRequired && json.extensionsRequired.indexOf(this.name) >= 0) {
+          throw new Error("THREE.GLTFLoader: setKTX2Loader must be called before loading KTX2 textures");
+        } else {
+          return null;
+        }
+      }
+      return parser.loadTextureImage(textureIndex, extension.source, loader);
+    }
+  };
+  var GLTFTextureWebPExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.EXT_TEXTURE_WEBP;
+    }
+    loadTexture(textureIndex) {
+      const name = this.name;
+      const parser = this.parser;
+      const json = parser.json;
+      const textureDef = json.textures[textureIndex];
+      if (!textureDef.extensions || !textureDef.extensions[name]) {
+        return null;
+      }
+      const extension = textureDef.extensions[name];
+      const source = json.images[extension.source];
+      let loader = parser.textureLoader;
+      if (source.uri) {
+        const handler = parser.options.manager.getHandler(source.uri);
+        if (handler !== null) loader = handler;
+      }
+      return parser.loadTextureImage(textureIndex, extension.source, loader);
+    }
+  };
+  var GLTFTextureAVIFExtension = class {
+    constructor(parser) {
+      this.parser = parser;
+      this.name = EXTENSIONS.EXT_TEXTURE_AVIF;
+    }
+    loadTexture(textureIndex) {
+      const name = this.name;
+      const parser = this.parser;
+      const json = parser.json;
+      const textureDef = json.textures[textureIndex];
+      if (!textureDef.extensions || !textureDef.extensions[name]) {
+        return null;
+      }
+      const extension = textureDef.extensions[name];
+      const source = json.images[extension.source];
+      let loader = parser.textureLoader;
+      if (source.uri) {
+        const handler = parser.options.manager.getHandler(source.uri);
+        if (handler !== null) loader = handler;
+      }
+      return parser.loadTextureImage(textureIndex, extension.source, loader);
+    }
+  };
+  var GLTFMeshoptCompression = class {
+    constructor(parser, name) {
+      this.name = name;
+      this.parser = parser;
+    }
+    loadBufferView(index) {
+      const json = this.parser.json;
+      const bufferView = json.bufferViews[index];
+      if (bufferView.extensions && bufferView.extensions[this.name]) {
+        const extensionDef = bufferView.extensions[this.name];
+        const buffer = this.parser.getDependency("buffer", extensionDef.buffer);
+        const decoder = this.parser.options.meshoptDecoder;
+        if (!decoder || !decoder.supported) {
+          if (json.extensionsRequired && json.extensionsRequired.indexOf(this.name) >= 0) {
+            throw new Error("THREE.GLTFLoader: setMeshoptDecoder must be called before loading compressed files");
+          } else {
+            return null;
+          }
+        }
+        return buffer.then(function(res) {
+          const byteOffset = extensionDef.byteOffset || 0;
+          const byteLength = extensionDef.byteLength || 0;
+          const count = extensionDef.count;
+          const stride = extensionDef.byteStride;
+          const source = new Uint8Array(res, byteOffset, byteLength);
+          if (decoder.decodeGltfBufferAsync) {
+            return decoder.decodeGltfBufferAsync(count, stride, source, extensionDef.mode, extensionDef.filter).then(function(res2) {
+              return res2.buffer;
+            });
+          } else {
+            return decoder.ready.then(function() {
+              const result = new ArrayBuffer(count * stride);
+              decoder.decodeGltfBuffer(new Uint8Array(result), count, stride, source, extensionDef.mode, extensionDef.filter);
+              return result;
+            });
+          }
+        });
+      } else {
+        return null;
+      }
+    }
+  };
+  var GLTFMeshGpuInstancing = class {
+    constructor(parser) {
+      this.name = EXTENSIONS.EXT_MESH_GPU_INSTANCING;
+      this.parser = parser;
+    }
+    createNodeMesh(nodeIndex) {
+      const json = this.parser.json;
+      const nodeDef = json.nodes[nodeIndex];
+      if (!nodeDef.extensions || !nodeDef.extensions[this.name] || nodeDef.mesh === void 0) {
+        return null;
+      }
+      const meshDef = json.meshes[nodeDef.mesh];
+      for (const primitive of meshDef.primitives) {
+        if (primitive.mode !== WEBGL_CONSTANTS.TRIANGLES && primitive.mode !== WEBGL_CONSTANTS.TRIANGLE_STRIP && primitive.mode !== WEBGL_CONSTANTS.TRIANGLE_FAN && primitive.mode !== void 0) {
+          return null;
+        }
+      }
+      const extensionDef = nodeDef.extensions[this.name];
+      const attributesDef = extensionDef.attributes;
+      const pending = [];
+      const attributes = {};
+      for (const key in attributesDef) {
+        pending.push(this.parser.getDependency("accessor", attributesDef[key]).then((accessor) => {
+          attributes[key] = accessor;
+          return attributes[key];
+        }));
+      }
+      if (pending.length < 1) {
+        return null;
+      }
+      pending.push(this.parser.createNodeMesh(nodeIndex));
+      return Promise.all(pending).then((results) => {
+        const nodeObject = results.pop();
+        const meshes = nodeObject.isGroup ? nodeObject.children : [nodeObject];
+        const count = results[0].count;
+        const instancedMeshes = [];
+        for (const mesh of meshes) {
+          const m = new Matrix4();
+          const p = new Vector3();
+          const q = new Quaternion();
+          const s = new Vector3(1, 1, 1);
+          const instancedMesh = new InstancedMesh(mesh.geometry, mesh.material, count);
+          for (let i = 0; i < count; i++) {
+            if (attributes.TRANSLATION) {
+              p.fromBufferAttribute(attributes.TRANSLATION, i);
+            }
+            if (attributes.ROTATION) {
+              q.fromBufferAttribute(attributes.ROTATION, i);
+            }
+            if (attributes.SCALE) {
+              s.fromBufferAttribute(attributes.SCALE, i);
+            }
+            instancedMesh.setMatrixAt(i, m.compose(p, q, s));
+          }
+          let instanceGeometry = null;
+          for (const attributeName in attributes) {
+            if (attributeName === "_COLOR_0") {
+              const attr = attributes[attributeName];
+              instancedMesh.instanceColor = new InstancedBufferAttribute(attr.array, attr.itemSize, attr.normalized);
+            } else if (attributeName !== "TRANSLATION" && attributeName !== "ROTATION" && attributeName !== "SCALE") {
+              if (instanceGeometry === null) {
+                const source = instancedMesh.geometry;
+                instanceGeometry = new BufferGeometry();
+                instanceGeometry.name = source.name;
+                for (const name in source.attributes) instanceGeometry.setAttribute(name, source.attributes[name]);
+                for (const name in source.morphAttributes) instanceGeometry.morphAttributes[name] = source.morphAttributes[name];
+                if (source.index !== null) instanceGeometry.setIndex(source.index);
+                instanceGeometry.morphTargetsRelative = source.morphTargetsRelative;
+                for (const group of source.groups) instanceGeometry.addGroup(group.start, group.count, group.materialIndex);
+                if (source.boundingBox !== null) instanceGeometry.boundingBox = source.boundingBox.clone();
+                if (source.boundingSphere !== null) instanceGeometry.boundingSphere = source.boundingSphere.clone();
+                instanceGeometry.drawRange.start = source.drawRange.start;
+                instanceGeometry.drawRange.count = source.drawRange.count;
+                instanceGeometry.userData = Object.assign({}, source.userData);
+                instancedMesh.geometry = instanceGeometry;
+              }
+              const attr = attributes[attributeName];
+              instanceGeometry.setAttribute(attributeName, new InstancedBufferAttribute(attr.array, attr.itemSize, attr.normalized));
+            }
+          }
+          Object3D.prototype.copy.call(instancedMesh, mesh);
+          this.parser.assignFinalMaterial(instancedMesh);
+          instancedMeshes.push(instancedMesh);
+        }
+        if (nodeObject.isGroup) {
+          nodeObject.clear();
+          nodeObject.add(...instancedMeshes);
+          return nodeObject;
+        }
+        return instancedMeshes[0];
+      });
+    }
+  };
+  var BINARY_EXTENSION_HEADER_MAGIC = "glTF";
+  var BINARY_EXTENSION_HEADER_LENGTH = 12;
+  var BINARY_EXTENSION_CHUNK_TYPES = { JSON: 1313821514, BIN: 5130562 };
+  var GLTFBinaryExtension = class {
+    constructor(data) {
+      this.name = EXTENSIONS.KHR_BINARY_GLTF;
+      this.content = null;
+      this.body = null;
+      const headerView = new DataView(data, 0, BINARY_EXTENSION_HEADER_LENGTH);
+      const textDecoder = new TextDecoder();
+      this.header = {
+        magic: textDecoder.decode(new Uint8Array(data.slice(0, 4))),
+        version: headerView.getUint32(4, true),
+        length: headerView.getUint32(8, true)
+      };
+      if (this.header.magic !== BINARY_EXTENSION_HEADER_MAGIC) {
+        throw new Error("THREE.GLTFLoader: Unsupported glTF-Binary header.");
+      } else if (this.header.version < 2) {
+        throw new Error("THREE.GLTFLoader: Legacy binary file detected.");
+      }
+      const chunkContentsLength = this.header.length - BINARY_EXTENSION_HEADER_LENGTH;
+      const chunkView = new DataView(data, BINARY_EXTENSION_HEADER_LENGTH);
+      let chunkIndex = 0;
+      while (chunkIndex < chunkContentsLength) {
+        const chunkLength = chunkView.getUint32(chunkIndex, true);
+        chunkIndex += 4;
+        const chunkType = chunkView.getUint32(chunkIndex, true);
+        chunkIndex += 4;
+        if (chunkType === BINARY_EXTENSION_CHUNK_TYPES.JSON) {
+          const contentArray = new Uint8Array(data, BINARY_EXTENSION_HEADER_LENGTH + chunkIndex, chunkLength);
+          this.content = textDecoder.decode(contentArray);
+        } else if (chunkType === BINARY_EXTENSION_CHUNK_TYPES.BIN) {
+          const byteOffset = BINARY_EXTENSION_HEADER_LENGTH + chunkIndex;
+          this.body = data.slice(byteOffset, byteOffset + chunkLength);
+        }
+        chunkIndex += chunkLength;
+      }
+      if (this.content === null) {
+        throw new Error("THREE.GLTFLoader: JSON content not found.");
+      }
+    }
+  };
+  var GLTFDracoMeshCompressionExtension = class {
+    constructor(json, dracoLoader) {
+      if (!dracoLoader) {
+        throw new Error("THREE.GLTFLoader: No DRACOLoader instance provided.");
+      }
+      this.name = EXTENSIONS.KHR_DRACO_MESH_COMPRESSION;
+      this.json = json;
+      this.dracoLoader = dracoLoader;
+      this.dracoLoader.preload();
+    }
+    decodePrimitive(primitive, parser) {
+      const json = this.json;
+      const dracoLoader = this.dracoLoader;
+      const bufferViewIndex = primitive.extensions[this.name].bufferView;
+      const gltfAttributeMap = primitive.extensions[this.name].attributes;
+      const threeAttributeMap = {};
+      const attributeNormalizedMap = {};
+      const attributeTypeMap = {};
+      for (const attributeName in gltfAttributeMap) {
+        const threeAttributeName = ATTRIBUTES[attributeName] || attributeName.toLowerCase();
+        threeAttributeMap[threeAttributeName] = gltfAttributeMap[attributeName];
+      }
+      for (const attributeName in primitive.attributes) {
+        const threeAttributeName = ATTRIBUTES[attributeName] || attributeName.toLowerCase();
+        if (gltfAttributeMap[attributeName] !== void 0) {
+          const accessorDef = json.accessors[primitive.attributes[attributeName]];
+          const componentType = WEBGL_COMPONENT_TYPES[accessorDef.componentType];
+          attributeTypeMap[threeAttributeName] = componentType.name;
+          attributeNormalizedMap[threeAttributeName] = accessorDef.normalized === true;
+        }
+      }
+      return parser.getDependency("bufferView", bufferViewIndex).then(function(bufferView) {
+        return new Promise(function(resolve, reject) {
+          dracoLoader.decodeDracoFile(bufferView, function(geometry) {
+            for (const attributeName in geometry.attributes) {
+              const attribute = geometry.attributes[attributeName];
+              const normalized = attributeNormalizedMap[attributeName];
+              if (normalized !== void 0) attribute.normalized = normalized;
+            }
+            resolve(geometry);
+          }, threeAttributeMap, attributeTypeMap, LinearSRGBColorSpace, reject);
+        });
+      });
+    }
+  };
+  var GLTFTextureTransformExtension = class {
+    constructor() {
+      this.name = EXTENSIONS.KHR_TEXTURE_TRANSFORM;
+    }
+    extendTexture(texture, transform) {
+      if ((transform.texCoord === void 0 || transform.texCoord === texture.channel) && transform.offset === void 0 && transform.rotation === void 0 && transform.scale === void 0) {
+        return texture;
+      }
+      texture = texture.clone();
+      if (transform.texCoord !== void 0) {
+        texture.channel = transform.texCoord;
+      }
+      if (transform.offset !== void 0) {
+        texture.offset.fromArray(transform.offset);
+      }
+      if (transform.rotation !== void 0) {
+        texture.rotation = transform.rotation;
+      }
+      if (transform.scale !== void 0) {
+        texture.repeat.fromArray(transform.scale);
+      }
+      if (transform.rotation !== void 0) {
+        const c = Math.cos(texture.rotation);
+        const s = Math.sin(texture.rotation);
+        texture.matrix.set(
+          texture.repeat.x * c,
+          texture.repeat.y * s,
+          texture.offset.x,
+          -texture.repeat.x * s,
+          texture.repeat.y * c,
+          texture.offset.y,
+          0,
+          0,
+          1
+        );
+        texture.matrixAutoUpdate = false;
+      }
+      texture.needsUpdate = true;
+      return texture;
+    }
+  };
+  var GLTFMeshQuantizationExtension = class {
+    constructor() {
+      this.name = EXTENSIONS.KHR_MESH_QUANTIZATION;
+    }
+  };
+  var GLTFCubicSplineInterpolant = class extends Interpolant {
+    constructor(parameterPositions, sampleValues, sampleSize, resultBuffer) {
+      super(parameterPositions, sampleValues, sampleSize, resultBuffer);
+    }
+    copySampleValue_(index) {
+      const result = this.resultBuffer, values = this.sampleValues, valueSize = this.valueSize, offset = index * valueSize * 3 + valueSize;
+      for (let i = 0; i !== valueSize; i++) {
+        result[i] = values[offset + i];
+      }
+      return result;
+    }
+    interpolate_(i1, t0, t, t1) {
+      const result = this.resultBuffer;
+      const values = this.sampleValues;
+      const stride = this.valueSize;
+      const stride2 = stride * 2;
+      const stride3 = stride * 3;
+      const td = t1 - t0;
+      const p = (t - t0) / td;
+      const pp = p * p;
+      const ppp = pp * p;
+      const offset1 = i1 * stride3;
+      const offset0 = offset1 - stride3;
+      const s2 = -2 * ppp + 3 * pp;
+      const s3 = ppp - pp;
+      const s0 = 1 - s2;
+      const s1 = s3 - pp + p;
+      for (let i = 0; i !== stride; i++) {
+        const p0 = values[offset0 + i + stride];
+        const m0 = values[offset0 + i + stride2] * td;
+        const p1 = values[offset1 + i + stride];
+        const m1 = values[offset1 + i] * td;
+        result[i] = s0 * p0 + s1 * m0 + s2 * p1 + s3 * m1;
+      }
+      return result;
+    }
+  };
+  var _quaternion = new Quaternion();
+  var GLTFCubicSplineQuaternionInterpolant = class extends GLTFCubicSplineInterpolant {
+    interpolate_(i1, t0, t, t1) {
+      const result = super.interpolate_(i1, t0, t, t1);
+      _quaternion.fromArray(result).normalize().toArray(result);
+      return result;
+    }
+  };
+  var WEBGL_CONSTANTS = {
+    FLOAT: 5126,
+    //FLOAT_MAT2: 35674,
+    FLOAT_MAT3: 35675,
+    FLOAT_MAT4: 35676,
+    FLOAT_VEC2: 35664,
+    FLOAT_VEC3: 35665,
+    FLOAT_VEC4: 35666,
+    LINEAR: 9729,
+    REPEAT: 10497,
+    SAMPLER_2D: 35678,
+    POINTS: 0,
+    LINES: 1,
+    LINE_LOOP: 2,
+    LINE_STRIP: 3,
+    TRIANGLES: 4,
+    TRIANGLE_STRIP: 5,
+    TRIANGLE_FAN: 6,
+    UNSIGNED_BYTE: 5121,
+    UNSIGNED_SHORT: 5123
+  };
+  var WEBGL_COMPONENT_TYPES = {
+    5120: Int8Array,
+    5121: Uint8Array,
+    5122: Int16Array,
+    5123: Uint16Array,
+    5125: Uint32Array,
+    5126: Float32Array
+  };
+  var WEBGL_FILTERS = {
+    9728: NearestFilter,
+    9729: LinearFilter,
+    9984: NearestMipmapNearestFilter,
+    9985: LinearMipmapNearestFilter,
+    9986: NearestMipmapLinearFilter,
+    9987: LinearMipmapLinearFilter
+  };
+  var WEBGL_WRAPPINGS = {
+    33071: ClampToEdgeWrapping,
+    33648: MirroredRepeatWrapping,
+    10497: RepeatWrapping
+  };
+  var WEBGL_TYPE_SIZES = {
+    "SCALAR": 1,
+    "VEC2": 2,
+    "VEC3": 3,
+    "VEC4": 4,
+    "MAT2": 4,
+    "MAT3": 9,
+    "MAT4": 16
+  };
+  var ATTRIBUTES = {
+    POSITION: "position",
+    NORMAL: "normal",
+    TANGENT: "tangent",
+    TEXCOORD_0: "uv",
+    TEXCOORD_1: "uv1",
+    TEXCOORD_2: "uv2",
+    TEXCOORD_3: "uv3",
+    COLOR_0: "color",
+    WEIGHTS_0: "skinWeight",
+    JOINTS_0: "skinIndex"
+  };
+  var PATH_PROPERTIES = {
+    scale: "scale",
+    translation: "position",
+    rotation: "quaternion",
+    weights: "morphTargetInfluences"
+  };
+  var INTERPOLATION = {
+    CUBICSPLINE: void 0,
+    // We use a custom interpolant (GLTFCubicSplineInterpolation) for CUBICSPLINE tracks. Each
+    // keyframe track will be initialized with a default interpolation type, then modified.
+    LINEAR: InterpolateLinear,
+    STEP: InterpolateDiscrete
+  };
+  var ALPHA_MODES = {
+    OPAQUE: "OPAQUE",
+    MASK: "MASK",
+    BLEND: "BLEND"
+  };
+  function createDefaultMaterial(cache) {
+    if (cache["DefaultMaterial"] === void 0) {
+      cache["DefaultMaterial"] = new MeshStandardMaterial({
+        color: 16777215,
+        emissive: 0,
+        metalness: 1,
+        roughness: 1,
+        transparent: false,
+        depthTest: true,
+        side: FrontSide
+      });
+    }
+    return cache["DefaultMaterial"];
+  }
+  function addUnknownExtensionsToUserData(knownExtensions, object, objectDef) {
+    for (const name in objectDef.extensions) {
+      if (knownExtensions[name] === void 0) {
+        object.userData.gltfExtensions = object.userData.gltfExtensions || {};
+        object.userData.gltfExtensions[name] = objectDef.extensions[name];
+      }
+    }
+  }
+  function assignExtrasToUserData(object, gltfDef) {
+    if (gltfDef.extras !== void 0) {
+      if (typeof gltfDef.extras === "object") {
+        Object.assign(object.userData, gltfDef.extras);
+      } else {
+        console.warn("THREE.GLTFLoader: Ignoring primitive type .extras, " + gltfDef.extras);
+      }
+    }
+  }
+  function addMorphTargets(geometry, targets, parser) {
+    let hasMorphPosition = false;
+    let hasMorphNormal = false;
+    let hasMorphColor = false;
+    for (let i = 0, il = targets.length; i < il; i++) {
+      const target = targets[i];
+      if (target.POSITION !== void 0) hasMorphPosition = true;
+      if (target.NORMAL !== void 0) hasMorphNormal = true;
+      if (target.COLOR_0 !== void 0) hasMorphColor = true;
+      if (hasMorphPosition && hasMorphNormal && hasMorphColor) break;
+    }
+    if (!hasMorphPosition && !hasMorphNormal && !hasMorphColor) return Promise.resolve(geometry);
+    const pendingPositionAccessors = [];
+    const pendingNormalAccessors = [];
+    const pendingColorAccessors = [];
+    for (let i = 0, il = targets.length; i < il; i++) {
+      const target = targets[i];
+      if (hasMorphPosition) {
+        const pendingAccessor = target.POSITION !== void 0 ? parser.getDependency("accessor", target.POSITION) : geometry.attributes.position;
+        pendingPositionAccessors.push(pendingAccessor);
+      }
+      if (hasMorphNormal) {
+        const pendingAccessor = target.NORMAL !== void 0 ? parser.getDependency("accessor", target.NORMAL) : geometry.attributes.normal;
+        pendingNormalAccessors.push(pendingAccessor);
+      }
+      if (hasMorphColor) {
+        const pendingAccessor = target.COLOR_0 !== void 0 ? parser.getDependency("accessor", target.COLOR_0) : geometry.attributes.color;
+        pendingColorAccessors.push(pendingAccessor);
+      }
+    }
+    return Promise.all([
+      Promise.all(pendingPositionAccessors),
+      Promise.all(pendingNormalAccessors),
+      Promise.all(pendingColorAccessors)
+    ]).then(function(accessors) {
+      const morphPositions = accessors[0];
+      const morphNormals = accessors[1];
+      const morphColors = accessors[2];
+      if (hasMorphPosition) geometry.morphAttributes.position = morphPositions;
+      if (hasMorphNormal) geometry.morphAttributes.normal = morphNormals;
+      if (hasMorphColor) geometry.morphAttributes.color = morphColors;
+      geometry.morphTargetsRelative = true;
+      return geometry;
+    });
+  }
+  function updateMorphTargets(mesh, meshDef) {
+    mesh.updateMorphTargets();
+    if (meshDef.weights !== void 0) {
+      for (let i = 0, il = meshDef.weights.length; i < il; i++) {
+        mesh.morphTargetInfluences[i] = meshDef.weights[i];
+      }
+    }
+    if (meshDef.extras && Array.isArray(meshDef.extras.targetNames)) {
+      const targetNames = meshDef.extras.targetNames;
+      if (mesh.morphTargetInfluences.length === targetNames.length) {
+        mesh.morphTargetDictionary = {};
+        for (let i = 0, il = targetNames.length; i < il; i++) {
+          mesh.morphTargetDictionary[targetNames[i]] = i;
+        }
+      } else {
+        console.warn("THREE.GLTFLoader: Invalid extras.targetNames length. Ignoring names.");
+      }
+    }
+  }
+  function createPrimitiveKey(primitiveDef) {
+    let geometryKey;
+    const dracoExtension = primitiveDef.extensions && primitiveDef.extensions[EXTENSIONS.KHR_DRACO_MESH_COMPRESSION];
+    if (dracoExtension) {
+      geometryKey = "draco:" + dracoExtension.bufferView + ":" + dracoExtension.indices + ":" + createAttributesKey(dracoExtension.attributes);
+    } else {
+      geometryKey = primitiveDef.indices + ":" + createAttributesKey(primitiveDef.attributes) + ":" + primitiveDef.mode;
+    }
+    if (primitiveDef.targets !== void 0) {
+      for (let i = 0, il = primitiveDef.targets.length; i < il; i++) {
+        geometryKey += ":" + createAttributesKey(primitiveDef.targets[i]);
+      }
+    }
+    return geometryKey;
+  }
+  function createAttributesKey(attributes) {
+    let attributesKey = "";
+    const keys = Object.keys(attributes).sort();
+    for (let i = 0, il = keys.length; i < il; i++) {
+      attributesKey += keys[i] + ":" + attributes[keys[i]] + ";";
+    }
+    return attributesKey;
+  }
+  function getNormalizedComponentScale(constructor) {
+    switch (constructor) {
+      case Int8Array:
+        return 1 / 127;
+      case Uint8Array:
+        return 1 / 255;
+      case Int16Array:
+        return 1 / 32767;
+      case Uint16Array:
+        return 1 / 65535;
+      default:
+        throw new Error("THREE.GLTFLoader: Unsupported normalized accessor component type.");
+    }
+  }
+  function getImageURIMimeType(uri) {
+    if (uri.search(/\.jpe?g($|\?)/i) > 0 || uri.search(/^data\:image\/jpeg/) === 0) return "image/jpeg";
+    if (uri.search(/\.webp($|\?)/i) > 0 || uri.search(/^data\:image\/webp/) === 0) return "image/webp";
+    if (uri.search(/\.ktx2($|\?)/i) > 0 || uri.search(/^data\:image\/ktx2/) === 0) return "image/ktx2";
+    return "image/png";
+  }
+  var _identityMatrix2 = new Matrix4();
+  var GLTFParser = class {
+    constructor(json = {}, options = {}) {
+      this.json = json;
+      this.extensions = {};
+      this.plugins = {};
+      this.options = options;
+      this.cache = new GLTFRegistry();
+      this.associations = /* @__PURE__ */ new Map();
+      this.primitiveCache = {};
+      this.nodeCache = {};
+      this.meshCache = { refs: {}, uses: {} };
+      this.cameraCache = { refs: {}, uses: {} };
+      this.lightCache = { refs: {}, uses: {} };
+      this.sourceCache = {};
+      this.textureCache = {};
+      this.nodeNamesUsed = {};
+      let isSafari = false;
+      let safariVersion = -1;
+      let isFirefox = false;
+      let firefoxVersion = -1;
+      if (typeof navigator !== "undefined" && typeof navigator.userAgent !== "undefined") {
+        const userAgent = navigator.userAgent;
+        isSafari = /^((?!chrome|android).)*safari/i.test(userAgent) === true;
+        const safariMatch = userAgent.match(/Version\/(\d+)/);
+        safariVersion = isSafari && safariMatch ? parseInt(safariMatch[1], 10) : -1;
+        isFirefox = userAgent.indexOf("Firefox") > -1;
+        firefoxVersion = isFirefox ? userAgent.match(/Firefox\/([0-9]+)\./)[1] : -1;
+      }
+      if (typeof createImageBitmap === "undefined" || isSafari && safariVersion < 17 || isFirefox && firefoxVersion < 98) {
+        this.textureLoader = new TextureLoader(this.options.manager);
+        this.textureLoader.setPriority(this.options.priority);
+        this.textureLoader.setCache(this.options.cache);
+      } else {
+        this.textureLoader = new ImageBitmapLoader(this.options.manager);
+        this.textureLoader.setPriority(this.options.priority);
+        this.textureLoader.setCache(this.options.cache);
+      }
+      this.textureLoader.setCrossOrigin(this.options.crossOrigin);
+      this.textureLoader.setWithCredentials(this.options.withCredentials);
+      this.textureLoader.setRequestHeader(this.options.requestHeader);
+      this.fileLoader = new FileLoader(this.options.manager);
+      this.fileLoader.setPriority(this.options.priority);
+      this.fileLoader.setCache(this.options.cache);
+      this.fileLoader.setResponseType("arraybuffer");
+      if (this.options.withCredentials || this.options.crossOrigin === "use-credentials") {
+        this.fileLoader.setWithCredentials(true);
+      }
+    }
+    setExtensions(extensions) {
+      this.extensions = extensions;
+    }
+    setPlugins(plugins) {
+      this.plugins = plugins;
+    }
+    parse(onLoad, onError) {
+      const parser = this;
+      const json = this.json;
+      const extensions = this.extensions;
+      this.cache.removeAll();
+      this.nodeCache = {};
+      this._invokeAll(function(ext) {
+        return ext._markDefs && ext._markDefs();
+      });
+      Promise.all(this._invokeAll(function(ext) {
+        return ext.beforeRoot && ext.beforeRoot();
+      })).then(function() {
+        return Promise.all([
+          parser.getDependencies("scene"),
+          parser.getDependencies("animation"),
+          parser.getDependencies("camera")
+        ]);
+      }).then(function(dependencies) {
+        const result = {
+          scene: dependencies[0][json.scene || 0],
+          scenes: dependencies[0],
+          animations: dependencies[1],
+          cameras: dependencies[2],
+          asset: json.asset,
+          parser,
+          userData: {}
+        };
+        addUnknownExtensionsToUserData(extensions, result, json);
+        assignExtrasToUserData(result, json);
+        return Promise.all(parser._invokeAll(function(ext) {
+          return ext.afterRoot && ext.afterRoot(result);
+        })).then(function() {
+          for (const scene of result.scenes) {
+            scene.updateMatrixWorld();
+          }
+          onLoad(result);
+        });
+      }).catch(onError);
+    }
+    /**
+     * Marks the special nodes/meshes in json for efficient parse.
+     *
+     * @private
+     */
+    _markDefs() {
+      const nodeDefs = this.json.nodes || [];
+      const skinDefs = this.json.skins || [];
+      const meshDefs = this.json.meshes || [];
+      for (let skinIndex = 0, skinLength = skinDefs.length; skinIndex < skinLength; skinIndex++) {
+        const joints = skinDefs[skinIndex].joints;
+        for (let i = 0, il = joints.length; i < il; i++) {
+          nodeDefs[joints[i]].isBone = true;
+        }
+      }
+      for (let nodeIndex = 0, nodeLength = nodeDefs.length; nodeIndex < nodeLength; nodeIndex++) {
+        const nodeDef = nodeDefs[nodeIndex];
+        if (nodeDef.mesh !== void 0) {
+          this._addNodeRef(this.meshCache, nodeDef.mesh);
+          if (nodeDef.skin !== void 0) {
+            meshDefs[nodeDef.mesh].isSkinnedMesh = true;
+          }
+        }
+        if (nodeDef.camera !== void 0) {
+          this._addNodeRef(this.cameraCache, nodeDef.camera);
+        }
+      }
+    }
+    /**
+     * Counts references to shared node / Object3D resources. These resources
+     * can be reused, or "instantiated", at multiple nodes in the scene
+     * hierarchy. Mesh, Camera, and Light instances are instantiated and must
+     * be marked. Non-scenegraph resources (like Materials, Geometries, and
+     * Textures) can be reused directly and are not marked here.
+     *
+     * Example: CesiumMilkTruck sample model reuses "Wheel" meshes.
+     *
+     * @private
+     * @param {Object} cache
+     * @param {Object3D} index
+     */
+    _addNodeRef(cache, index) {
+      if (index === void 0) return;
+      if (cache.refs[index] === void 0) {
+        cache.refs[index] = cache.uses[index] = 0;
+      }
+      cache.refs[index]++;
+    }
+    /**
+     * Returns a reference to a shared resource, cloning it if necessary.
+     *
+     * @private
+     * @param {Object} cache
+     * @param {number} index
+     * @param {Object} object
+     * @return {Object}
+     */
+    _getNodeRef(cache, index, object) {
+      if (cache.refs[index] <= 1) return object;
+      const ref = object.clone();
+      const updateMappings = (original, clone2) => {
+        const mappings = this.associations.get(original);
+        if (mappings != null) {
+          this.associations.set(clone2, mappings);
+        }
+        for (const [i, child] of original.children.entries()) {
+          updateMappings(child, clone2.children[i]);
+        }
+      };
+      updateMappings(object, ref);
+      ref.name += "_instance_" + cache.uses[index]++;
+      return ref;
+    }
+    _invokeOne(func) {
+      const extensions = Object.values(this.plugins);
+      extensions.push(this);
+      for (let i = 0; i < extensions.length; i++) {
+        const result = func(extensions[i]);
+        if (result) return result;
+      }
+      return null;
+    }
+    _invokeAll(func) {
+      const extensions = Object.values(this.plugins);
+      extensions.unshift(this);
+      const pending = [];
+      for (let i = 0; i < extensions.length; i++) {
+        const result = func(extensions[i]);
+        if (result) pending.push(result);
+      }
+      return pending;
+    }
+    /**
+     * Requests the specified dependency asynchronously, with caching.
+     *
+     * @private
+     * @param {string} type
+     * @param {number} index
+     * @return {Promise<Object3D|Material|Texture|AnimationClip|ArrayBuffer|Object>}
+     */
+    getDependency(type, index) {
+      const cacheKey = type + ":" + index;
+      let dependency = this.cache.get(cacheKey);
+      if (!dependency) {
+        switch (type) {
+          case "scene":
+            dependency = this.loadScene(index);
+            break;
+          case "node":
+            dependency = this._invokeOne(function(ext) {
+              return ext.loadNode && ext.loadNode(index);
+            });
+            break;
+          case "mesh":
+            dependency = this._invokeOne(function(ext) {
+              return ext.loadMesh && ext.loadMesh(index);
+            });
+            break;
+          case "accessor":
+            dependency = this.loadAccessor(index);
+            break;
+          case "bufferView":
+            dependency = this._invokeOne(function(ext) {
+              return ext.loadBufferView && ext.loadBufferView(index);
+            });
+            break;
+          case "buffer":
+            dependency = this.loadBuffer(index);
+            break;
+          case "material":
+            dependency = this._invokeOne(function(ext) {
+              return ext.loadMaterial && ext.loadMaterial(index);
+            });
+            break;
+          case "texture":
+            dependency = this._invokeOne(function(ext) {
+              return ext.loadTexture && ext.loadTexture(index);
+            });
+            break;
+          case "skin":
+            dependency = this.loadSkin(index);
+            break;
+          case "animation":
+            dependency = this._invokeOne(function(ext) {
+              return ext.loadAnimation && ext.loadAnimation(index);
+            });
+            break;
+          case "camera":
+            dependency = this.loadCamera(index);
+            break;
+          default:
+            dependency = this._invokeOne(function(ext) {
+              return ext != this && ext.getDependency && ext.getDependency(type, index);
+            });
+            if (!dependency) {
+              throw new Error("Unknown type: " + type);
+            }
+            break;
+        }
+        this.cache.add(cacheKey, dependency);
+      }
+      return dependency;
+    }
+    /**
+     * Requests all dependencies of the specified type asynchronously, with caching.
+     *
+     * @private
+     * @param {string} type
+     * @return {Promise<Array<Object>>}
+     */
+    getDependencies(type) {
+      let dependencies = this.cache.get(type);
+      if (!dependencies) {
+        const parser = this;
+        const defs = this.json[type + (type === "mesh" ? "es" : "s")] || [];
+        dependencies = Promise.all(defs.map(function(def, index) {
+          return parser.getDependency(type, index);
+        }));
+        this.cache.add(type, dependencies);
+      }
+      return dependencies;
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#buffers-and-buffer-views
+     *
+     * @private
+     * @param {number} bufferIndex
+     * @return {Promise<ArrayBuffer>}
+     */
+    loadBuffer(bufferIndex) {
+      const bufferDef = this.json.buffers[bufferIndex];
+      const loader = this.fileLoader;
+      if (bufferDef.type && bufferDef.type !== "arraybuffer") {
+        throw new Error("THREE.GLTFLoader: " + bufferDef.type + " buffer type is not supported.");
+      }
+      if (bufferDef.uri === void 0 && bufferIndex === 0) {
+        return Promise.resolve(this.extensions[EXTENSIONS.KHR_BINARY_GLTF].body);
+      }
+      const options = this.options;
+      return new Promise(function(resolve, reject) {
+        loader.load(LoaderUtils.resolveURL(bufferDef.uri, options.path), resolve, void 0, function() {
+          reject(new Error('THREE.GLTFLoader: Failed to load buffer "' + bufferDef.uri + '".'));
+        });
+      });
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#buffers-and-buffer-views
+     *
+     * @private
+     * @param {number} bufferViewIndex
+     * @return {Promise<ArrayBuffer>}
+     */
+    loadBufferView(bufferViewIndex) {
+      const bufferViewDef = this.json.bufferViews[bufferViewIndex];
+      return this.getDependency("buffer", bufferViewDef.buffer).then(function(buffer) {
+        const byteLength = bufferViewDef.byteLength || 0;
+        const byteOffset = bufferViewDef.byteOffset || 0;
+        return buffer.slice(byteOffset, byteOffset + byteLength);
+      });
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#accessors
+     *
+     * @private
+     * @param {number} accessorIndex
+     * @return {Promise<BufferAttribute|InterleavedBufferAttribute>}
+     */
+    loadAccessor(accessorIndex) {
+      const parser = this;
+      const json = this.json;
+      const accessorDef = this.json.accessors[accessorIndex];
+      if (accessorDef.bufferView === void 0 && accessorDef.sparse === void 0) {
+        const itemSize = WEBGL_TYPE_SIZES[accessorDef.type];
+        const TypedArray = WEBGL_COMPONENT_TYPES[accessorDef.componentType];
+        const normalized = accessorDef.normalized === true;
+        const array = new TypedArray(accessorDef.count * itemSize);
+        return Promise.resolve(new BufferAttribute(array, itemSize, normalized));
+      }
+      const pendingBufferViews = [];
+      if (accessorDef.bufferView !== void 0) {
+        pendingBufferViews.push(this.getDependency("bufferView", accessorDef.bufferView));
+      } else {
+        pendingBufferViews.push(null);
+      }
+      if (accessorDef.sparse !== void 0) {
+        pendingBufferViews.push(this.getDependency("bufferView", accessorDef.sparse.indices.bufferView));
+        pendingBufferViews.push(this.getDependency("bufferView", accessorDef.sparse.values.bufferView));
+      }
+      return Promise.all(pendingBufferViews).then(function(bufferViews) {
+        const bufferView = bufferViews[0];
+        const itemSize = WEBGL_TYPE_SIZES[accessorDef.type];
+        const TypedArray = WEBGL_COMPONENT_TYPES[accessorDef.componentType];
+        const elementBytes = TypedArray.BYTES_PER_ELEMENT;
+        const itemBytes = elementBytes * itemSize;
+        const byteOffset = accessorDef.byteOffset || 0;
+        const byteStride = accessorDef.bufferView !== void 0 ? json.bufferViews[accessorDef.bufferView].byteStride : void 0;
+        const normalized = accessorDef.normalized === true;
+        let array, bufferAttribute;
+        if (byteStride && byteStride !== itemBytes) {
+          const ibSlice = Math.floor(byteOffset / byteStride);
+          const ibCacheKey = "InterleavedBuffer:" + accessorDef.bufferView + ":" + accessorDef.componentType + ":" + ibSlice + ":" + accessorDef.count;
+          let ib = parser.cache.get(ibCacheKey);
+          if (!ib) {
+            array = new TypedArray(bufferView, ibSlice * byteStride, accessorDef.count * byteStride / elementBytes);
+            ib = new InterleavedBuffer(array, byteStride / elementBytes);
+            parser.cache.add(ibCacheKey, ib);
+          }
+          bufferAttribute = new InterleavedBufferAttribute(ib, itemSize, byteOffset % byteStride / elementBytes, normalized);
+        } else {
+          if (bufferView === null) {
+            array = new TypedArray(accessorDef.count * itemSize);
+          } else {
+            array = new TypedArray(bufferView, byteOffset, accessorDef.count * itemSize);
+          }
+          bufferAttribute = new BufferAttribute(array, itemSize, normalized);
+        }
+        if (accessorDef.sparse !== void 0) {
+          const itemSizeIndices = WEBGL_TYPE_SIZES.SCALAR;
+          const TypedArrayIndices = WEBGL_COMPONENT_TYPES[accessorDef.sparse.indices.componentType];
+          const byteOffsetIndices = accessorDef.sparse.indices.byteOffset || 0;
+          const byteOffsetValues = accessorDef.sparse.values.byteOffset || 0;
+          const sparseIndices = new TypedArrayIndices(bufferViews[1], byteOffsetIndices, accessorDef.sparse.count * itemSizeIndices);
+          const sparseValues = new TypedArray(bufferViews[2], byteOffsetValues, accessorDef.sparse.count * itemSize);
+          if (bufferView !== null) {
+            bufferAttribute = new BufferAttribute(bufferAttribute.array.slice(), bufferAttribute.itemSize, bufferAttribute.normalized);
+          }
+          bufferAttribute.normalized = false;
+          for (let i = 0, il = sparseIndices.length; i < il; i++) {
+            const index = sparseIndices[i];
+            bufferAttribute.setX(index, sparseValues[i * itemSize]);
+            if (itemSize >= 2) bufferAttribute.setY(index, sparseValues[i * itemSize + 1]);
+            if (itemSize >= 3) bufferAttribute.setZ(index, sparseValues[i * itemSize + 2]);
+            if (itemSize >= 4) bufferAttribute.setW(index, sparseValues[i * itemSize + 3]);
+            if (itemSize >= 5) throw new Error("THREE.GLTFLoader: Unsupported itemSize in sparse BufferAttribute.");
+          }
+          bufferAttribute.normalized = normalized;
+        }
+        return bufferAttribute;
+      });
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#textures
+     *
+     * @private
+     * @param {number} textureIndex
+     * @return {Promise<?Texture>}
+     */
+    loadTexture(textureIndex) {
+      const json = this.json;
+      const options = this.options;
+      const textureDef = json.textures[textureIndex];
+      const sourceIndex = textureDef.source;
+      const sourceDef = json.images[sourceIndex];
+      let loader = this.textureLoader;
+      if (sourceDef.uri) {
+        const handler = options.manager.getHandler(sourceDef.uri);
+        if (handler !== null) loader = handler;
+      }
+      return this.loadTextureImage(textureIndex, sourceIndex, loader);
+    }
+    loadTextureImage(textureIndex, sourceIndex, loader) {
+      const parser = this;
+      const json = this.json;
+      const textureDef = json.textures[textureIndex];
+      const sourceDef = json.images[sourceIndex];
+      const cacheKey = (sourceDef.uri || sourceDef.bufferView) + ":" + textureDef.sampler;
+      if (this.textureCache[cacheKey]) {
+        return this.textureCache[cacheKey];
+      }
+      const promise = this.loadImageSource(sourceIndex, loader).then(function(texture) {
+        texture.flipY = false;
+        texture.name = textureDef.name || sourceDef.name || "";
+        if (texture.name === "" && typeof sourceDef.uri === "string" && sourceDef.uri.startsWith("data:image/") === false) {
+          texture.name = sourceDef.uri;
+        }
+        const samplers = json.samplers || {};
+        const sampler = samplers[textureDef.sampler] || {};
+        texture.magFilter = WEBGL_FILTERS[sampler.magFilter] || LinearFilter;
+        texture.minFilter = WEBGL_FILTERS[sampler.minFilter] || LinearMipmapLinearFilter;
+        texture.wrapS = WEBGL_WRAPPINGS[sampler.wrapS] || RepeatWrapping;
+        texture.wrapT = WEBGL_WRAPPINGS[sampler.wrapT] || RepeatWrapping;
+        texture.generateMipmaps = !texture.isCompressedTexture && texture.minFilter !== NearestFilter && texture.minFilter !== LinearFilter;
+        parser.associations.set(texture, { textures: textureIndex });
+        return texture;
+      }).catch(function() {
+        return null;
+      });
+      this.textureCache[cacheKey] = promise;
+      return promise;
+    }
+    loadImageSource(sourceIndex, loader) {
+      const parser = this;
+      const json = this.json;
+      const options = this.options;
+      if (this.sourceCache[sourceIndex] !== void 0) {
+        return this.sourceCache[sourceIndex].then((texture) => texture.clone());
+      }
+      const sourceDef = json.images[sourceIndex];
+      const URL2 = self.URL || self.webkitURL;
+      let sourceURI = sourceDef.uri || "";
+      let isObjectURL = false;
+      let pending;
+      if (loader.isKTX2Loader === true && sourceDef.bufferView !== void 0) {
+        pending = parser.getDependency("bufferView", sourceDef.bufferView).then(function(bufferView) {
+          return new Promise(function(resolve, reject) {
+            loader.parse(bufferView, resolve, reject);
+          });
+        });
+      } else {
+        if (sourceDef.bufferView !== void 0) {
+          sourceURI = parser.getDependency("bufferView", sourceDef.bufferView).then(function(bufferView) {
+            isObjectURL = true;
+            const blob = new Blob([bufferView], { type: sourceDef.mimeType });
+            sourceURI = URL2.createObjectURL(blob);
+            return sourceURI;
+          });
+        } else if (sourceDef.uri === void 0) {
+          throw new Error("THREE.GLTFLoader: Image " + sourceIndex + " is missing URI and bufferView");
+        }
+        pending = Promise.resolve(sourceURI).then(function(sourceURI2) {
+          return new Promise(function(resolve, reject) {
+            let onLoad = resolve;
+            if (loader.isImageBitmapLoader === true) {
+              onLoad = function(imageBitmap) {
+                const texture = new Texture(imageBitmap);
+                texture.needsUpdate = true;
+                resolve(texture);
+              };
+            }
+            loader.load(LoaderUtils.resolveURL(sourceURI2, options.path), onLoad, void 0, reject);
+          });
+        });
+      }
+      const promise = pending.then(function(texture) {
+        if (isObjectURL === true) {
+          URL2.revokeObjectURL(sourceURI);
+        }
+        assignExtrasToUserData(texture, sourceDef);
+        texture.userData.mimeType = sourceDef.mimeType || getImageURIMimeType(sourceDef.uri);
+        return texture;
+      }).catch(function(error2) {
+        console.error("THREE.GLTFLoader: Couldn't load texture", sourceURI);
+        throw error2;
+      });
+      this.sourceCache[sourceIndex] = promise;
+      return promise;
+    }
+    /**
+     * Asynchronously assigns a texture to the given material parameters.
+     *
+     * @private
+     * @param {Object} materialParams
+     * @param {string} mapName
+     * @param {Object} mapDef
+     * @param {string} [colorSpace]
+     * @return {Promise<Texture>}
+     */
+    assignTexture(materialParams, mapName, mapDef, colorSpace) {
+      const parser = this;
+      return this.getDependency("texture", mapDef.index).then(function(texture) {
+        if (!texture) return null;
+        if (mapDef.texCoord !== void 0 && mapDef.texCoord > 0) {
+          texture = texture.clone();
+          texture.channel = mapDef.texCoord;
+        }
+        if (parser.extensions[EXTENSIONS.KHR_TEXTURE_TRANSFORM]) {
+          const transform = mapDef.extensions !== void 0 ? mapDef.extensions[EXTENSIONS.KHR_TEXTURE_TRANSFORM] : void 0;
+          if (transform) {
+            const gltfReference = parser.associations.get(texture);
+            texture = parser.extensions[EXTENSIONS.KHR_TEXTURE_TRANSFORM].extendTexture(texture, transform);
+            parser.associations.set(texture, gltfReference);
+          }
+        }
+        if (colorSpace !== void 0) {
+          texture.colorSpace = colorSpace;
+        }
+        materialParams[mapName] = texture;
+        return texture;
+      });
+    }
+    /**
+     * Assigns final material to a Mesh, Line, or Points instance. The instance
+     * already has a material (generated from the glTF material options alone)
+     * but reuse of the same glTF material may require multiple threejs materials
+     * to accommodate different primitive types, defines, etc. New materials will
+     * be created if necessary, and reused from a cache.
+     *
+     * @private
+     * @param {Object3D} mesh Mesh, Line, or Points instance.
+     */
+    assignFinalMaterial(mesh) {
+      const geometry = mesh.geometry;
+      let material = mesh.material;
+      const useDerivativeTangents = geometry.attributes.tangent === void 0;
+      const useVertexColors = geometry.attributes.color !== void 0;
+      const useFlatShading = geometry.attributes.normal === void 0;
+      if (mesh.isPoints) {
+        const cacheKey = "PointsMaterial:" + material.uuid;
+        let pointsMaterial = this.cache.get(cacheKey);
+        if (!pointsMaterial) {
+          pointsMaterial = new PointsMaterial();
+          Material.prototype.copy.call(pointsMaterial, material);
+          pointsMaterial.color.copy(material.color);
+          pointsMaterial.map = material.map;
+          pointsMaterial.sizeAttenuation = false;
+          this.cache.add(cacheKey, pointsMaterial);
+        }
+        material = pointsMaterial;
+      } else if (mesh.isLine) {
+        const cacheKey = "LineBasicMaterial:" + material.uuid;
+        let lineMaterial = this.cache.get(cacheKey);
+        if (!lineMaterial) {
+          lineMaterial = new LineBasicMaterial();
+          Material.prototype.copy.call(lineMaterial, material);
+          lineMaterial.color.copy(material.color);
+          lineMaterial.map = material.map;
+          this.cache.add(cacheKey, lineMaterial);
+        }
+        material = lineMaterial;
+      }
+      if (useDerivativeTangents || useVertexColors || useFlatShading) {
+        let cacheKey = "ClonedMaterial:" + material.uuid + ":";
+        if (useDerivativeTangents) cacheKey += "derivative-tangents:";
+        if (useVertexColors) cacheKey += "vertex-colors:";
+        if (useFlatShading) cacheKey += "flat-shading:";
+        let cachedMaterial = this.cache.get(cacheKey);
+        if (!cachedMaterial) {
+          cachedMaterial = material.clone();
+          if (useVertexColors) cachedMaterial.vertexColors = true;
+          if (useFlatShading) cachedMaterial.flatShading = true;
+          if (useDerivativeTangents) {
+            if (cachedMaterial.normalScale) cachedMaterial.normalScale.y *= -1;
+            if (cachedMaterial.clearcoatNormalScale) cachedMaterial.clearcoatNormalScale.y *= -1;
+          }
+          this.cache.add(cacheKey, cachedMaterial);
+          this.associations.set(cachedMaterial, this.associations.get(material));
+        }
+        material = cachedMaterial;
+      }
+      mesh.material = material;
+    }
+    getMaterialType() {
+      return MeshStandardMaterial;
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#materials
+     *
+     * @private
+     * @param {number} materialIndex
+     * @return {Promise<Material>}
+     */
+    loadMaterial(materialIndex) {
+      const parser = this;
+      const json = this.json;
+      const extensions = this.extensions;
+      const materialDef = json.materials[materialIndex];
+      let materialType;
+      const materialParams = {};
+      const materialExtensions = materialDef.extensions || {};
+      const pending = [];
+      if (materialExtensions[EXTENSIONS.KHR_MATERIALS_UNLIT]) {
+        const kmuExtension = extensions[EXTENSIONS.KHR_MATERIALS_UNLIT];
+        materialType = kmuExtension.getMaterialType();
+        pending.push(kmuExtension.extendParams(materialParams, materialDef, parser));
+      } else {
+        const metallicRoughness = materialDef.pbrMetallicRoughness || {};
+        materialParams.color = new Color(1, 1, 1);
+        materialParams.opacity = 1;
+        if (Array.isArray(metallicRoughness.baseColorFactor)) {
+          const array = metallicRoughness.baseColorFactor;
+          materialParams.color.setRGB(array[0], array[1], array[2], LinearSRGBColorSpace);
+          materialParams.opacity = array[3];
+        }
+        if (metallicRoughness.baseColorTexture !== void 0) {
+          pending.push(parser.assignTexture(materialParams, "map", metallicRoughness.baseColorTexture, SRGBColorSpace));
+        }
+        materialParams.metalness = metallicRoughness.metallicFactor !== void 0 ? metallicRoughness.metallicFactor : 1;
+        materialParams.roughness = metallicRoughness.roughnessFactor !== void 0 ? metallicRoughness.roughnessFactor : 1;
+        if (metallicRoughness.metallicRoughnessTexture !== void 0) {
+          pending.push(parser.assignTexture(materialParams, "metalnessMap", metallicRoughness.metallicRoughnessTexture));
+          pending.push(parser.assignTexture(materialParams, "roughnessMap", metallicRoughness.metallicRoughnessTexture));
+        }
+        materialType = this._invokeOne(function(ext) {
+          return ext.getMaterialType && ext.getMaterialType(materialIndex);
+        });
+        pending.push(Promise.all(this._invokeAll(function(ext) {
+          return ext.extendMaterialParams && ext.extendMaterialParams(materialIndex, materialParams);
+        })));
+      }
+      if (materialDef.doubleSided === true) {
+        materialParams.side = DoubleSide;
+      }
+      const alphaMode = materialDef.alphaMode || ALPHA_MODES.OPAQUE;
+      if (alphaMode === ALPHA_MODES.BLEND) {
+        materialParams.transparent = true;
+        materialParams.depthWrite = false;
+      } else {
+        materialParams.transparent = false;
+        if (alphaMode === ALPHA_MODES.MASK) {
+          materialParams.alphaTest = materialDef.alphaCutoff !== void 0 ? materialDef.alphaCutoff : 0.5;
+        }
+      }
+      if (materialDef.normalTexture !== void 0 && materialType !== MeshBasicMaterial) {
+        pending.push(parser.assignTexture(materialParams, "normalMap", materialDef.normalTexture));
+        materialParams.normalScale = new Vector2(1, 1);
+        if (materialDef.normalTexture.scale !== void 0) {
+          const scale = materialDef.normalTexture.scale;
+          materialParams.normalScale.set(scale, scale);
+        }
+      }
+      if (materialDef.occlusionTexture !== void 0 && materialType !== MeshBasicMaterial) {
+        pending.push(parser.assignTexture(materialParams, "aoMap", materialDef.occlusionTexture));
+        if (materialDef.occlusionTexture.strength !== void 0) {
+          materialParams.aoMapIntensity = materialDef.occlusionTexture.strength;
+        }
+      }
+      if (materialDef.emissiveFactor !== void 0 && materialType !== MeshBasicMaterial) {
+        const emissiveFactor = materialDef.emissiveFactor;
+        materialParams.emissive = new Color().setRGB(emissiveFactor[0], emissiveFactor[1], emissiveFactor[2], LinearSRGBColorSpace);
+      }
+      if (materialDef.emissiveTexture !== void 0 && materialType !== MeshBasicMaterial) {
+        pending.push(parser.assignTexture(materialParams, "emissiveMap", materialDef.emissiveTexture, SRGBColorSpace));
+      }
+      return Promise.all(pending).then(function() {
+        const material = new materialType(materialParams);
+        if (materialDef.name) material.name = materialDef.name;
+        assignExtrasToUserData(material, materialDef);
+        parser.associations.set(material, { materials: materialIndex });
+        if (materialDef.extensions) addUnknownExtensionsToUserData(extensions, material, materialDef);
+        return material;
+      });
+    }
+    /**
+     * When Object3D instances are targeted by animation, they need unique names.
+     *
+     * @private
+     * @param {string} originalName
+     * @return {string}
+     */
+    createUniqueName(originalName) {
+      const sanitizedName = PropertyBinding.sanitizeNodeName(originalName || "");
+      if (sanitizedName in this.nodeNamesUsed) {
+        return sanitizedName + "_" + ++this.nodeNamesUsed[sanitizedName];
+      } else {
+        this.nodeNamesUsed[sanitizedName] = 0;
+        return sanitizedName;
+      }
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#geometry
+     *
+     * Creates BufferGeometries from primitives.
+     *
+     * @private
+     * @param {Array<GLTF.Primitive>} primitives
+     * @return {Promise<Array<BufferGeometry>>}
+     */
+    loadGeometries(primitives) {
+      const parser = this;
+      const extensions = this.extensions;
+      const cache = this.primitiveCache;
+      function createDracoPrimitive(primitive) {
+        return extensions[EXTENSIONS.KHR_DRACO_MESH_COMPRESSION].decodePrimitive(primitive, parser).then(function(geometry) {
+          return addPrimitiveAttributes(geometry, primitive, parser);
+        });
+      }
+      const pending = [];
+      for (let i = 0, il = primitives.length; i < il; i++) {
+        const primitive = primitives[i];
+        const cacheKey = createPrimitiveKey(primitive);
+        const cached = cache[cacheKey];
+        if (cached) {
+          pending.push(cached.promise);
+        } else {
+          let geometryPromise;
+          if (primitive.extensions && primitive.extensions[EXTENSIONS.KHR_DRACO_MESH_COMPRESSION]) {
+            geometryPromise = createDracoPrimitive(primitive);
+          } else {
+            geometryPromise = addPrimitiveAttributes(new BufferGeometry(), primitive, parser);
+          }
+          if (primitive.mode === WEBGL_CONSTANTS.TRIANGLE_STRIP) {
+            geometryPromise = geometryPromise.then((geometry) => toTrianglesDrawMode(geometry, TriangleStripDrawMode));
+          } else if (primitive.mode === WEBGL_CONSTANTS.TRIANGLE_FAN) {
+            geometryPromise = geometryPromise.then((geometry) => toTrianglesDrawMode(geometry, TriangleFanDrawMode));
+          }
+          cache[cacheKey] = { primitive, promise: geometryPromise };
+          pending.push(geometryPromise);
+        }
+      }
+      return Promise.all(pending);
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#meshes
+     *
+     * @private
+     * @param {number} meshIndex
+     * @return {Promise<Group|Mesh|SkinnedMesh|Line|Points>}
+     */
+    loadMesh(meshIndex) {
+      const parser = this;
+      const json = this.json;
+      const extensions = this.extensions;
+      const meshDef = json.meshes[meshIndex];
+      const primitives = meshDef.primitives;
+      const pending = [];
+      for (let i = 0, il = primitives.length; i < il; i++) {
+        const material = primitives[i].material === void 0 ? createDefaultMaterial(this.cache) : this.getDependency("material", primitives[i].material);
+        pending.push(material);
+      }
+      pending.push(parser.loadGeometries(primitives));
+      return Promise.all(pending).then(async function(results) {
+        const materials = results.slice(0, results.length - 1);
+        const geometries = results[results.length - 1];
+        const meshes = [];
+        for (let i = 0, il = geometries.length; i < il; i++) {
+          const geometry = geometries[i];
+          const primitive = primitives[i];
+          let mesh;
+          const material = materials[i];
+          if (primitive.mode === WEBGL_CONSTANTS.TRIANGLES || primitive.mode === WEBGL_CONSTANTS.TRIANGLE_STRIP || primitive.mode === WEBGL_CONSTANTS.TRIANGLE_FAN || primitive.mode === void 0) {
+            const needsSkinning = meshDef.isSkinnedMesh === true;
+            const hasSkinningAttributes = geometry.hasAttribute("skinIndex") && geometry.hasAttribute("skinWeight");
+            if (needsSkinning && hasSkinningAttributes === false) {
+              console.warn("THREE.GLTFLoader: Missing skinIndex or skinWeight attributes. Skinning disabled.");
+            }
+            mesh = needsSkinning && hasSkinningAttributes ? new SkinnedMesh(geometry, material) : new Mesh(geometry, material);
+            if (mesh.isSkinnedMesh === true) {
+              mesh.normalizeSkinWeights();
+            }
+          } else if (primitive.mode === WEBGL_CONSTANTS.LINES) {
+            mesh = new LineSegments(geometry, material);
+          } else if (primitive.mode === WEBGL_CONSTANTS.LINE_STRIP) {
+            mesh = new Line(geometry, material);
+          } else if (primitive.mode === WEBGL_CONSTANTS.LINE_LOOP) {
+            mesh = new LineLoop(geometry, material);
+          } else if (primitive.mode === WEBGL_CONSTANTS.POINTS) {
+            mesh = new Points(geometry, material);
+          } else {
+            throw new Error("THREE.GLTFLoader: Primitive mode unsupported: " + primitive.mode);
+          }
+          if (Object.keys(mesh.geometry.morphAttributes).length > 0) {
+            updateMorphTargets(mesh, meshDef);
+          }
+          mesh.name = parser.createUniqueName(meshDef.name || "mesh_" + meshIndex);
+          assignExtrasToUserData(mesh, meshDef);
+          if (primitive.extensions) addUnknownExtensionsToUserData(extensions, mesh, primitive);
+          parser.assignFinalMaterial(mesh);
+          meshes.push(mesh);
+        }
+        for (let i = 0, il = meshes.length; i < il; i++) {
+          parser.associations.set(meshes[i], {
+            meshes: meshIndex,
+            primitives: i
+          });
+        }
+        if (meshes.length === 1) {
+          if (meshDef.extensions) addUnknownExtensionsToUserData(extensions, meshes[0], meshDef);
+          return meshes[0];
+        }
+        const group = new Group();
+        if (meshDef.extensions) addUnknownExtensionsToUserData(extensions, group, meshDef);
+        parser.associations.set(group, { meshes: meshIndex });
+        for (let i = 0, il = meshes.length; i < il; i++) {
+          group.add(meshes[i]);
+        }
+        return group;
+      });
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#cameras
+     *
+     * @private
+     * @param {number} cameraIndex
+     * @return {Promise<Camera>|undefined}
+     */
+    loadCamera(cameraIndex) {
+      let camera;
+      const cameraDef = this.json.cameras[cameraIndex];
+      const params = cameraDef[cameraDef.type];
+      if (!params) {
+        console.warn("THREE.GLTFLoader: Missing camera parameters.");
+        return;
+      }
+      if (cameraDef.type === "perspective") {
+        camera = new PerspectiveCamera(MathUtils.radToDeg(params.yfov), params.aspectRatio || 1, params.znear || 1, params.zfar || 2e6);
+      } else if (cameraDef.type === "orthographic") {
+        camera = new OrthographicCamera(-params.xmag, params.xmag, params.ymag, -params.ymag, params.znear, params.zfar);
+      }
+      if (cameraDef.name) camera.name = this.createUniqueName(cameraDef.name);
+      assignExtrasToUserData(camera, cameraDef);
+      return Promise.resolve(camera);
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#skins
+     *
+     * @private
+     * @param {number} skinIndex
+     * @return {Promise<Skeleton>}
+     */
+    loadSkin(skinIndex) {
+      const skinDef = this.json.skins[skinIndex];
+      const pending = [];
+      for (let i = 0, il = skinDef.joints.length; i < il; i++) {
+        pending.push(this._loadNodeShallow(skinDef.joints[i]));
+      }
+      if (skinDef.inverseBindMatrices !== void 0) {
+        pending.push(this.getDependency("accessor", skinDef.inverseBindMatrices));
+      } else {
+        pending.push(null);
+      }
+      return Promise.all(pending).then(function(results) {
+        const inverseBindMatrices = results.pop();
+        const jointNodes = results;
+        const bones = [];
+        const boneInverses = [];
+        for (let i = 0, il = jointNodes.length; i < il; i++) {
+          const jointNode = jointNodes[i];
+          if (jointNode) {
+            bones.push(jointNode);
+            const mat = new Matrix4();
+            if (inverseBindMatrices !== null) {
+              mat.fromArray(inverseBindMatrices.array, i * 16);
+            }
+            boneInverses.push(mat);
+          } else {
+            console.warn('THREE.GLTFLoader: Joint "%s" could not be found.', skinDef.joints[i]);
+          }
+        }
+        return new Skeleton(bones, boneInverses);
+      });
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#animations
+     *
+     * @private
+     * @param {number} animationIndex
+     * @return {Promise<AnimationClip>}
+     */
+    loadAnimation(animationIndex) {
+      const json = this.json;
+      const parser = this;
+      const animationDef = json.animations[animationIndex];
+      const animationName = animationDef.name ? animationDef.name : "animation_" + animationIndex;
+      const pendingNodes = [];
+      const pendingInputAccessors = [];
+      const pendingOutputAccessors = [];
+      const pendingSamplers = [];
+      const pendingTargets = [];
+      for (let i = 0, il = animationDef.channels.length; i < il; i++) {
+        const channel = animationDef.channels[i];
+        const sampler = animationDef.samplers[channel.sampler];
+        const target = channel.target;
+        const name = target.node;
+        const input = animationDef.parameters !== void 0 ? animationDef.parameters[sampler.input] : sampler.input;
+        const output = animationDef.parameters !== void 0 ? animationDef.parameters[sampler.output] : sampler.output;
+        if (target.node === void 0) continue;
+        pendingNodes.push(this.getDependency("node", name));
+        pendingInputAccessors.push(this.getDependency("accessor", input));
+        pendingOutputAccessors.push(this.getDependency("accessor", output));
+        pendingSamplers.push(sampler);
+        pendingTargets.push(target);
+      }
+      return Promise.all([
+        Promise.all(pendingNodes),
+        Promise.all(pendingInputAccessors),
+        Promise.all(pendingOutputAccessors),
+        Promise.all(pendingSamplers),
+        Promise.all(pendingTargets)
+      ]).then(function(dependencies) {
+        const nodes = dependencies[0];
+        const inputAccessors = dependencies[1];
+        const outputAccessors = dependencies[2];
+        const samplers = dependencies[3];
+        const targets = dependencies[4];
+        const tracks = [];
+        for (let i = 0, il = nodes.length; i < il; i++) {
+          const node = nodes[i];
+          const inputAccessor = inputAccessors[i];
+          const outputAccessor = outputAccessors[i];
+          const sampler = samplers[i];
+          const target = targets[i];
+          if (node === void 0) continue;
+          if (node.updateMatrix) {
+            node.updateMatrix();
+          }
+          const createdTracks = parser._createAnimationTracks(node, inputAccessor, outputAccessor, sampler, target);
+          if (createdTracks) {
+            for (let k = 0; k < createdTracks.length; k++) {
+              tracks.push(createdTracks[k]);
+            }
+          }
+        }
+        const animation = new AnimationClip(animationName, void 0, tracks);
+        assignExtrasToUserData(animation, animationDef);
+        return animation;
+      });
+    }
+    createNodeMesh(nodeIndex) {
+      const json = this.json;
+      const parser = this;
+      const nodeDef = json.nodes[nodeIndex];
+      if (nodeDef.mesh === void 0) return null;
+      return parser.getDependency("mesh", nodeDef.mesh).then(function(mesh) {
+        const node = parser._getNodeRef(parser.meshCache, nodeDef.mesh, mesh);
+        if (nodeDef.weights !== void 0) {
+          node.traverse(function(o) {
+            if (!o.isMesh) return;
+            for (let i = 0, il = nodeDef.weights.length; i < il; i++) {
+              o.morphTargetInfluences[i] = nodeDef.weights[i];
+            }
+          });
+        }
+        return node;
+      });
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#nodes-and-hierarchy
+     *
+     * @private
+     * @param {number} nodeIndex
+     * @return {Promise<Object3D>}
+     */
+    loadNode(nodeIndex) {
+      const json = this.json;
+      const parser = this;
+      const nodeDef = json.nodes[nodeIndex];
+      const nodePending = parser._loadNodeShallow(nodeIndex);
+      const childPending = [];
+      const childrenDef = nodeDef.children || [];
+      for (let i = 0, il = childrenDef.length; i < il; i++) {
+        childPending.push(parser.getDependency("node", childrenDef[i]));
+      }
+      const skeletonPending = nodeDef.skin === void 0 ? Promise.resolve(null) : parser.getDependency("skin", nodeDef.skin);
+      return Promise.all([
+        nodePending,
+        Promise.all(childPending),
+        skeletonPending
+      ]).then(function(results) {
+        const node = results[0];
+        const children = results[1];
+        const skeleton = results[2];
+        if (skeleton !== null) {
+          node.traverse(function(mesh) {
+            if (!mesh.isSkinnedMesh) return;
+            mesh.bind(skeleton, _identityMatrix2);
+          });
+        }
+        for (let i = 0, il = children.length; i < il; i++) {
+          node.add(children[i]);
+        }
+        if (node.userData.pivot !== void 0 && children.length > 0) {
+          const pivot = node.userData.pivot;
+          const pivotChild = children[0];
+          node.pivot = new Vector3().fromArray(pivot);
+          node.position.x -= pivot[0];
+          node.position.y -= pivot[1];
+          node.position.z -= pivot[2];
+          pivotChild.position.set(0, 0, 0);
+          delete node.userData.pivot;
+        }
+        return node;
+      });
+    }
+    // ._loadNodeShallow() parses a single node.
+    // skin and child nodes are created and added in .loadNode() (no '_' prefix).
+    _loadNodeShallow(nodeIndex) {
+      const json = this.json;
+      const extensions = this.extensions;
+      const parser = this;
+      if (this.nodeCache[nodeIndex] !== void 0) {
+        return this.nodeCache[nodeIndex];
+      }
+      const nodeDef = json.nodes[nodeIndex];
+      const nodeName = nodeDef.name ? parser.createUniqueName(nodeDef.name) : "";
+      const pending = [];
+      const meshPromise = parser._invokeOne(function(ext) {
+        return ext.createNodeMesh && ext.createNodeMesh(nodeIndex);
+      });
+      if (meshPromise) {
+        pending.push(meshPromise);
+      }
+      if (nodeDef.camera !== void 0) {
+        pending.push(parser.getDependency("camera", nodeDef.camera).then(function(camera) {
+          return parser._getNodeRef(parser.cameraCache, nodeDef.camera, camera);
+        }));
+      }
+      parser._invokeAll(function(ext) {
+        return ext.createNodeAttachment && ext.createNodeAttachment(nodeIndex);
+      }).forEach(function(promise) {
+        pending.push(promise);
+      });
+      this.nodeCache[nodeIndex] = Promise.all(pending).then(function(objects) {
+        let node;
+        if (nodeDef.isBone === true) {
+          node = new Bone();
+        } else if (objects.length > 1) {
+          node = new Group();
+        } else if (objects.length === 1) {
+          node = objects[0];
+        } else {
+          node = new Object3D();
+        }
+        if (node !== objects[0]) {
+          for (let i = 0, il = objects.length; i < il; i++) {
+            node.add(objects[i]);
+          }
+        }
+        if (nodeDef.name) {
+          node.userData.name = nodeDef.name;
+          node.name = nodeName;
+        }
+        assignExtrasToUserData(node, nodeDef);
+        if (nodeDef.extensions) addUnknownExtensionsToUserData(extensions, node, nodeDef);
+        if (nodeDef.matrix !== void 0) {
+          const matrix = new Matrix4();
+          matrix.fromArray(nodeDef.matrix);
+          node.applyMatrix4(matrix);
+        } else {
+          if (nodeDef.translation !== void 0) {
+            node.position.fromArray(nodeDef.translation);
+          }
+          if (nodeDef.rotation !== void 0) {
+            node.quaternion.fromArray(nodeDef.rotation);
+          }
+          if (nodeDef.scale !== void 0) {
+            node.scale.fromArray(nodeDef.scale);
+          }
+        }
+        if (!parser.associations.has(node)) {
+          parser.associations.set(node, {});
+        } else if (nodeDef.mesh !== void 0 && parser.meshCache.refs[nodeDef.mesh] > 1) {
+          const mapping = parser.associations.get(node);
+          parser.associations.set(node, { ...mapping });
+        }
+        parser.associations.get(node).nodes = nodeIndex;
+        return node;
+      });
+      return this.nodeCache[nodeIndex];
+    }
+    /**
+     * Specification: https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#scenes
+     *
+     * @private
+     * @param {number} sceneIndex
+     * @return {Promise<Group>}
+     */
+    loadScene(sceneIndex) {
+      const extensions = this.extensions;
+      const sceneDef = this.json.scenes[sceneIndex];
+      const parser = this;
+      const scene = new Group();
+      if (sceneDef.name) scene.name = parser.createUniqueName(sceneDef.name);
+      assignExtrasToUserData(scene, sceneDef);
+      if (sceneDef.extensions) addUnknownExtensionsToUserData(extensions, scene, sceneDef);
+      const nodeIds = sceneDef.nodes || [];
+      const pending = [];
+      for (let i = 0, il = nodeIds.length; i < il; i++) {
+        pending.push(parser.getDependency("node", nodeIds[i]));
+      }
+      return Promise.all(pending).then(function(nodes) {
+        for (let i = 0, il = nodes.length; i < il; i++) {
+          const node = nodes[i];
+          if (node.parent !== null) {
+            scene.add(clone(node));
+          } else {
+            scene.add(node);
+          }
+        }
+        const reduceAssociations = (node) => {
+          const reducedAssociations = /* @__PURE__ */ new Map();
+          for (const [key, value] of parser.associations) {
+            if (key instanceof Material || key instanceof Texture) {
+              reducedAssociations.set(key, value);
+            }
+          }
+          node.traverse((node2) => {
+            const mappings = parser.associations.get(node2);
+            if (mappings != null) {
+              reducedAssociations.set(node2, mappings);
+            }
+          });
+          return reducedAssociations;
+        };
+        parser.associations = reduceAssociations(scene);
+        return scene;
+      });
+    }
+    _createAnimationTracks(node, inputAccessor, outputAccessor, sampler, target) {
+      const tracks = [];
+      const targetName = node.name ? node.name : node.uuid;
+      const targetNames = [];
+      function collectMorphTargets(object) {
+        if (object.morphTargetInfluences) {
+          targetNames.push(object.name ? object.name : object.uuid);
+        }
+      }
+      if (PATH_PROPERTIES[target.path] === PATH_PROPERTIES.weights) {
+        collectMorphTargets(node);
+        if (node.isGroup) {
+          node.children.forEach(collectMorphTargets);
+        }
+      } else {
+        targetNames.push(targetName);
+      }
+      let TypedKeyframeTrack;
+      switch (PATH_PROPERTIES[target.path]) {
+        case PATH_PROPERTIES.weights:
+          TypedKeyframeTrack = NumberKeyframeTrack;
+          break;
+        case PATH_PROPERTIES.rotation:
+          TypedKeyframeTrack = QuaternionKeyframeTrack;
+          break;
+        case PATH_PROPERTIES.translation:
+        case PATH_PROPERTIES.scale:
+          TypedKeyframeTrack = VectorKeyframeTrack;
+          break;
+        default:
+          switch (outputAccessor.itemSize) {
+            case 1:
+              TypedKeyframeTrack = NumberKeyframeTrack;
+              break;
+            case 2:
+            case 3:
+            default:
+              TypedKeyframeTrack = VectorKeyframeTrack;
+              break;
+          }
+          break;
+      }
+      const interpolation = sampler.interpolation !== void 0 ? INTERPOLATION[sampler.interpolation] : InterpolateLinear;
+      const outputArray = this._getArrayFromAccessor(outputAccessor);
+      for (let j = 0, jl = targetNames.length; j < jl; j++) {
+        const track = new TypedKeyframeTrack(
+          targetNames[j] + "." + PATH_PROPERTIES[target.path],
+          inputAccessor.array,
+          outputArray,
+          interpolation
+        );
+        if (sampler.interpolation === "CUBICSPLINE") {
+          this._createCubicSplineTrackInterpolant(track);
+        }
+        tracks.push(track);
+      }
+      return tracks;
+    }
+    _getArrayFromAccessor(accessor) {
+      let outputArray = accessor.array;
+      if (accessor.normalized) {
+        const scale = getNormalizedComponentScale(outputArray.constructor);
+        const scaled = new Float32Array(outputArray.length);
+        for (let j = 0, jl = outputArray.length; j < jl; j++) {
+          scaled[j] = outputArray[j] * scale;
+        }
+        outputArray = scaled;
+      }
+      return outputArray;
+    }
+    _createCubicSplineTrackInterpolant(track) {
+      track.createInterpolant = function InterpolantFactoryMethodGLTFCubicSpline(result) {
+        const interpolantType = this instanceof QuaternionKeyframeTrack ? GLTFCubicSplineQuaternionInterpolant : GLTFCubicSplineInterpolant;
+        return new interpolantType(this.times, this.values, this.getValueSize() / 3, result);
+      };
+      track.createInterpolant.isInterpolantFactoryMethodGLTFCubicSpline = true;
+    }
+  };
+  function computeBounds(geometry, primitiveDef, parser) {
+    const attributes = primitiveDef.attributes;
+    const box = new Box3();
+    if (attributes.POSITION !== void 0) {
+      const accessor = parser.json.accessors[attributes.POSITION];
+      const min = accessor.min;
+      const max = accessor.max;
+      if (min !== void 0 && max !== void 0) {
+        box.set(
+          new Vector3(min[0], min[1], min[2]),
+          new Vector3(max[0], max[1], max[2])
+        );
+        if (accessor.normalized) {
+          const boxScale = getNormalizedComponentScale(WEBGL_COMPONENT_TYPES[accessor.componentType]);
+          box.min.multiplyScalar(boxScale);
+          box.max.multiplyScalar(boxScale);
+        }
+      } else {
+        console.warn("THREE.GLTFLoader: Missing min/max properties for accessor POSITION.");
+        return;
+      }
+    } else {
+      return;
+    }
+    const targets = primitiveDef.targets;
+    if (targets !== void 0) {
+      const maxDisplacement = new Vector3();
+      const vector = new Vector3();
+      for (let i = 0, il = targets.length; i < il; i++) {
+        const target = targets[i];
+        if (target.POSITION !== void 0) {
+          const accessor = parser.json.accessors[target.POSITION];
+          const min = accessor.min;
+          const max = accessor.max;
+          if (min !== void 0 && max !== void 0) {
+            vector.setX(Math.max(Math.abs(min[0]), Math.abs(max[0])));
+            vector.setY(Math.max(Math.abs(min[1]), Math.abs(max[1])));
+            vector.setZ(Math.max(Math.abs(min[2]), Math.abs(max[2])));
+            if (accessor.normalized) {
+              const boxScale = getNormalizedComponentScale(WEBGL_COMPONENT_TYPES[accessor.componentType]);
+              vector.multiplyScalar(boxScale);
+            }
+            maxDisplacement.max(vector);
+          } else {
+            console.warn("THREE.GLTFLoader: Missing min/max properties for accessor POSITION.");
+          }
+        }
+      }
+      box.expandByVector(maxDisplacement);
+    }
+    geometry.boundingBox = box;
+    const sphere = new Sphere();
+    box.getCenter(sphere.center);
+    sphere.radius = box.min.distanceTo(box.max) / 2;
+    geometry.boundingSphere = sphere;
+  }
+  function addPrimitiveAttributes(geometry, primitiveDef, parser) {
+    const attributes = primitiveDef.attributes;
+    const pending = [];
+    function assignAttributeAccessor(accessorIndex, attributeName) {
+      return parser.getDependency("accessor", accessorIndex).then(function(accessor) {
+        geometry.setAttribute(attributeName, accessor);
+      });
+    }
+    for (const gltfAttributeName in attributes) {
+      const threeAttributeName = ATTRIBUTES[gltfAttributeName] || gltfAttributeName.toLowerCase();
+      if (threeAttributeName in geometry.attributes) continue;
+      pending.push(assignAttributeAccessor(attributes[gltfAttributeName], threeAttributeName));
+    }
+    if (primitiveDef.indices !== void 0 && !geometry.index) {
+      const accessor = parser.getDependency("accessor", primitiveDef.indices).then(function(accessor2) {
+        geometry.setIndex(accessor2);
+      });
+      pending.push(accessor);
+    }
+    if (ColorManagement.workingColorSpace !== LinearSRGBColorSpace && "COLOR_0" in attributes) {
+      console.warn(`THREE.GLTFLoader: Converting vertex colors from "srgb-linear" to "${ColorManagement.workingColorSpace}" not supported.`);
+    }
+    assignExtrasToUserData(geometry, primitiveDef);
+    computeBounds(geometry, primitiveDef, parser);
+    return Promise.all(pending).then(function() {
+      return primitiveDef.targets !== void 0 ? addMorphTargets(geometry, primitiveDef.targets, parser) : geometry;
+    });
+  }
+
   // js/obstacles.js
   var ObstacleManager = class {
     constructor(scene, track) {
@@ -39666,6 +45173,17 @@ void main() {
       this.train = null;
       this.obstacles = [];
       this.nextId = 1;
+      this.gltfLoader = new GLTFLoader();
+      this.loadedModels = {};
+      this.modelUrls = {
+        human: "assets/models/human.glb",
+        elephant: "assets/models/elephant.glb",
+        cow: "assets/models/cow.glb",
+        dog: "assets/models/dog.glb",
+        deer: "assets/models/deer.glb",
+        boar: "assets/models/boar.glb"
+      };
+      this.preloadModels();
       this.activeDeterrenceMode = "electric_shock";
       this.deterrenceSpecs = {
         electric_shock: {
@@ -39700,64 +45218,61 @@ void main() {
         deterrenceMode: "electric_shock"
       };
       this.animTime = 0;
-      this.materials = {
-        humanSkinPeach: new MeshStandardMaterial({ color: 16566183, roughness: 0.62 }),
-        // Warm peach skin tone
-        humanSkinShadow: new MeshStandardMaterial({ color: 15445387, roughness: 0.68 }),
-        humanBlush: new MeshStandardMaterial({ color: 16020150, roughness: 0.55, transparent: true, opacity: 0.85 }),
-        // Rosy blush cheeks
-        humanHairGinger: new MeshStandardMaterial({ color: 14243627, roughness: 0.78 }),
-        // Auburn / ginger swept quiff hair
-        humanHairDark: new MeshStandardMaterial({ color: 2565930, roughness: 0.82 }),
-        humanEyesWhite: new MeshBasicMaterial({ color: 16777215 }),
-        humanEyesIris: new MeshStandardMaterial({ color: 1976635, roughness: 0.2 }),
-        // Deep dark friendly pupil
-        humanEyeReflex: new MeshBasicMaterial({ color: 16777215 }),
-        // Specular catchlight dot
-        humanBrow: new MeshStandardMaterial({ color: 2565930, roughness: 0.7 }),
-        // Arched brows
-        humanSmile: new MeshStandardMaterial({ color: 10105874, roughness: 0.6 }),
-        // Sweet curved mouth
-        humanPoloCream: new MeshStandardMaterial({ color: 16051940, roughness: 0.72 }),
-        // Beige / cream polo shirt
-        humanPoloCollar: new MeshStandardMaterial({ color: 16777215, roughness: 0.55 }),
-        // Crisp white folded collar
-        humanPantsBrown: new MeshStandardMaterial({ color: 7883314, roughness: 0.75 }),
-        // Tailored warm brown chinos
-        humanShoesDark: new MeshStandardMaterial({ color: 2039587, roughness: 0.65 }),
-        // Dark casual loafers
-        humanBeltLeather: new MeshStandardMaterial({ color: 4073251, roughness: 0.6 }),
-        humanBuckleSilver: new MeshStandardMaterial({ color: 14870768, metalness: 0.85, roughness: 0.25 }),
-        humanButtonPearl: new MeshStandardMaterial({ color: 15857145, roughness: 0.3 }),
-        humanShoeSole: new MeshStandardMaterial({ color: 16317180, roughness: 0.35 }),
-        humanVestOrange: new MeshStandardMaterial({ color: 16733440, roughness: 0.45 }),
-        humanReflectiveSilver: new MeshStandardMaterial({ color: 16777215, roughness: 0.15, metalness: 0.7 }),
-        // Animal Specific Materials (Multiple Species with Realistic Tones)
-        dogFurTan: new MeshStandardMaterial({ color: 14251782, roughness: 0.78 }),
-        // Indian Pariah Dog Golden/Tan Fur
-        dogNoseDark: new MeshStandardMaterial({ color: 1579035, roughness: 0.35 }),
-        dogCollarRed: new MeshStandardMaterial({ color: 14427686, roughness: 0.5 }),
-        deerFurFawn: new MeshStandardMaterial({ color: 11817737, roughness: 0.75 }),
-        // Spotted Deer / Chital Fawn Fur
-        deerSpotsCream: new MeshStandardMaterial({ color: 16708551, roughness: 0.7 }),
-        deerAntlersDark: new MeshStandardMaterial({ color: 4528643, roughness: 0.55 }),
-        cowHideCream: new MeshStandardMaterial({ color: 15857145, roughness: 0.75 }),
-        // Indian Zebu Cattle Off-White Hide
-        cowHideGrey: new MeshStandardMaterial({ color: 9741240, roughness: 0.8 }),
-        // Zebu Shoulder Hump Shading
-        cowHornsDark: new MeshStandardMaterial({ color: 1976635, roughness: 0.35, metalness: 0.15 }),
-        cowMuzzlePink: new MeshStandardMaterial({ color: 16502760, roughness: 0.6 }),
-        elephantHideGrey: new MeshStandardMaterial({ color: 4674921, roughness: 0.88 }),
-        // Wild Asian Elephant Weathered Hide
-        elephantIvory: new MeshStandardMaterial({ color: 16710083, roughness: 0.3, metalness: 0.1 }),
-        // Elephant Ivory Tusks
-        boarBristleDark: new MeshStandardMaterial({ color: 2696484, roughness: 0.85 }),
-        hoofDark: new MeshStandardMaterial({ color: 1579035, roughness: 0.5 })
-      };
+      this.initTexturesAndMaterials();
       this.initDefaultObstacles();
     }
     setTrain(train) {
       this.train = train;
+    }
+    // Preload photorealistic 3D GLTF models from assets/models/
+    preloadModels() {
+      if (typeof window === "undefined" || !this.gltfLoader) return;
+      Object.entries(this.modelUrls).forEach(([type, url]) => {
+        this.gltfLoader.load(
+          url,
+          (gltf) => {
+            console.log(`[ObstacleManager] Loaded photorealistic 3D asset: ${type}`);
+            const model = gltf.scene;
+            model.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+            });
+            this.loadedModels[type] = {
+              scene: model,
+              animations: gltf.animations || []
+            };
+            if (this.activeScenarioIndex) {
+              this.applyScenario(this.activeScenarioIndex);
+            }
+          },
+          void 0,
+          () => {
+          }
+        );
+      });
+    }
+    // Load a custom photorealistic GLTF/GLB model from URL or local path
+    loadCustomModel(type, url) {
+      if (!this.gltfLoader) return;
+      this.gltfLoader.load(url, (gltf) => {
+        console.log(`[ObstacleManager] Loaded custom 3D model for ${type}:`, url);
+        const model = gltf.scene;
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        this.loadedModels[type] = {
+          scene: model,
+          animations: gltf.animations || []
+        };
+        if (this.activeScenarioIndex) {
+          this.applyScenario(this.activeScenarioIndex);
+        }
+      });
     }
     // Remove any leftover human / animal / debris meshes from the scene
     cleanupSceneObstacles() {
@@ -39779,98 +45294,717 @@ void main() {
       });
     }
     // ------------------------------------------------------------------
-    // Canvas Texture Generator for Living Expressive Human Facial Features
+    // High-Fidelity Procedural PBR Textures & Material Initialization
+    // ------------------------------------------------------------------
+    initTexturesAndMaterials() {
+      this.textures = this.createProceduralTextures();
+      const denimMap = this.textures.denim || null;
+      const denimBump = this.textures.denimBump || null;
+      const shirtMap = this.textures.shirt || null;
+      const shirtBump = this.textures.shirtBump || null;
+      const leatherMap = this.textures.leather || null;
+      const leatherBump = this.textures.leatherBump || null;
+      const skinBump = this.textures.skinBump || null;
+      const dogFurMap = this.textures.dogFur || null;
+      const cowHideMap = this.textures.cowHide || null;
+      const elephantSkinMap = this.textures.elephantSkin || null;
+      const elephantBump = this.textures.elephantBump || null;
+      const elephantEarMap = this.textures.elephantEar || null;
+      const ivoryMap = this.textures.ivory || null;
+      const ivoryBump = this.textures.ivoryBump || null;
+      const hornMap = this.textures.horn || null;
+      this.materials = {
+        // Authentic Warm Indian Complexion (Natural Wheatish/Tan PBR Skin)
+        humanSkin: new MeshStandardMaterial({
+          color: 10380612,
+          bumpMap: skinBump,
+          bumpScale: 0.012,
+          roughness: 0.6,
+          metalness: 0.02
+        }),
+        humanSkinPeach: new MeshStandardMaterial({
+          color: 10775367,
+          bumpMap: skinBump,
+          bumpScale: 0.012,
+          roughness: 0.6,
+          metalness: 0.02
+        }),
+        humanSkinShadow: new MeshStandardMaterial({
+          color: 7750952,
+          roughness: 0.72
+        }),
+        humanBlush: new MeshStandardMaterial({
+          color: 9064504,
+          roughness: 0.6,
+          transparent: true,
+          opacity: 0.45
+        }),
+        // Natural Deep Black / Espresso Groomed Hair
+        humanHairDark: new MeshStandardMaterial({
+          color: 1381137,
+          roughness: 0.82,
+          metalness: 0.05
+        }),
+        humanHairGinger: new MeshStandardMaterial({
+          color: 1381137,
+          roughness: 0.82
+        }),
+        // Realistic Human Eyes
+        humanEyesWhite: new MeshStandardMaterial({
+          color: 16184303,
+          roughness: 0.35
+        }),
+        humanEyesIris: new MeshStandardMaterial({
+          color: 2758412,
+          // Rich dark-brown / hazel iris
+          roughness: 0.12,
+          metalness: 0.1
+        }),
+        humanEyeReflex: new MeshBasicMaterial({ color: 16777215 }),
+        humanBrow: new MeshStandardMaterial({
+          color: 1381137,
+          roughness: 0.75
+        }),
+        humanSmile: new MeshStandardMaterial({
+          color: 8142645,
+          roughness: 0.55
+        }),
+        // Realistic Clothing & Accessories (Modern Casual Shirt, Indigo Jeans, Leather)
+        humanPoloCream: new MeshStandardMaterial({
+          color: 2573670,
+          // Stylish classic dusty indigo chambray shirt
+          map: shirtMap,
+          bumpMap: shirtBump,
+          bumpScale: 0.025,
+          roughness: 0.7
+        }),
+        humanPoloCollar: new MeshStandardMaterial({
+          color: 1979984,
+          map: shirtMap,
+          roughness: 0.68
+        }),
+        humanShirt: new MeshStandardMaterial({
+          color: 2573670,
+          map: shirtMap,
+          bumpMap: shirtBump,
+          bumpScale: 0.025,
+          roughness: 0.7
+        }),
+        humanPantsBrown: new MeshStandardMaterial({
+          color: 2174789,
+          // Deep denim indigo blue trousers
+          map: denimMap,
+          bumpMap: denimBump,
+          bumpScale: 0.035,
+          roughness: 0.75
+        }),
+        humanPantsDenim: new MeshStandardMaterial({
+          color: 2174789,
+          map: denimMap,
+          bumpMap: denimBump,
+          bumpScale: 0.035,
+          roughness: 0.75
+        }),
+        humanBeltLeather: new MeshStandardMaterial({
+          color: 2955792,
+          // Dark genuine leather
+          map: leatherMap,
+          bumpMap: leatherBump,
+          bumpScale: 0.03,
+          roughness: 0.52,
+          metalness: 0.08
+        }),
+        humanBuckleSilver: new MeshStandardMaterial({
+          color: 14870768,
+          metalness: 0.9,
+          roughness: 0.22
+        }),
+        humanButtonPearl: new MeshStandardMaterial({
+          color: 15857145,
+          roughness: 0.25,
+          metalness: 0.15
+        }),
+        humanShoesDark: new MeshStandardMaterial({
+          color: 1644052,
+          // Dark espresso leather shoes
+          map: leatherMap,
+          bumpMap: leatherBump,
+          bumpScale: 0.03,
+          roughness: 0.45,
+          metalness: 0.06
+        }),
+        humanShoeSole: new MeshStandardMaterial({
+          color: 15987958,
+          // Off-white vulcanized rubber sole rim
+          roughness: 0.42
+        }),
+        humanWatchSilver: new MeshStandardMaterial({
+          color: 13948120,
+          metalness: 0.92,
+          roughness: 0.18
+        }),
+        humanWatchStrap: new MeshStandardMaterial({
+          color: 1579035,
+          roughness: 0.6
+        }),
+        humanVestOrange: new MeshStandardMaterial({
+          color: 16733440,
+          roughness: 0.45
+        }),
+        humanReflectiveSilver: new MeshStandardMaterial({
+          color: 16777215,
+          roughness: 0.15,
+          metalness: 0.7
+        }),
+        // Indian Pariah Dog (Desi Indie: Golden-Tan Coat, Wet Leathery Nose)
+        dogFurTan: new MeshStandardMaterial({
+          color: 12876598,
+          map: dogFurMap,
+          roughness: 0.76
+        }),
+        dogFurCream: new MeshStandardMaterial({
+          color: 16116960,
+          map: dogFurMap,
+          roughness: 0.74
+        }),
+        dogNoseDark: new MeshStandardMaterial({
+          color: 1710104,
+          roughness: 0.32,
+          metalness: 0.15
+        }),
+        // Indian Zebu Cow (Sacred Cow: White/Cream Hide with Grey Hump & Lyre Horns)
+        cowHideCream: new MeshStandardMaterial({
+          color: 15986920,
+          map: cowHideMap,
+          bumpMap: elephantBump,
+          bumpScale: 0.022,
+          roughness: 0.75
+        }),
+        cowHideGrey: new MeshStandardMaterial({
+          color: 9081502,
+          bumpMap: elephantBump,
+          bumpScale: 0.022,
+          roughness: 0.78
+        }),
+        cowHornsDark: new MeshStandardMaterial({
+          color: 2237998,
+          map: hornMap,
+          roughness: 0.38,
+          metalness: 0.12
+        }),
+        cowMuzzlePink: new MeshStandardMaterial({
+          color: 4866371,
+          // Slate-pink wet bovine muzzle
+          roughness: 0.32,
+          metalness: 0.12
+        }),
+        hoofDark: new MeshStandardMaterial({
+          color: 1447706,
+          roughness: 0.45,
+          metalness: 0.15
+        }),
+        // Asian Wild Elephant (Weathered Deep-Wrinkled Slate Hide, Ivory Tusks)
+        elephantHideGrey: new MeshStandardMaterial({
+          color: 4015181,
+          map: elephantSkinMap,
+          bumpMap: elephantBump,
+          bumpScale: 0.065,
+          roughness: 0.86
+        }),
+        elephantEar: new MeshStandardMaterial({
+          color: 4343888,
+          map: elephantEarMap,
+          bumpMap: elephantBump,
+          bumpScale: 0.05,
+          roughness: 0.88
+        }),
+        elephantIvory: new MeshStandardMaterial({
+          color: 16578797,
+          map: ivoryMap,
+          bumpMap: ivoryBump,
+          bumpScale: 0.015,
+          roughness: 0.22,
+          metalness: 0.04
+        }),
+        // Spotted Chital Deer & Wild Boar
+        deerFurFawn: new MeshStandardMaterial({
+          color: 11817737,
+          roughness: 0.74
+        }),
+        deerSpotsCream: new MeshStandardMaterial({
+          color: 16708551,
+          roughness: 0.7
+        }),
+        deerAntlersDark: new MeshStandardMaterial({
+          color: 4005902,
+          roughness: 0.52
+        }),
+        boarBristleDark: new MeshStandardMaterial({
+          color: 2367776,
+          roughness: 0.85
+        })
+      };
+    }
+    // ------------------------------------------------------------------
+    // High-Resolution Procedural Texture Generators
+    // ------------------------------------------------------------------
+    createProceduralTextures() {
+      if (typeof document === "undefined") return {};
+      const textures = {};
+      try {
+        const canvasDenim = document.createElement("canvas");
+        canvasDenim.width = 512;
+        canvasDenim.height = 512;
+        const ctxD = canvasDenim.getContext("2d");
+        ctxD.fillStyle = "#1e2e42";
+        ctxD.fillRect(0, 0, 512, 512);
+        ctxD.strokeStyle = "rgba(40, 60, 85, 0.45)";
+        ctxD.lineWidth = 1.5;
+        for (let i = -512; i < 1024; i += 4) {
+          ctxD.beginPath();
+          ctxD.moveTo(i, 0);
+          ctxD.lineTo(i + 512, 512);
+          ctxD.stroke();
+        }
+        const stoneGrad = ctxD.createLinearGradient(0, 0, 512, 0);
+        stoneGrad.addColorStop(0, "rgba(20, 32, 48, 0.4)");
+        stoneGrad.addColorStop(0.5, "rgba(45, 68, 96, 0.3)");
+        stoneGrad.addColorStop(1, "rgba(20, 32, 48, 0.4)");
+        ctxD.fillStyle = stoneGrad;
+        ctxD.fillRect(0, 0, 512, 512);
+        [24, 34, 478, 488].forEach((x) => {
+          ctxD.strokeStyle = "#c8943f";
+          ctxD.lineWidth = 2;
+          ctxD.setLineDash([8, 6]);
+          ctxD.beginPath();
+          ctxD.moveTo(x, 0);
+          ctxD.lineTo(x, 512);
+          ctxD.stroke();
+        });
+        ctxD.setLineDash([]);
+        const texDenim = new CanvasTexture(canvasDenim);
+        texDenim.wrapS = texDenim.wrapT = RepeatWrapping;
+        texDenim.repeat.set(2, 4);
+        textures.denim = texDenim;
+        const canvasDenimBump = document.createElement("canvas");
+        canvasDenimBump.width = 256;
+        canvasDenimBump.height = 256;
+        const ctxDB = canvasDenimBump.getContext("2d");
+        ctxDB.fillStyle = "#808080";
+        ctxDB.fillRect(0, 0, 256, 256);
+        ctxDB.strokeStyle = "#a5a5a5";
+        ctxDB.lineWidth = 1.5;
+        for (let i = -256; i < 512; i += 4) {
+          ctxDB.beginPath();
+          ctxDB.moveTo(i, 0);
+          ctxDB.lineTo(i + 256, 256);
+          ctxDB.stroke();
+        }
+        [12, 17, 239, 244].forEach((x) => {
+          ctxDB.strokeStyle = "#ffffff";
+          ctxDB.lineWidth = 2;
+          ctxDB.beginPath();
+          ctxDB.moveTo(x, 0);
+          ctxDB.lineTo(x, 256);
+          ctxDB.stroke();
+        });
+        const texDenimBump = new CanvasTexture(canvasDenimBump);
+        texDenimBump.wrapS = texDenimBump.wrapT = RepeatWrapping;
+        texDenimBump.repeat.set(4, 8);
+        textures.denimBump = texDenimBump;
+        const canvasShirt = document.createElement("canvas");
+        canvasShirt.width = 512;
+        canvasShirt.height = 512;
+        const ctxS = canvasShirt.getContext("2d");
+        ctxS.fillStyle = "#274566";
+        ctxS.fillRect(0, 0, 512, 512);
+        ctxS.strokeStyle = "rgba(60, 95, 135, 0.35)";
+        ctxS.lineWidth = 1;
+        for (let x = 0; x < 512; x += 4) {
+          ctxS.beginPath();
+          ctxS.moveTo(x, 0);
+          ctxS.lineTo(x, 512);
+          ctxS.stroke();
+        }
+        for (let y = 0; y < 512; y += 4) {
+          ctxS.beginPath();
+          ctxS.moveTo(0, y);
+          ctxS.lineTo(512, y);
+          ctxS.stroke();
+        }
+        const texShirt = new CanvasTexture(canvasShirt);
+        texShirt.wrapS = texShirt.wrapT = RepeatWrapping;
+        texShirt.repeat.set(4, 4);
+        textures.shirt = texShirt;
+        const canvasShirtBump = document.createElement("canvas");
+        canvasShirtBump.width = 256;
+        canvasShirtBump.height = 256;
+        const ctxSB = canvasShirtBump.getContext("2d");
+        ctxSB.fillStyle = "#808080";
+        ctxSB.fillRect(0, 0, 256, 256);
+        ctxSB.strokeStyle = "#9c9c9c";
+        ctxSB.lineWidth = 1;
+        for (let i = 0; i < 256; i += 4) {
+          ctxSB.beginPath();
+          ctxSB.moveTo(i, 0);
+          ctxSB.lineTo(i, 256);
+          ctxSB.stroke();
+          ctxSB.beginPath();
+          ctxSB.moveTo(0, i);
+          ctxSB.lineTo(256, i);
+          ctxSB.stroke();
+        }
+        const texShirtBump = new CanvasTexture(canvasShirtBump);
+        texShirtBump.wrapS = texShirtBump.wrapT = RepeatWrapping;
+        texShirtBump.repeat.set(8, 8);
+        textures.shirtBump = texShirtBump;
+        const canvasLeather = document.createElement("canvas");
+        canvasLeather.width = 256;
+        canvasLeather.height = 256;
+        const ctxL = canvasLeather.getContext("2d");
+        ctxL.fillStyle = "#261710";
+        ctxL.fillRect(0, 0, 256, 256);
+        ctxL.fillStyle = "rgba(18, 10, 6, 0.4)";
+        for (let i = 0; i < 400; i++) {
+          const lx = Math.random() * 256;
+          const ly = Math.random() * 256;
+          const lr = Math.random() * 3 + 1;
+          ctxL.beginPath();
+          ctxL.arc(lx, ly, lr, 0, Math.PI * 2);
+          ctxL.fill();
+        }
+        const texLeather = new CanvasTexture(canvasLeather);
+        texLeather.wrapS = texLeather.wrapT = RepeatWrapping;
+        texLeather.repeat.set(2, 2);
+        textures.leather = texLeather;
+        const canvasLeatherBump = document.createElement("canvas");
+        canvasLeatherBump.width = 256;
+        canvasLeatherBump.height = 256;
+        const ctxLB = canvasLeatherBump.getContext("2d");
+        ctxLB.fillStyle = "#808080";
+        ctxLB.fillRect(0, 0, 256, 256);
+        ctxLB.fillStyle = "#656565";
+        for (let i = 0; i < 300; i++) {
+          const bx = Math.random() * 256;
+          const by = Math.random() * 256;
+          ctxLB.beginPath();
+          ctxLB.arc(bx, by, Math.random() * 3 + 1, 0, Math.PI * 2);
+          ctxLB.fill();
+        }
+        const texLeatherBump = new CanvasTexture(canvasLeatherBump);
+        texLeatherBump.wrapS = texLeatherBump.wrapT = RepeatWrapping;
+        texLeatherBump.repeat.set(4, 4);
+        textures.leatherBump = texLeatherBump;
+        const canvasSkinBump = document.createElement("canvas");
+        canvasSkinBump.width = 256;
+        canvasSkinBump.height = 256;
+        const ctxSkB = canvasSkinBump.getContext("2d");
+        ctxSkB.fillStyle = "#808080";
+        ctxSkB.fillRect(0, 0, 256, 256);
+        ctxSkB.fillStyle = "#6e6e6e";
+        for (let i = 0; i < 500; i++) {
+          const px2 = Math.random() * 256;
+          const py2 = Math.random() * 256;
+          ctxSkB.beginPath();
+          ctxSkB.arc(px2, py2, Math.random() * 1.5 + 0.5, 0, Math.PI * 2);
+          ctxSkB.fill();
+        }
+        const texSkinBump = new CanvasTexture(canvasSkinBump);
+        texSkinBump.wrapS = texSkinBump.wrapT = RepeatWrapping;
+        texSkinBump.repeat.set(4, 4);
+        textures.skinBump = texSkinBump;
+        const canvasDog = document.createElement("canvas");
+        canvasDog.width = 512;
+        canvasDog.height = 512;
+        const ctxDog = canvasDog.getContext("2d");
+        ctxDog.fillStyle = "#c47b36";
+        ctxDog.fillRect(0, 0, 512, 512);
+        ctxDog.strokeStyle = "rgba(165, 95, 35, 0.4)";
+        ctxDog.lineWidth = 1;
+        for (let i = 0; i < 600; i++) {
+          const fx = Math.random() * 512;
+          const fy = Math.random() * 512;
+          const flen = Math.random() * 16 + 6;
+          ctxDog.beginPath();
+          ctxDog.moveTo(fx, fy);
+          ctxDog.lineTo(fx + flen * 0.4, fy + flen);
+          ctxDog.stroke();
+        }
+        const dogGrad = ctxDog.createRadialGradient(256, 120, 20, 256, 120, 140);
+        dogGrad.addColorStop(0, "rgba(245, 236, 224, 0.7)");
+        dogGrad.addColorStop(1, "rgba(196, 123, 54, 0)");
+        ctxDog.fillStyle = dogGrad;
+        ctxDog.beginPath();
+        ctxDog.arc(256, 120, 140, 0, Math.PI * 2);
+        ctxDog.fill();
+        const texDog = new CanvasTexture(canvasDog);
+        texDog.wrapS = texDog.wrapT = RepeatWrapping;
+        texDog.repeat.set(2, 2);
+        textures.dogFur = texDog;
+        const canvasCow = document.createElement("canvas");
+        canvasCow.width = 512;
+        canvasCow.height = 512;
+        const ctxCow = canvasCow.getContext("2d");
+        ctxCow.fillStyle = "#eae6df";
+        ctxCow.fillRect(0, 0, 512, 512);
+        ctxCow.fillStyle = "rgba(148, 163, 184, 0.28)";
+        for (let i = 0; i < 20; i++) {
+          const cx = Math.random() * 512;
+          const cy = Math.random() * 512;
+          const cr = Math.random() * 50 + 20;
+          ctxCow.beginPath();
+          ctxCow.arc(cx, cy, cr, 0, Math.PI * 2);
+          ctxCow.fill();
+        }
+        const texCow = new CanvasTexture(canvasCow);
+        texCow.wrapS = texCow.wrapT = RepeatWrapping;
+        texCow.repeat.set(2, 2);
+        textures.cowHide = texCow;
+        const canvasEle = document.createElement("canvas");
+        canvasEle.width = 512;
+        canvasEle.height = 512;
+        const ctxEle = canvasEle.getContext("2d");
+        ctxEle.fillStyle = "#3d444d";
+        ctxEle.fillRect(0, 0, 512, 512);
+        ctxEle.strokeStyle = "rgba(26, 30, 36, 0.7)";
+        ctxEle.lineWidth = 1.6;
+        for (let y = 0; y < 512; y += 10) {
+          ctxEle.beginPath();
+          ctxEle.moveTo(0, y + (Math.random() - 0.5) * 6);
+          for (let x = 30; x < 512; x += 30) {
+            ctxEle.lineTo(x, y + (Math.random() - 0.5) * 8);
+          }
+          ctxEle.stroke();
+        }
+        ctxEle.strokeStyle = "rgba(26, 30, 36, 0.45)";
+        ctxEle.lineWidth = 1.2;
+        for (let x = 0; x < 512; x += 16) {
+          ctxEle.beginPath();
+          ctxEle.moveTo(x + (Math.random() - 0.5) * 6, 0);
+          for (let y = 30; y < 512; y += 30) {
+            ctxEle.lineTo(x + (Math.random() - 0.5) * 8, y);
+          }
+          ctxEle.stroke();
+        }
+        ctxEle.fillStyle = "rgba(215, 145, 135, 0.55)";
+        for (let i = 0; i < 110; i++) {
+          const ex = Math.random() * 140 + 360;
+          const ey = Math.random() * 512;
+          ctxEle.beginPath();
+          ctxEle.arc(ex, ey, Math.random() * 3.5 + 1, 0, Math.PI * 2);
+          ctxEle.fill();
+        }
+        const texEle = new CanvasTexture(canvasEle);
+        texEle.wrapS = texEle.wrapT = RepeatWrapping;
+        texEle.repeat.set(2, 2);
+        textures.elephantSkin = texEle;
+        const canvasEleBump = document.createElement("canvas");
+        canvasEleBump.width = 512;
+        canvasEleBump.height = 512;
+        const ctxEB = canvasEleBump.getContext("2d");
+        ctxEB.fillStyle = "#808080";
+        ctxEB.fillRect(0, 0, 512, 512);
+        ctxEB.strokeStyle = "#252525";
+        ctxEB.lineWidth = 2.4;
+        for (let y = 0; y < 512; y += 12) {
+          ctxEB.beginPath();
+          ctxEB.moveTo(0, y + (Math.random() - 0.5) * 6);
+          for (let x = 24; x < 512; x += 24) {
+            ctxEB.lineTo(x, y + (Math.random() - 0.5) * 8);
+          }
+          ctxEB.stroke();
+        }
+        ctxEB.strokeStyle = "#383838";
+        ctxEB.lineWidth = 1.8;
+        for (let x = 0; x < 512; x += 18) {
+          ctxEB.beginPath();
+          ctxEB.moveTo(x + (Math.random() - 0.5) * 6, 0);
+          for (let y = 24; y < 512; y += 24) {
+            ctxEB.lineTo(x + (Math.random() - 0.5) * 8, y);
+          }
+          ctxEB.stroke();
+        }
+        ctxEB.strokeStyle = "#b5b5b5";
+        ctxEB.lineWidth = 1.2;
+        for (let y = 0; y < 512; y += 12) {
+          ctxEB.beginPath();
+          ctxEB.moveTo(0, y - 2 + (Math.random() - 0.5) * 4);
+          for (let x = 30; x < 512; x += 30) {
+            ctxEB.lineTo(x, y - 2 + (Math.random() - 0.5) * 4);
+          }
+          ctxEB.stroke();
+        }
+        const texEleBump = new CanvasTexture(canvasEleBump);
+        texEleBump.wrapS = texEleBump.wrapT = RepeatWrapping;
+        texEleBump.repeat.set(3, 3);
+        textures.elephantBump = texEleBump;
+        const canvasEleEar = document.createElement("canvas");
+        canvasEleEar.width = 512;
+        canvasEleEar.height = 512;
+        const ctxEar = canvasEleEar.getContext("2d");
+        ctxEar.fillStyle = "#3e454e";
+        ctxEar.fillRect(0, 0, 512, 512);
+        const earGrad = ctxEar.createRadialGradient(256, 256, 30, 256, 256, 220);
+        earGrad.addColorStop(0, "rgba(205, 140, 130, 0.45)");
+        earGrad.addColorStop(0.7, "rgba(80, 85, 95, 0.2)");
+        earGrad.addColorStop(1, "rgba(62, 69, 78, 0)");
+        ctxEar.fillStyle = earGrad;
+        ctxEar.fillRect(0, 0, 512, 512);
+        ctxEar.strokeStyle = "rgba(145, 65, 60, 0.35)";
+        ctxEar.lineWidth = 1.5;
+        for (let angle = -0.6; angle <= 0.6; angle += 0.18) {
+          ctxEar.beginPath();
+          ctxEar.moveTo(60, 256);
+          const ex = 60 + Math.cos(angle) * 380;
+          const ey = 256 + Math.sin(angle) * 380;
+          ctxEar.quadraticCurveTo(240, 256 + Math.sin(angle) * 180, ex, ey);
+          ctxEar.stroke();
+        }
+        const texEleEar = new CanvasTexture(canvasEleEar);
+        textures.elephantEar = texEleEar;
+        const canvasIvory = document.createElement("canvas");
+        canvasIvory.width = 256;
+        canvasIvory.height = 256;
+        const ctxIvory = canvasIvory.getContext("2d");
+        const ivoryGrad = ctxIvory.createLinearGradient(0, 0, 0, 256);
+        ivoryGrad.addColorStop(0, "#fcf8ed");
+        ivoryGrad.addColorStop(0.5, "#f3eedc");
+        ivoryGrad.addColorStop(1, "#e6dec7");
+        ctxIvory.fillStyle = ivoryGrad;
+        ctxIvory.fillRect(0, 0, 256, 256);
+        ctxIvory.strokeStyle = "rgba(200, 185, 155, 0.25)";
+        ctxIvory.lineWidth = 1;
+        for (let y = 0; y < 256; y += 8) {
+          ctxIvory.beginPath();
+          ctxIvory.moveTo(0, y);
+          ctxIvory.lineTo(256, y);
+          ctxIvory.stroke();
+        }
+        const texIvory = new CanvasTexture(canvasIvory);
+        texIvory.wrapS = texIvory.wrapT = RepeatWrapping;
+        texIvory.repeat.set(1, 2);
+        textures.ivory = texIvory;
+        const canvasIvoryBump = document.createElement("canvas");
+        canvasIvoryBump.width = 256;
+        canvasIvoryBump.height = 256;
+        const ctxIB = canvasIvoryBump.getContext("2d");
+        ctxIB.fillStyle = "#808080";
+        ctxIB.fillRect(0, 0, 256, 256);
+        ctxIB.strokeStyle = "#929292";
+        ctxIB.lineWidth = 1;
+        for (let y = 0; y < 256; y += 6) {
+          ctxIB.beginPath();
+          ctxIB.moveTo(0, y);
+          ctxIB.lineTo(256, y);
+          ctxIB.stroke();
+        }
+        const texIvoryBump = new CanvasTexture(canvasIvoryBump);
+        texIvoryBump.wrapS = texIvoryBump.wrapT = RepeatWrapping;
+        texIvoryBump.repeat.set(2, 4);
+        textures.ivoryBump = texIvoryBump;
+        const canvasHorn = document.createElement("canvas");
+        canvasHorn.width = 256;
+        canvasHorn.height = 256;
+        const ctxHorn = canvasHorn.getContext("2d");
+        const hornGrad = ctxHorn.createLinearGradient(0, 0, 0, 256);
+        hornGrad.addColorStop(0, "#363a42");
+        hornGrad.addColorStop(0.7, "#1c1f24");
+        hornGrad.addColorStop(1, "#0a0c0e");
+        ctxHorn.fillStyle = hornGrad;
+        ctxHorn.fillRect(0, 0, 256, 256);
+        ctxHorn.strokeStyle = "rgba(70, 75, 85, 0.35)";
+        ctxHorn.lineWidth = 1.5;
+        for (let y = 0; y < 256; y += 12) {
+          ctxHorn.beginPath();
+          ctxHorn.moveTo(0, y);
+          ctxHorn.lineTo(256, y);
+          ctxHorn.stroke();
+        }
+        const texHorn = new CanvasTexture(canvasHorn);
+        texHorn.wrapS = texHorn.wrapT = RepeatWrapping;
+        texHorn.repeat.set(1, 2);
+        textures.horn = texHorn;
+      } catch (e) {
+        console.warn("Could not generate procedural canvas textures:", e);
+      }
+      return textures;
+    }
+    // ------------------------------------------------------------------
+    // Canvas Texture Generator for Photorealistic Indian Human Facial Features
     // ------------------------------------------------------------------
     createHumanFaceTexture() {
-      if (typeof document === "undefined") return null;
+      if (typeof document === "undefined") {
+        return { tex: null, drawFace: () => {
+        } };
+      }
       const canvas = document.createElement("canvas");
       canvas.width = 1024;
       canvas.height = 1024;
       const ctx = canvas.getContext("2d");
       const drawFace = (blinkFactor = 0) => {
         ctx.clearRect(0, 0, 1024, 1024);
-        ctx.fillStyle = "#fcd5ba";
+        ctx.fillStyle = "#a26b48";
         ctx.fillRect(0, 0, 1024, 1024);
-        const hairGrad = ctx.createLinearGradient(0, 180, 0, 320);
-        hairGrad.addColorStop(0, "#d9572b");
-        hairGrad.addColorStop(0.85, "#d9572b");
-        hairGrad.addColorStop(1, "rgba(217, 87, 43, 0)");
+        const headGlow = ctx.createRadialGradient(512, 440, 20, 512, 440, 320);
+        headGlow.addColorStop(0, "#b07854");
+        headGlow.addColorStop(0.65, "#a26b48");
+        headGlow.addColorStop(1, "#8b5536");
+        ctx.fillStyle = headGlow;
+        ctx.fillRect(0, 0, 1024, 1024);
+        const hairGrad = ctx.createLinearGradient(0, 160, 0, 330);
+        hairGrad.addColorStop(0, "#141210");
+        hairGrad.addColorStop(0.85, "#141210");
+        hairGrad.addColorStop(1, "rgba(20, 18, 16, 0)");
         ctx.fillStyle = hairGrad;
-        ctx.fillRect(0, 0, 1024, 320);
-        ctx.fillStyle = "#d9572b";
-        ctx.fillRect(0, 0, 160, 1024);
-        ctx.fillRect(864, 0, 160, 1024);
+        ctx.fillRect(0, 0, 1024, 330);
+        ctx.fillStyle = "#141210";
+        ctx.fillRect(0, 0, 175, 1024);
+        ctx.fillRect(849, 0, 175, 1024);
         [-1, 1].forEach((side) => {
-          const cx = 512 + side * 115;
-          const cy = 540;
-          const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 85);
-          grad.addColorStop(0, "rgba(244, 114, 182, 0.85)");
-          grad.addColorStop(0.5, "rgba(251, 113, 133, 0.40)");
-          grad.addColorStop(1, "rgba(252, 213, 186, 0)");
-          ctx.fillStyle = grad;
+          const cx = 512 + side * 125;
+          const cy = 545;
+          const cheekGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 110);
+          cheekGrad.addColorStop(0, "rgba(178, 105, 75, 0.45)");
+          cheekGrad.addColorStop(0.6, "rgba(162, 107, 72, 0.2)");
+          cheekGrad.addColorStop(1, "rgba(162, 107, 72, 0)");
+          ctx.fillStyle = cheekGrad;
           ctx.beginPath();
-          ctx.arc(cx, cy, 85, 0, Math.PI * 2);
+          ctx.arc(cx, cy, 110, 0, Math.PI * 2);
           ctx.fill();
         });
         [-1, 1].forEach((side) => {
-          const ex = 512 + side * 75;
-          const ey = 460;
-          const ew = 28;
-          const eh = 38;
-          ctx.fillStyle = "#ffffff";
+          const ex = 512 + side * 76;
+          const ey = 462;
+          const socketGrad = ctx.createRadialGradient(ex, ey, 4, ex, ey, 38);
+          socketGrad.addColorStop(0, "rgba(75, 42, 28, 0.40)");
+          socketGrad.addColorStop(0.7, "rgba(120, 70, 48, 0.20)");
+          socketGrad.addColorStop(1, "rgba(162, 107, 72, 0)");
+          ctx.fillStyle = socketGrad;
           ctx.beginPath();
-          ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
+          ctx.arc(ex, ey, 38, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = "#1c1917";
-          ctx.beginPath();
-          ctx.ellipse(ex + side * 3, ey, ew * 0.72, eh * 0.82, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.arc(ex + side * 3 + 8, ey - 10, 8.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(ex + side * 3 - 8, ey + 10, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-          if (blinkFactor > 0.02) {
-            ctx.fillStyle = "#fcd5ba";
-            ctx.beginPath();
-            const lidHeight = eh * 2 * blinkFactor;
-            ctx.rect(ex - ew - 5, ey - eh - 5, (ew + 5) * 2, lidHeight);
-            ctx.fill();
-            ctx.strokeStyle = "#27272a";
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(ex - ew, ey - eh + lidHeight);
-            ctx.lineTo(ex + ew, ey - eh + lidHeight);
-            ctx.stroke();
-          }
-          ctx.strokeStyle = "#27272a";
-          ctx.lineWidth = 8;
-          ctx.lineCap = "round";
-          ctx.beginPath();
-          ctx.moveTo(ex - ew * 1.15, ey - eh - 16);
-          ctx.quadraticCurveTo(ex, ey - eh - 32, ex + ew * 1.15, ey - eh - 14);
-          ctx.stroke();
         });
-        ctx.strokeStyle = "#e09f7a";
-        ctx.lineWidth = 5;
-        ctx.lineCap = "round";
+        const noseShadow = ctx.createRadialGradient(512, 530, 4, 512, 530, 32);
+        noseShadow.addColorStop(0, "rgba(70, 38, 25, 0.32)");
+        noseShadow.addColorStop(1, "rgba(162, 107, 72, 0)");
+        ctx.fillStyle = noseShadow;
         ctx.beginPath();
-        ctx.arc(512, 515, 14, 0.2 * Math.PI, 0.8 * Math.PI);
-        ctx.stroke();
-        ctx.strokeStyle = "#9a3412";
-        ctx.lineWidth = 7;
-        ctx.lineCap = "round";
+        ctx.arc(512, 530, 32, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(28, 18, 12, 0.25)";
         ctx.beginPath();
-        ctx.arc(512, 565, 36, 0.15 * Math.PI, 0.85 * Math.PI);
-        ctx.stroke();
+        ctx.ellipse(512, 554, 44, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(512, 615, 60, 24, 0, 0, Math.PI * 2);
+        ctx.fill();
       };
       drawFace(0);
       const tex = new CanvasTexture(canvas);
+      tex.colorSpace = SRGBColorSpace;
       return { tex, canvas, ctx, drawFace };
     }
-    // Parametric tapered tube geometry with closed rounded caps (Used for stylized hair quiff locks)
+    // Parametric tapered tube geometry with closed rounded caps (Used for horns, tails, tusks)
     createTaperedTubeGeometry(curve, tubularSegments = 16, rStart = 0.024, rEnd = 3e-3, radialSegments = 8, cap = true) {
       const points = curve.getPoints(tubularSegments);
       const frames = curve.computeFrenetFrames(tubularSegments, false);
@@ -39922,303 +46056,566 @@ void main() {
         }
       }
       const geo = new BufferGeometry();
-      geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
+      geo.setAttribute(
+        "position",
+        new Float32BufferAttribute(positions, 3)
+      );
       geo.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
       geo.setIndex(indices);
       geo.computeVertexNormals();
       return geo;
     }
     // ------------------------------------------------------------------
-    // 3D Human Character Model Builder (Fully Articulated Anatomy & Clothing)
-    // Auburn/ginger quiff hair, peach skin, blushing cheeks, cream polo shirt,
-    // brown chinos, casual dark loafers, articulated arms and legs
+    // 3D Realistic Human Character Model Builder (Adult Male in Track Setting)
+    // Anatomically accurate masculine frame, natural warm Indian skin tone,
+    // textured chambray shirt, denim chinos, leather belt & watch, articulated hands
     // ------------------------------------------------------------------
     buildHumanMesh(poseMode = "mid", config = {}) {
       const group = new Group();
       group.name = "stylizedHuman";
       const faceData = this.createHumanFaceTexture();
+      const skinMat = this.materials.humanSkin;
+      const skinShadowMat = this.materials.humanSkinShadow;
+      const hairMat = this.materials.humanHairDark;
+      const shirtMat = config.shirtMat || this.materials.humanShirt;
+      const pantsMat = config.pantsMat || this.materials.humanPantsDenim;
+      const leatherMat = this.materials.humanBeltLeather;
+      const buckleMat = this.materials.humanBuckleSilver;
+      const buttonMat = this.materials.humanButtonPearl;
+      const shoesMat = this.materials.humanShoesDark;
+      const soleMat = this.materials.humanShoeSole;
+      const watchMat = this.materials.humanWatchSilver;
+      const strapMat = this.materials.humanWatchStrap;
+      const pelvisGroup = new Group();
+      pelvisGroup.position.y = 0.88;
       const pelvis = new Mesh(
-        new CylinderGeometry(0.15, 0.138, 0.16, 24),
-        this.materials.humanPantsBrown
+        new CylinderGeometry(0.158, 0.138, 0.2, 24),
+        pantsMat
       );
-      pelvis.position.y = 0.88;
-      pelvis.scale.set(1.04, 1, 0.78);
+      pelvis.scale.set(1.08, 1, 0.82);
       pelvis.castShadow = true;
-      group.add(pelvis);
+      pelvis.receiveShadow = true;
+      pelvisGroup.add(pelvis);
+      const flyPlacket = new Mesh(
+        new BoxGeometry(0.022, 0.12, 0.012),
+        pantsMat
+      );
+      flyPlacket.position.set(6e-3, -0.01, 0.136);
+      pelvisGroup.add(flyPlacket);
+      [-1, 1].forEach((side) => {
+        const pocketRivet = new Mesh(
+          new SphereGeometry(5e-3, 8, 6),
+          buckleMat
+        );
+        pocketRivet.position.set(side * 0.125, 0.065, 0.115);
+        pelvisGroup.add(pocketRivet);
+      });
+      const waistband = new Mesh(
+        new CylinderGeometry(0.162, 0.158, 0.042, 24),
+        pantsMat
+      );
+      waistband.position.y = 0.085;
+      waistband.scale.set(1.08, 1, 0.82);
+      pelvisGroup.add(waistband);
       const belt = new Mesh(
-        new CylinderGeometry(0.153, 0.151, 0.035, 24),
-        this.materials.humanBeltLeather
+        new CylinderGeometry(0.165, 0.161, 0.038, 24),
+        leatherMat
       );
-      belt.position.set(0, 0.945, 0);
-      belt.scale.set(1.05, 1, 0.79);
-      group.add(belt);
+      belt.position.y = 0.085;
+      belt.scale.set(1.08, 1, 0.82);
+      pelvisGroup.add(belt);
       const buckle = new Mesh(
-        new BoxGeometry(0.032, 0.03, 0.012),
-        this.materials.humanBuckleSilver
+        new BoxGeometry(0.046, 0.034, 0.015),
+        buckleMat
       );
-      buckle.position.set(0, 0.945, 0.122);
-      group.add(buckle);
+      buckle.position.set(0, 0.085, 0.135);
+      pelvisGroup.add(buckle);
+      const buckleProng = new Mesh(
+        new BoxGeometry(8e-3, 0.024, 8e-3),
+        buckleMat
+      );
+      buckleProng.position.set(0, 0.085, 0.142);
+      pelvisGroup.add(buckleProng);
+      const beltKeeper = new Mesh(
+        new BoxGeometry(0.014, 0.038, 0.018),
+        leatherMat
+      );
+      beltKeeper.position.set(0.032, 0.085, 0.133);
+      pelvisGroup.add(beltKeeper);
+      [
+        { x: -0.065, z: 0.126, rotY: -0.2 },
+        { x: 0.065, z: 0.126, rotY: 0.2 },
+        { x: -0.155, z: 0, rotY: -Math.PI / 2 },
+        { x: 0.155, z: 0, rotY: Math.PI / 2 }
+      ].forEach((lp) => {
+        const loop = new Mesh(
+          new BoxGeometry(0.01, 0.045, 0.012),
+          pantsMat
+        );
+        loop.position.set(lp.x, 0.085, lp.z);
+        loop.rotation.y = lp.rotY;
+        pelvisGroup.add(loop);
+      });
+      group.add(pelvisGroup);
       const torsoGroup = new Group();
       torsoGroup.position.set(0, 0.94, 0);
-      const shirtMat = config.shirtMat || this.materials.humanPoloCream;
-      const collarMat = config.collarMat || this.materials.humanPoloCollar;
+      const abdomen = new Mesh(
+        new CylinderGeometry(0.172, 0.154, 0.18, 24),
+        shirtMat
+      );
+      abdomen.position.y = 0.1;
+      abdomen.scale.set(1.06, 1, 0.77);
+      abdomen.castShadow = true;
+      torsoGroup.add(abdomen);
+      const shirtHem = new Mesh(
+        new CylinderGeometry(0.158, 0.165, 0.04, 24),
+        shirtMat
+      );
+      shirtHem.position.y = 0.015;
+      shirtHem.scale.set(1.07, 1, 0.78);
+      torsoGroup.add(shirtHem);
       const chest = new Mesh(
-        new CylinderGeometry(0.185, 0.16, 0.24, 24),
+        new CylinderGeometry(0.202, 0.174, 0.26, 24),
         shirtMat
       );
       chest.position.y = 0.28;
-      chest.scale.set(1.08, 1, 0.76);
+      chest.scale.set(1.12, 1, 0.79);
       chest.castShadow = true;
       torsoGroup.add(chest);
-      const waist = new Mesh(
-        new CylinderGeometry(0.16, 0.146, 0.18, 24),
-        shirtMat
-      );
-      waist.position.y = 0.1;
-      waist.scale.set(1.04, 1, 0.76);
-      waist.castShadow = true;
-      torsoGroup.add(waist);
-      const hem = new Mesh(
-        new CylinderGeometry(0.154, 0.158, 0.045, 24),
-        shirtMat
-      );
-      hem.position.y = 0.01;
-      hem.scale.set(1.05, 1, 0.78);
-      torsoGroup.add(hem);
-      [-0.18, 0.18].forEach((sx) => {
-        const deltoid = new Mesh(
-          new SphereGeometry(0.07, 18, 14),
+      [-1, 1].forEach((side) => {
+        const pec = new Mesh(
+          new SphereGeometry(0.082, 16, 12),
           shirtMat
         );
-        deltoid.position.set(sx, 0.33, 0);
-        deltoid.scale.set(1, 0.85, 0.95);
+        pec.position.set(side * 0.076, 0.28, 0.082);
+        pec.scale.set(1.1, 0.75, 0.55);
+        torsoGroup.add(pec);
+      });
+      [-0.195, 0.195].forEach((sx) => {
+        const deltoid = new Mesh(
+          new SphereGeometry(0.078, 18, 14),
+          shirtMat
+        );
+        deltoid.position.set(sx, 0.34, 0);
+        deltoid.scale.set(1, 0.9, 0.98);
         torsoGroup.add(deltoid);
       });
+      [-1, 1].forEach((side) => {
+        const clavicle = new Mesh(
+          new CylinderGeometry(0.01, 0.014, 0.11, 10),
+          skinMat
+        );
+        clavicle.position.set(side * 0.065, 0.365, 0.065);
+        clavicle.rotation.set(-0.15, 0, side * 0.38);
+        torsoGroup.add(clavicle);
+      });
       const neck = new Mesh(
-        new CylinderGeometry(0.046, 0.052, 0.12, 18),
-        this.materials.humanSkinPeach
+        new CylinderGeometry(0.05, 0.06, 0.13, 22),
+        skinMat
       );
-      neck.position.y = 0.42;
+      neck.position.y = 0.43;
       torsoGroup.add(neck);
-      const collarBand = new Mesh(
-        new CylinderGeometry(0.058, 0.07, 0.045, 20),
-        collarMat
+      [-1, 1].forEach((side) => {
+        const scm = new Mesh(
+          new CylinderGeometry(0.012, 0.016, 0.13, 10),
+          skinMat
+        );
+        scm.position.set(side * 0.032, 0.42, 0.03);
+        scm.rotation.set(0.18, 0, side * -0.22);
+        torsoGroup.add(scm);
+      });
+      const adamsApple = new Mesh(
+        new SphereGeometry(0.012, 10, 8),
+        skinMat
       );
-      collarBand.position.y = 0.39;
+      adamsApple.position.set(0, 0.43, 0.052);
+      adamsApple.scale.set(0.9, 1.1, 1.1);
+      torsoGroup.add(adamsApple);
+      const collarBand = new Mesh(
+        new CylinderGeometry(0.064, 0.076, 0.046, 22),
+        shirtMat
+      );
+      collarBand.position.y = 0.4;
       torsoGroup.add(collarBand);
       [-1, 1].forEach((side) => {
         const lapel = new Mesh(
-          new BoxGeometry(0.065, 0.09, 0.012),
-          collarMat
+          new BoxGeometry(0.068, 0.096, 0.014),
+          shirtMat
         );
-        lapel.position.set(side * 0.046, 0.36, 0.078);
-        lapel.rotation.set(-0.35, side * 0.28, side * -0.36);
+        lapel.position.set(side * 0.048, 0.365, 0.084);
+        lapel.rotation.set(-0.32, side * 0.26, side * -0.34);
         torsoGroup.add(lapel);
       });
       const placket = new Mesh(
-        new BoxGeometry(0.024, 0.14, 0.012),
-        collarMat
+        new BoxGeometry(0.026, 0.24, 0.012),
+        shirtMat
       );
-      placket.position.set(0, 0.26, 0.114);
+      placket.position.set(0, 0.26, 0.125);
       torsoGroup.add(placket);
-      [0.3, 0.24].forEach((by) => {
+      [0.33, 0.26, 0.19].forEach((by) => {
         const button = new Mesh(
-          new CylinderGeometry(5e-3, 5e-3, 6e-3, 8).rotateX(Math.PI / 2),
-          this.materials.humanButtonPearl
+          new CylinderGeometry(55e-4, 55e-4, 6e-3, 12).rotateX(
+            Math.PI / 2
+          ),
+          buttonMat
         );
-        button.position.set(0, by, 0.121);
+        button.position.set(0, by, 0.132);
         torsoGroup.add(button);
       });
-      const headGroup = new Group();
-      headGroup.position.set(0, 0.5, 0.01);
-      const cranium = new Mesh(
-        new SphereGeometry(0.122, 28, 22),
-        this.materials.humanSkinPeach
+      const pocket = new Mesh(
+        new BoxGeometry(0.064, 0.074, 8e-3),
+        shirtMat
       );
-      cranium.scale.set(0.92, 1.05, 0.96);
+      pocket.position.set(0.098, 0.28, 0.124);
+      pocket.rotation.z = -0.04;
+      torsoGroup.add(pocket);
+      const pocketFlap = new Mesh(
+        new BoxGeometry(0.068, 0.022, 0.01),
+        shirtMat
+      );
+      pocketFlap.position.set(0.098, 0.32, 0.126);
+      pocketFlap.rotation.z = -0.04;
+      torsoGroup.add(pocketFlap);
+      const headGroup = new Group();
+      headGroup.position.set(0, 0.52, 0.01);
+      const craniumMat = faceData.tex ? new MeshStandardMaterial({
+        map: faceData.tex,
+        bumpMap: this.materials.humanSkin.bumpMap || null,
+        bumpScale: 0.012,
+        roughness: 0.6,
+        metalness: 0.02
+      }) : skinMat;
+      const cranium = new Mesh(
+        new SphereGeometry(0.122, 32, 24),
+        craniumMat
+      );
+      cranium.scale.set(0.92, 1.06, 0.98);
       cranium.castShadow = true;
       headGroup.add(cranium);
       const chin = new Mesh(
-        new SphereGeometry(0.066, 18, 14),
-        this.materials.humanSkinPeach
+        new SphereGeometry(0.068, 20, 16),
+        skinMat
       );
-      chin.position.set(0, -0.065, 0.038);
-      chin.scale.set(1.1, 0.88, 1.08);
+      chin.position.set(0, -0.068, 0.04);
+      chin.scale.set(1.12, 0.9, 1.1);
       headGroup.add(chin);
       [-1, 1].forEach((side) => {
+        const jawRidge = new Mesh(
+          new CylinderGeometry(0.022, 0.016, 0.11, 10),
+          skinMat
+        );
+        jawRidge.position.set(side * 0.088, -0.048, 5e-3);
+        jawRidge.rotation.set(0.3, 0, side * -0.55);
+        headGroup.add(jawRidge);
+      });
+      [-1, 1].forEach((side) => {
+        const earGroup = new Group();
+        earGroup.position.set(side * 0.115, -5e-3, -5e-3);
+        earGroup.rotation.y = side * 0.18;
+        const earHelix = new Mesh(
+          new SphereGeometry(0.026, 14, 10),
+          skinMat
+        );
+        earHelix.scale.set(0.35, 1.15, 0.75);
+        earGroup.add(earHelix);
+        const earHollow = new Mesh(
+          new SphereGeometry(0.016, 10, 8),
+          skinShadowMat
+        );
+        earHollow.scale.set(0.2, 0.8, 0.5);
+        earHollow.position.set(side * 3e-3, 0, 4e-3);
+        earGroup.add(earHollow);
+        const tragus = new Mesh(
+          new SphereGeometry(8e-3, 8, 6),
+          skinMat
+        );
+        tragus.position.set(side * -6e-3, -2e-3, 8e-3);
+        earGroup.add(tragus);
+        headGroup.add(earGroup);
+      });
+      const hairCap = new Mesh(
+        new SphereGeometry(
+          0.128,
+          32,
+          24,
+          0,
+          Math.PI * 2,
+          0,
+          Math.PI * 0.58
+        ),
+        hairMat
+      );
+      hairCap.position.set(0, 0.018, -0.01);
+      hairCap.scale.set(0.96, 1.06, 1.02);
+      headGroup.add(hairCap);
+      const hairTopPts = [
+        new Vector3(-0.065, 0.12, 0.06),
+        new Vector3(-0.02, 0.158, 0.02),
+        new Vector3(0.035, 0.152, -0.03),
+        new Vector3(0.065, 0.125, -0.075)
+      ];
+      const hairTopGeo = this.createTaperedTubeGeometry(
+        new CatmullRomCurve3(hairTopPts),
+        16,
+        0.042,
+        8e-3,
+        10,
+        true
+      );
+      headGroup.add(new Mesh(hairTopGeo, hairMat));
+      [-1, 1].forEach((side) => {
+        const sideburn = new Mesh(
+          new CylinderGeometry(0.012, 5e-3, 0.06, 8),
+          hairMat
+        );
+        sideburn.position.set(side * 0.11, 0.015, 0.02);
+        sideburn.rotation.x = -0.15;
+        headGroup.add(sideburn);
+      });
+      const browRidge = new Mesh(
+        new CylinderGeometry(0.018, 0.016, 0.14, 12).rotateZ(Math.PI / 2),
+        skinMat
+      );
+      browRidge.position.set(0, 0.036, 0.108);
+      browRidge.scale.set(1, 0.65, 0.75);
+      headGroup.add(browRidge);
+      [-1, 1].forEach((side) => {
+        const browCurve = new CatmullRomCurve3([
+          new Vector3(side * 0.018, 0.04, 0.114),
+          new Vector3(side * 0.048, 0.048, 0.112),
+          new Vector3(side * 0.075, 0.038, 0.098)
+        ]);
+        const browGeo = this.createTaperedTubeGeometry(
+          browCurve,
+          10,
+          8e-3,
+          3e-3,
+          8,
+          true
+        );
+        headGroup.add(new Mesh(browGeo, hairMat));
+      });
+      [-1, 1].forEach((side) => {
         const eyeGroup = new Group();
-        eyeGroup.position.set(side * 0.045, 0.014, 0.108);
-        eyeGroup.rotation.y = side * 0.15;
+        eyeGroup.position.set(side * 0.046, 0.014, 0.11);
+        eyeGroup.rotation.y = side * 0.12;
         const sclera = new Mesh(
           new SphereGeometry(0.026, 16, 12),
           this.materials.humanEyesWhite
         );
         sclera.scale.set(0.95, 1.25, 0.4);
         eyeGroup.add(sclera);
+        const caruncle = new Mesh(
+          new SphereGeometry(5e-3, 8, 6),
+          this.materials.humanBlush
+        );
+        caruncle.position.set(-side * 0.016, -1e-3, 8e-3);
+        eyeGroup.add(caruncle);
         const iris = new Mesh(
           new SphereGeometry(0.017, 14, 10),
-          new MeshStandardMaterial({ color: 4528643, roughness: 0.2 })
+          this.materials.humanEyesIris
         );
         iris.position.set(side * 2e-3, 0, 9e-3);
         iris.scale.set(0.92, 1.15, 0.3);
         eyeGroup.add(iris);
         const pupil = new Mesh(
           new SphereGeometry(0.01, 12, 8),
-          this.materials.humanEyesIris
+          hairMat
         );
         pupil.position.set(side * 2e-3, 0, 0.014);
-        pupil.scale.set(0.85, 1.1, 0.25);
         eyeGroup.add(pupil);
-        const hl1 = new Mesh(new SphereGeometry(45e-4, 8, 8), this.materials.humanEyeReflex);
-        hl1.position.set(side * 4e-3, 7e-3, 0.016);
-        eyeGroup.add(hl1);
-        const hl2 = new Mesh(new SphereGeometry(25e-4, 8, 8), this.materials.humanEyeReflex);
-        hl2.position.set(side * -4e-3, -5e-3, 0.016);
-        eyeGroup.add(hl2);
-        const brow = new Mesh(
-          new CylinderGeometry(5e-3, 3e-3, 0.052, 8).rotateZ(Math.PI / 2),
-          new MeshStandardMaterial({ color: 8138002, roughness: 0.75 })
+        const hl = new Mesh(
+          new SphereGeometry(4e-3, 8, 8),
+          this.materials.humanEyeReflex
         );
-        brow.position.set(0, 0.038, 6e-3);
-        brow.rotation.z = side * -0.15;
-        brow.rotation.x = -0.25;
-        eyeGroup.add(brow);
+        hl.position.set(side * 4e-3, 7e-3, 0.016);
+        eyeGroup.add(hl);
+        const eyelid = new Mesh(
+          new TorusGeometry(0.024, 4e-3, 8, 12, Math.PI),
+          skinMat
+        );
+        eyelid.position.set(0, 3e-3, 8e-3);
+        eyelid.rotation.x = 0.2;
+        eyeGroup.add(eyelid);
+        if (side === -1) {
+          group.userData.eyelidL = eyelid;
+        } else {
+          group.userData.eyelidR = eyelid;
+        }
         headGroup.add(eyeGroup);
       });
-      const nose = new Mesh(
-        new SphereGeometry(0.015, 12, 10),
-        this.materials.humanSkinPeach
+      const noseBridgeMesh = new Mesh(
+        new CylinderGeometry(9e-3, 0.014, 0.05, 10),
+        skinMat
       );
-      nose.position.set(0, -0.014, 0.126);
-      nose.scale.set(0.9, 0.75, 1.1);
-      headGroup.add(nose);
-      const smile = new Mesh(
-        new TorusGeometry(0.025, 35e-4, 8, 16, Math.PI * 0.65),
+      noseBridgeMesh.position.set(0, 8e-3, 0.122);
+      noseBridgeMesh.rotation.x = -0.22;
+      headGroup.add(noseBridgeMesh);
+      const noseTip = new Mesh(
+        new SphereGeometry(0.015, 14, 10),
+        skinMat
+      );
+      noseTip.position.set(0, -0.015, 0.13);
+      noseTip.scale.set(0.92, 0.78, 1.15);
+      headGroup.add(noseTip);
+      [-1, 1].forEach((side) => {
+        const alar = new Mesh(
+          new SphereGeometry(8e-3, 10, 8),
+          skinMat
+        );
+        alar.position.set(side * 0.014, -0.018, 0.122);
+        headGroup.add(alar);
+        const nostrilHole = new Mesh(
+          new SphereGeometry(45e-4, 8, 6),
+          skinShadowMat
+        );
+        nostrilHole.position.set(side * 8e-3, -0.021, 0.124);
+        headGroup.add(nostrilHole);
+      });
+      [-1, 1].forEach((side) => {
+        const nasolabial = new Mesh(
+          new CylinderGeometry(7e-3, 0.012, 0.065, 8),
+          skinMat
+        );
+        nasolabial.position.set(side * 0.024, -0.032, 0.118);
+        nasolabial.rotation.set(-0.25, 0, side * 0.35);
+        headGroup.add(nasolabial);
+      });
+      const philtrum = new Mesh(
+        new BoxGeometry(0.01, 0.016, 6e-3),
+        skinShadowMat
+      );
+      philtrum.position.set(0, -0.032, 0.124);
+      headGroup.add(philtrum);
+      [-1, 1].forEach((side) => {
+        const bow = new Mesh(
+          new SphereGeometry(0.012, 10, 8),
+          this.materials.humanSmile
+        );
+        bow.position.set(side * 0.011, -0.041, 0.118);
+        bow.scale.set(1.1, 0.55, 0.65);
+        headGroup.add(bow);
+      });
+      const lowerLip = new Mesh(
+        new SphereGeometry(0.016, 12, 8),
         this.materials.humanSmile
       );
-      smile.position.set(0, -0.046, 0.114);
-      smile.rotation.set(0.2, 0, Math.PI * 1.18);
-      headGroup.add(smile);
-      [-1, 1].forEach((side) => {
-        const blush = new Mesh(
-          new SphereGeometry(0.022, 10, 8),
-          this.materials.humanBlush
-        );
-        blush.position.set(side * 0.072, -0.02, 0.096);
-        blush.scale.set(1, 0.65, 0.25);
-        headGroup.add(blush);
-        const ear = new Mesh(
-          new SphereGeometry(0.026, 14, 10),
-          this.materials.humanSkinPeach
-        );
-        ear.scale.set(0.35, 1.15, 0.75);
-        ear.position.set(side * 0.115, -8e-3, -5e-3);
-        ear.rotation.y = side * 0.18;
-        headGroup.add(ear);
-      });
-      const hairCap = new Mesh(
-        new SphereGeometry(0.126, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
-        this.materials.humanHairGinger
-      );
-      hairCap.position.set(0, 0.015, -0.012);
-      hairCap.scale.set(0.95, 1.06, 1.02);
-      headGroup.add(hairCap);
-      const quiffCurve = new CatmullRomCurve3([
-        new Vector3(-0.05, 0.12, 0.06),
-        new Vector3(-0.01, 0.155, 0.02),
-        new Vector3(0.03, 0.15, -0.04),
-        new Vector3(0.06, 0.12, -0.08)
-      ]);
-      const quiffGeo = this.createTaperedTubeGeometry(quiffCurve, 16, 0.032, 4e-3, 10, true);
-      headGroup.add(new Mesh(quiffGeo, this.materials.humanHairGinger));
-      const crestFlickCurve = new CatmullRomCurve3([
-        new Vector3(-0.02, 0.13, 0.05),
-        new Vector3(0.02, 0.165, 0.01),
-        new Vector3(0.05, 0.155, -0.03)
-      ]);
-      const crestFlickGeo = this.createTaperedTubeGeometry(crestFlickCurve, 14, 0.024, 3e-3, 8, true);
-      headGroup.add(new Mesh(crestFlickGeo, this.materials.humanHairGinger));
-      const bang1Curve = new CatmullRomCurve3([
-        new Vector3(-0.08, 0.11, 0.07),
-        new Vector3(-0.02, 0.1, 0.11),
-        new Vector3(0.05, 0.075, 0.118),
-        new Vector3(0.09, 0.025, 0.095)
-      ]);
-      headGroup.add(new Mesh(this.createTaperedTubeGeometry(bang1Curve, 16, 0.026, 3e-3, 10, true), this.materials.humanHairGinger));
-      [-1, 1].forEach((side) => {
-        const sideburn = new Mesh(
-          new CylinderGeometry(0.01, 4e-3, 0.055, 8),
-          this.materials.humanHairGinger
-        );
-        sideburn.position.set(side * 0.108, 0.015, 0.02);
-        sideburn.rotation.x = -0.15;
-        headGroup.add(sideburn);
-      });
+      lowerLip.position.set(0, -0.052, 0.114);
+      lowerLip.scale.set(1.2, 0.65, 0.7);
+      headGroup.add(lowerLip);
       torsoGroup.add(headGroup);
       [-1, 1].forEach((side) => {
         const armGroup = new Group();
-        armGroup.position.set(side * 0.17, 0.33, 0);
+        armGroup.position.set(side * 0.18, 0.34, 0);
         const sleeve = new Mesh(
-          new CylinderGeometry(0.066, 0.054, 0.15, 18),
+          new CylinderGeometry(0.068, 0.056, 0.16, 18),
           shirtMat
         );
-        sleeve.position.set(side * 8e-3, -0.07, 0);
+        sleeve.position.set(side * 8e-3, -0.075, 0);
         sleeve.rotation.z = side * -0.06;
+        sleeve.castShadow = true;
         armGroup.add(sleeve);
-        const sleeveCuff = new Mesh(
-          new CylinderGeometry(0.056, 0.056, 0.02, 18),
+        const cuffHem = new Mesh(
+          new CylinderGeometry(0.058, 0.058, 0.022, 18),
           shirtMat
         );
-        sleeveCuff.position.set(side * 0.014, -0.14, 0);
-        armGroup.add(sleeveCuff);
+        cuffHem.position.set(side * 0.012, -0.152, 0);
+        cuffHem.rotation.z = side * -0.06;
+        armGroup.add(cuffHem);
         const bareBicep = new Mesh(
           new CylinderGeometry(0.048, 0.042, 0.14, 16),
-          this.materials.humanSkinPeach
+          skinMat
         );
-        bareBicep.position.set(side * 0.014, -0.15, 0);
+        bareBicep.position.set(side * 0.014, -0.165, 0);
+        bareBicep.castShadow = true;
         armGroup.add(bareBicep);
         const forearmGroup = new Group();
-        forearmGroup.position.set(side * 0.014, -0.22, 5e-3);
+        forearmGroup.position.set(side * 0.014, -0.225, 5e-3);
         const elbow = new Mesh(
-          new SphereGeometry(0.043, 14, 10),
-          this.materials.humanSkinPeach
+          new SphereGeometry(0.044, 14, 10),
+          skinMat
         );
         forearmGroup.add(elbow);
         const forearm = new Mesh(
           new CylinderGeometry(0.042, 0.034, 0.22, 16),
-          this.materials.humanSkinPeach
+          skinMat
         );
         forearm.position.set(0, -0.11, 8e-3);
         forearm.rotation.x = -0.08;
+        forearm.castShadow = true;
         forearmGroup.add(forearm);
+        if (side === -1) {
+          const watch = new Mesh(
+            new CylinderGeometry(0.024, 0.024, 8e-3, 16).rotateX(
+              Math.PI / 2
+            ),
+            watchMat
+          );
+          watch.position.set(0, -0.19, 0.028);
+          forearmGroup.add(watch);
+          const strap = new Mesh(
+            new TorusGeometry(0.038, 6e-3, 8, 16),
+            strapMat
+          );
+          strap.position.set(0, -0.19, 0.01);
+          strap.rotation.x = Math.PI / 2;
+          forearmGroup.add(strap);
+        }
         const handGroup = new Group();
-        handGroup.position.set(0, -0.22, 0.015);
+        handGroup.position.set(0, -0.225, 0.015);
         const wrist = new Mesh(
           new SphereGeometry(0.033, 12, 10),
-          this.materials.humanSkinPeach
+          skinMat
         );
         handGroup.add(wrist);
         const palm = new Mesh(
-          new BoxGeometry(0.042, 0.065, 0.028),
-          this.materials.humanSkinPeach
+          new BoxGeometry(0.046, 0.068, 0.028),
+          skinMat
         );
-        palm.position.set(0, -0.032, 0);
+        palm.position.set(0, -0.034, 0);
         handGroup.add(palm);
-        const thumb = new Mesh(
-          new CylinderGeometry(0.011, 9e-3, 0.036, 8),
-          this.materials.humanSkinPeach
+        const thenar = new Mesh(
+          new SphereGeometry(0.016, 10, 8),
+          skinMat
         );
-        thumb.position.set(-side * 0.022, -0.022, 0.012);
-        thumb.rotation.set(-0.35, 0, -side * 0.45);
-        handGroup.add(thumb);
-        [-0.014, -5e-3, 5e-3, 0.014].forEach((fx) => {
+        thenar.position.set(-side * 0.016, -0.024, 8e-3);
+        handGroup.add(thenar);
+        const thumbKnuckle = new Mesh(
+          new SphereGeometry(0.012, 10, 8),
+          skinMat
+        );
+        thumbKnuckle.position.set(-side * 0.022, -0.015, 0.01);
+        handGroup.add(thumbKnuckle);
+        const thumbProx = new Mesh(
+          new CylinderGeometry(0.011, 9e-3, 0.025, 8),
+          skinMat
+        );
+        thumbProx.position.set(-side * 0.026, -0.028, 0.012);
+        thumbProx.rotation.set(-0.35, 0, -side * 0.45);
+        handGroup.add(thumbProx);
+        const thumbDist = new Mesh(
+          new CylinderGeometry(9e-3, 7e-3, 0.022, 8),
+          skinMat
+        );
+        thumbDist.position.set(-side * 0.034, -0.046, 0.018);
+        thumbDist.rotation.set(-0.45, 0, -side * 0.35);
+        handGroup.add(thumbDist);
+        [-0.015, -5e-3, 5e-3, 0.015].forEach((fx, idx) => {
+          const fingerLen = 0.048 - Math.abs(idx - 1.5) * 5e-3;
           const finger = new Mesh(
-            new CylinderGeometry(9e-3, 7e-3, 0.042, 8),
-            this.materials.humanSkinPeach
+            new CylinderGeometry(85e-4, 7e-3, fingerLen, 8),
+            skinMat
           );
-          finger.position.set(fx, -0.075, 3e-3);
-          finger.rotation.x = 0.2;
+          finger.position.set(fx, -0.076, 4e-3);
+          finger.rotation.x = 0.22;
           handGroup.add(finger);
+          const nail = new Mesh(
+            new BoxGeometry(7e-3, 0.01, 3e-3),
+            this.materials.humanBlush || skinMat
+          );
+          nail.position.set(fx, -0.076 - fingerLen / 2 + 4e-3, 8e-3);
+          nail.rotation.x = 0.22;
+          handGroup.add(nail);
         });
         forearmGroup.add(handGroup);
         armGroup.add(forearmGroup);
@@ -40232,62 +46629,91 @@ void main() {
         }
       });
       group.add(torsoGroup);
-      const pantsMat = config.pantsMat || this.materials.humanPantsBrown;
       [-1, 1].forEach((side) => {
         const legGroup = new Group();
-        legGroup.position.set(side * 0.074, 0.86, 0);
+        legGroup.position.set(side * 0.076, 0.86, 0);
         const hip = new Mesh(
-          new SphereGeometry(0.068, 16, 12),
+          new SphereGeometry(0.072, 16, 12),
           pantsMat
         );
         legGroup.add(hip);
         const thigh = new Mesh(
-          new CylinderGeometry(0.068, 0.056, 0.4, 20),
+          new CylinderGeometry(0.072, 0.058, 0.42, 22),
           pantsMat
         );
-        thigh.position.set(0, -0.2, 5e-3);
+        thigh.position.set(0, -0.21, 5e-3);
         thigh.rotation.x = 0.02;
+        thigh.castShadow = true;
         legGroup.add(thigh);
+        const kneeGroup = new Group();
+        kneeGroup.position.set(0, -0.42, 8e-3);
         const knee = new Mesh(
           new SphereGeometry(0.056, 16, 12),
           pantsMat
         );
-        knee.position.set(0, -0.4, 0.012);
-        legGroup.add(knee);
+        kneeGroup.add(knee);
+        const kneeCap = new Mesh(
+          new SphereGeometry(0.026, 12, 10),
+          pantsMat
+        );
+        kneeCap.position.set(0, 0, 0.046);
+        kneeCap.scale.set(0.9, 1.15, 0.45);
+        kneeGroup.add(kneeCap);
         const lowerLegGroup = new Group();
-        lowerLegGroup.position.set(0, -0.4, 0.012);
+        lowerLegGroup.position.set(0, 0, 0);
         const calf = new Mesh(
-          new CylinderGeometry(0.056, 0.048, 0.38, 20),
+          new CylinderGeometry(0.054, 0.044, 0.42, 22),
           pantsMat
         );
-        calf.position.set(0, -0.19, -6e-3);
+        calf.position.set(0, -0.21, -5e-3);
+        calf.rotation.x = -0.02;
+        calf.castShadow = true;
         lowerLegGroup.add(calf);
-        const cuff = new Mesh(
-          new CylinderGeometry(0.052, 0.052, 0.025, 20),
+        const pantCuff = new Mesh(
+          new CylinderGeometry(0.052, 0.056, 0.042, 22),
           pantsMat
         );
-        cuff.position.set(0, -0.37, -6e-3);
-        lowerLegGroup.add(cuff);
+        pantCuff.position.set(0, -0.405, -5e-3);
+        lowerLegGroup.add(pantCuff);
         const shoeGroup = new Group();
-        shoeGroup.position.set(0, -0.41, 0.035);
-        const shoeBody = new Mesh(
-          new BoxGeometry(0.074, 0.065, 0.17),
-          this.materials.humanShoesDark
-        );
-        shoeGroup.add(shoeBody);
+        shoeGroup.position.set(0, -0.42, 0.015);
         const sole = new Mesh(
-          new BoxGeometry(0.078, 0.022, 0.175),
-          this.materials.humanShoeSole
+          new BoxGeometry(0.088, 0.026, 0.22),
+          soleMat
         );
-        sole.position.y = -0.032;
+        sole.position.set(0, -0.013, 0.035);
         shoeGroup.add(sole);
-        const toeCap = new Mesh(
-          new SphereGeometry(0.036, 12, 10),
-          this.materials.humanShoeSole
+        const upper = new Mesh(
+          new CylinderGeometry(0.044, 0.046, 0.17, 16).rotateX(
+            Math.PI / 2
+          ),
+          shoesMat
         );
-        toeCap.position.set(0, -0.012, 0.075);
-        toeCap.scale.set(1, 0.65, 0.85);
+        upper.position.set(0, 0.024, 0.038);
+        upper.scale.set(0.95, 0.68, 1.05);
+        upper.castShadow = true;
+        shoeGroup.add(upper);
+        const heelCounter = new Mesh(
+          new SphereGeometry(0.042, 12, 10),
+          shoesMat
+        );
+        heelCounter.position.set(0, 0.026, -0.032);
+        heelCounter.scale.set(0.95, 0.95, 0.7);
+        shoeGroup.add(heelCounter);
+        const toeCap = new Mesh(
+          new SphereGeometry(0.042, 14, 10),
+          shoesMat
+        );
+        toeCap.position.set(0, 0.018, 0.108);
+        toeCap.scale.set(0.96, 0.6, 0.9);
         shoeGroup.add(toeCap);
+        const laces = new Mesh(
+          new BoxGeometry(0.044, 8e-3, 0.05),
+          soleMat
+        );
+        laces.position.set(0, 0.036, 0.02);
+        laces.rotation.x = -0.25;
+        shoeGroup.add(laces);
         lowerLegGroup.add(shoeGroup);
         legGroup.add(lowerLegGroup);
         group.add(legGroup);
@@ -40308,11 +46734,7 @@ void main() {
       return group;
     }
     // ------------------------------------------------------------------
-    // Configure Human Biomechanical Poses for the 4 User Scenarios:
-    // 1. Enter on track: first leg on track (elevated rail) and second on ground (lower ballast)
-    // 2. Exit to track: first leg on ground (lower ballast) & second on track (elevated rail)
-    // 3. Mid in track: symmetrical center stance between rails
-    // 4. Suddenly appear on track: panicked emergency recoil / braking skid
+    // Configure Human Biomechanical Poses for Scenarios
     // ------------------------------------------------------------------
     applyHumanPose(group, poseMode) {
       if (!group || !group.userData) return;
@@ -40411,89 +46833,212 @@ void main() {
       }
     }
     // ------------------------------------------------------------------
-    // 3D Animal Model Builders (Multiple Species: Dog, Deer, Cow, Elephant)
-    // Accurate anatomies, distinctive species traits, sizes, and weights
+    // 1. Indian Pariah Dog / Desi Indie Kutta (~22 kg < 150 kg -> Net Scoopable)
+    // Athletic deep chest, tucked abdomen, wedge skull with stop, leathery rhinarium,
+    // amber almond eyes, alert prick ears, articulated limbs with toe pads & sickle tail
     // ------------------------------------------------------------------
-    // 1. Indian Desi Dog (Small Canine ~22 kg < 150 kg -> Net Scoopable)
     buildDogMesh(poseMode = "mid", config = {}) {
       const group = new Group();
       group.name = "stylizedAnimal";
       const furMat = this.materials.dogFurTan;
+      const creamMat = this.materials.dogFurCream;
       const darkMat = this.materials.dogNoseDark;
-      const collarMat = this.materials.dogCollarRed;
-      const bodyGeo = new CylinderGeometry(0.12, 0.1, 0.44, 16);
-      bodyGeo.rotateX(Math.PI / 2);
-      const body = new Mesh(bodyGeo, furMat);
-      body.position.set(0, 0.32, 0);
-      body.castShadow = true;
-      group.add(body);
-      const chest = new Mesh(new SphereGeometry(0.13, 14, 10), furMat);
-      chest.position.set(0, 0.33, 0.2);
-      group.add(chest);
-      const neck = new Mesh(new CylinderGeometry(0.08, 0.11, 0.18, 12), furMat);
-      neck.position.set(0, 0.42, 0.24);
-      neck.rotation.x = -0.42;
+      const ribcage = new Mesh(
+        new CylinderGeometry(0.135, 0.115, 0.32, 18).rotateX(Math.PI / 2),
+        furMat
+      );
+      ribcage.position.set(0, 0.34, 0.06);
+      ribcage.castShadow = true;
+      group.add(ribcage);
+      const chestPatch = new Mesh(
+        new SphereGeometry(0.11, 14, 10),
+        creamMat
+      );
+      chestPatch.position.set(0, 0.32, 0.2);
+      chestPatch.scale.set(0.85, 1.1, 0.7);
+      group.add(chestPatch);
+      const abdomen = new Mesh(
+        new CylinderGeometry(0.11, 0.085, 0.22, 16).rotateX(Math.PI / 2),
+        furMat
+      );
+      abdomen.position.set(0, 0.36, -0.14);
+      group.add(abdomen);
+      const croup = new Mesh(
+        new SphereGeometry(0.1, 14, 10),
+        furMat
+      );
+      croup.position.set(0, 0.36, -0.22);
+      croup.scale.set(0.9, 0.85, 1);
+      group.add(croup);
+      const neck = new Mesh(
+        new CylinderGeometry(0.082, 0.115, 0.2, 16),
+        furMat
+      );
+      neck.position.set(0, 0.44, 0.23);
+      neck.rotation.x = -0.46;
+      neck.castShadow = true;
       group.add(neck);
-      const collar = new Mesh(new TorusGeometry(0.085, 0.014, 8, 16), collarMat);
-      collar.position.set(0, 0.44, 0.25);
-      collar.rotation.x = -0.42;
-      group.add(collar);
       const headGroup = new Group();
-      headGroup.position.set(0, 0.5, 0.32);
-      const skull = new Mesh(new SphereGeometry(0.1, 14, 12), furMat);
+      headGroup.position.set(0, 0.52, 0.34);
+      const skull = new Mesh(
+        new SphereGeometry(0.102, 18, 14),
+        furMat
+      );
+      skull.scale.set(0.88, 0.95, 1.12);
+      skull.castShadow = true;
       headGroup.add(skull);
-      const muzzle = new Mesh(new BoxGeometry(0.09, 0.07, 0.13), furMat);
-      muzzle.position.set(0, -0.02, 0.11);
+      const muzzle = new Mesh(
+        new CylinderGeometry(0.046, 0.074, 0.16, 14).rotateX(Math.PI / 2),
+        furMat
+      );
+      muzzle.position.set(0, -0.02, 0.125);
       headGroup.add(muzzle);
-      const nose = new Mesh(new SphereGeometry(0.024, 10, 8), darkMat);
-      nose.position.set(0, 0.01, 0.17);
-      headGroup.add(nose);
-      [-0.045, 0.045].forEach((side) => {
-        const eyeWhite = new Mesh(new SphereGeometry(0.022, 10, 8), this.materials.humanEyesWhite);
-        eyeWhite.position.set(side, 0.035, 0.075);
+      const lowerJaw = new Mesh(
+        new BoxGeometry(0.062, 0.032, 0.13),
+        furMat
+      );
+      lowerJaw.position.set(0, -0.05, 0.115);
+      headGroup.add(lowerJaw);
+      const nosePad = new Mesh(
+        new SphereGeometry(0.024, 12, 10),
+        darkMat
+      );
+      nosePad.position.set(0, 6e-3, 0.2);
+      nosePad.scale.set(1.15, 0.85, 0.9);
+      headGroup.add(nosePad);
+      [-9e-3, 9e-3].forEach((nx) => {
+        const nostril = new Mesh(
+          new SphereGeometry(6e-3, 8, 6),
+          darkMat
+        );
+        nostril.position.set(nx, 3e-3, 0.218);
+        headGroup.add(nostril);
+      });
+      [-0.046, 0.046].forEach((side) => {
+        const eyeWhite = new Mesh(
+          new SphereGeometry(0.022, 10, 8),
+          this.materials.humanEyesWhite
+        );
+        eyeWhite.position.set(side, 0.038, 0.078);
         headGroup.add(eyeWhite);
-        const pupil = new Mesh(new SphereGeometry(0.015, 10, 8), darkMat);
-        pupil.position.set(side * 1.05, 0.035, 0.092);
+        const iris = new Mesh(
+          new SphereGeometry(0.016, 10, 8),
+          this.materials.humanEyesIris
+        );
+        iris.position.set(side * 1.05, 0.038, 0.092);
+        headGroup.add(iris);
+        const pupil = new Mesh(
+          new SphereGeometry(9e-3, 8, 8),
+          darkMat
+        );
+        pupil.position.set(side * 1.06, 0.038, 0.102);
         headGroup.add(pupil);
+        const hl = new Mesh(
+          new SphereGeometry(4e-3, 6, 6),
+          this.materials.humanEyeReflex
+        );
+        hl.position.set(side * 1.05 + 3e-3, 0.044, 0.106);
+        headGroup.add(hl);
       });
       [-1, 1].forEach((side) => {
-        const ear = new Mesh(new BoxGeometry(0.035, 0.1, 0.02), furMat);
-        ear.position.set(side * 0.08, 0.075, -0.02);
-        ear.rotation.set(-0.25, 0, side * -0.55);
-        headGroup.add(ear);
+        const earGroup = new Group();
+        earGroup.position.set(side * 0.075, 0.095, -0.02);
+        earGroup.rotation.set(-0.24, 0, side * -0.5);
+        const earFlap = new Mesh(
+          new ConeGeometry(0.048, 0.13, 10),
+          furMat
+        );
+        earFlap.scale.set(0.9, 1, 0.45);
+        earGroup.add(earFlap);
+        const earCavity = new Mesh(
+          new ConeGeometry(0.036, 0.11, 8),
+          this.materials.humanSkinShadow
+        );
+        earCavity.position.set(0, -0.01, 0.012);
+        earCavity.scale.set(0.8, 0.95, 0.3);
+        earGroup.add(earCavity);
+        headGroup.add(earGroup);
       });
       group.add(headGroup);
       const tailGroup = new Group();
-      tailGroup.position.set(0, 0.36, -0.22);
+      tailGroup.position.set(0, 0.38, -0.24);
       const tailPts = [
         new Vector3(0, 0, 0),
-        new Vector3(0, 0.08, -0.08),
-        new Vector3(0, 0.18, -0.12),
-        new Vector3(0, 0.26, -0.06)
+        new Vector3(0, 0.12, -0.08),
+        new Vector3(0, 0.24, -0.06),
+        new Vector3(0, 0.3, 0.03),
+        new Vector3(0, 0.25, 0.09)
       ];
-      const tailCurve = new CatmullRomCurve3(tailPts);
-      const tail = new Mesh(new TubeGeometry(tailCurve, 12, 0.02, 8, false), furMat);
-      tailGroup.add(tail);
+      const tailGeo = this.createTaperedTubeGeometry(
+        new CatmullRomCurve3(tailPts),
+        14,
+        0.024,
+        6e-3,
+        8,
+        true
+      );
+      tailGroup.add(new Mesh(tailGeo, furMat));
       group.add(tailGroup);
-      const legGeo = new CylinderGeometry(0.032, 0.026, 0.3, 10);
-      const pawGeo = new BoxGeometry(0.055, 0.03, 0.075);
       const legs = {};
       const legConfigs = [
-        { name: "legFL", x: -0.08, z: 0.16 },
-        { name: "legFR", x: 0.08, z: 0.16 },
-        { name: "legBL", x: -0.08, z: -0.16 },
-        { name: "legBR", x: 0.08, z: -0.16 }
+        { name: "legFL", x: -0.082, z: 0.18, isFront: true },
+        { name: "legFR", x: 0.082, z: 0.18, isFront: true },
+        { name: "legBL", x: -0.082, z: -0.18, isFront: false },
+        { name: "legBR", x: 0.082, z: -0.18, isFront: false }
       ];
       legConfigs.forEach((c) => {
         const legPivot = new Group();
-        legPivot.position.set(c.x, 0.3, c.z);
-        const limb = new Mesh(legGeo, furMat);
-        limb.position.set(0, -0.14, 0);
-        limb.castShadow = true;
-        legPivot.add(limb);
-        const paw = new Mesh(pawGeo, furMat);
-        paw.position.set(0, -0.29, 0.015);
-        legPivot.add(paw);
+        legPivot.position.set(c.x, 0.32, c.z);
+        if (c.isFront) {
+          const shoulder = new Mesh(
+            new SphereGeometry(0.048, 12, 10),
+            furMat
+          );
+          legPivot.add(shoulder);
+          const forearm = new Mesh(
+            new CylinderGeometry(0.03, 0.022, 0.22, 12),
+            furMat
+          );
+          forearm.position.set(0, -0.11, 0);
+          forearm.castShadow = true;
+          legPivot.add(forearm);
+          const paw = new Mesh(
+            new SphereGeometry(0.032, 12, 8),
+            furMat
+          );
+          paw.position.set(0, -0.23, 0.018);
+          paw.scale.set(0.9, 0.65, 1.25);
+          legPivot.add(paw);
+          const claws = new Mesh(
+            new BoxGeometry(0.042, 8e-3, 0.014),
+            darkMat
+          );
+          claws.position.set(0, -0.245, 0.048);
+          legPivot.add(claws);
+        } else {
+          const haunch = new Mesh(
+            new CylinderGeometry(0.054, 0.038, 0.16, 14),
+            furMat
+          );
+          haunch.position.set(0, -0.07, 0.015);
+          haunch.rotation.x = 0.25;
+          legPivot.add(haunch);
+          const hock = new Mesh(
+            new CylinderGeometry(0.034, 0.022, 0.16, 12),
+            furMat
+          );
+          hock.position.set(0, -0.165, -0.018);
+          hock.rotation.x = -0.28;
+          hock.castShadow = true;
+          legPivot.add(hock);
+          const rearPaw = new Mesh(
+            new SphereGeometry(0.032, 12, 8),
+            furMat
+          );
+          rearPaw.position.set(0, -0.23, 0.016);
+          rearPaw.scale.set(0.9, 0.65, 1.25);
+          legPivot.add(rearPaw);
+        }
         group.add(legPivot);
         legs[c.name] = legPivot;
       });
@@ -40503,96 +47048,11 @@ void main() {
       group.userData.legs = legs;
       return group;
     }
-    // 2. Indian Spotted Deer / Chital (~48 kg < 150 kg -> Net Scoopable)
-    buildDeerMesh(poseMode = "mid", config = {}) {
-      const group = new Group();
-      group.name = "stylizedAnimal";
-      const furMat = this.materials.deerFurFawn;
-      const creamMat = this.materials.deerSpotsCream;
-      const antlerMat = this.materials.deerAntlersDark;
-      const darkMat = this.materials.dogNoseDark;
-      const hoofMat = this.materials.hoofDark;
-      const bodyGeo = new CylinderGeometry(0.19, 0.16, 0.76, 16);
-      bodyGeo.rotateX(Math.PI / 2);
-      const body = new Mesh(bodyGeo, furMat);
-      body.position.set(0, 0.7, 0);
-      body.castShadow = true;
-      group.add(body);
-      [-1, 1].forEach((side) => {
-        for (let s = 0; s < 5; s++) {
-          const spot = new Mesh(new SphereGeometry(0.026, 8, 6), creamMat);
-          spot.position.set(side * 0.18, 0.72 + s % 2 * 0.04, -0.22 + s * 0.1);
-          group.add(spot);
-        }
-      });
-      const neck = new Mesh(new CylinderGeometry(0.1, 0.14, 0.42, 14), furMat);
-      neck.position.set(0, 0.92, 0.38);
-      neck.rotation.x = -0.55;
-      group.add(neck);
-      const headGroup = new Group();
-      headGroup.position.set(0, 1.12, 0.52);
-      const skull = new Mesh(new SphereGeometry(0.11, 14, 12), furMat);
-      headGroup.add(skull);
-      const muzzle = new Mesh(new ConeGeometry(0.085, 0.2, 12), furMat);
-      muzzle.rotation.x = Math.PI / 2;
-      muzzle.position.set(0, -0.035, 0.13);
-      headGroup.add(muzzle);
-      const nose = new Mesh(new SphereGeometry(0.026, 10, 8), darkMat);
-      nose.position.set(0, -0.035, 0.23);
-      headGroup.add(nose);
-      [-0.065, 0.065].forEach((side) => {
-        const eye = new Mesh(new SphereGeometry(0.028, 10, 8), darkMat);
-        eye.position.set(side, 0.035, 0.075);
-        headGroup.add(eye);
-        const catchlight = new Mesh(new SphereGeometry(9e-3, 6, 6), this.materials.humanEyesWhite);
-        catchlight.position.set(side * 1.05, 0.045, 0.098);
-        headGroup.add(catchlight);
-      });
-      [-1, 1].forEach((side) => {
-        const ear = new Mesh(new ConeGeometry(0.05, 0.18, 8), furMat);
-        ear.position.set(side * 0.11, 0.13, -0.03);
-        ear.rotation.set(-0.35, 0, side * -0.65);
-        headGroup.add(ear);
-      });
-      [-1, 1].forEach((side) => {
-        const antlerBeam = new Mesh(new CylinderGeometry(0.016, 0.022, 0.4, 8), antlerMat);
-        antlerBeam.position.set(side * 0.065, 0.24, 0.02);
-        antlerBeam.rotation.set(-0.3, side * 0.1, side * 0.22);
-        headGroup.add(antlerBeam);
-        const tine = new Mesh(new CylinderGeometry(9e-3, 0.013, 0.14, 8), antlerMat);
-        tine.position.set(side * 0.1, 0.26, 0.07);
-        tine.rotation.set(0.4, 0, side * 0.35);
-        headGroup.add(tine);
-      });
-      group.add(headGroup);
-      const legGeo = new CylinderGeometry(0.035, 0.024, 0.65, 10);
-      const hoofGeo = new BoxGeometry(0.048, 0.048, 0.065);
-      const legs = {};
-      const legConfigs = [
-        { name: "legFL", x: -0.11, z: 0.26 },
-        { name: "legFR", x: 0.11, z: 0.26 },
-        { name: "legBL", x: -0.11, z: -0.26 },
-        { name: "legBR", x: 0.11, z: -0.26 }
-      ];
-      legConfigs.forEach((c) => {
-        const legPivot = new Group();
-        legPivot.position.set(c.x, 0.68, c.z);
-        const limb = new Mesh(legGeo, furMat);
-        limb.position.set(0, -0.31, 0);
-        limb.castShadow = true;
-        legPivot.add(limb);
-        const hoof = new Mesh(hoofGeo, hoofMat);
-        hoof.position.set(0, -0.65, 0.01);
-        legPivot.add(hoof);
-        group.add(legPivot);
-        legs[c.name] = legPivot;
-      });
-      group.userData.type = "deer";
-      group.userData.headGroup = headGroup;
-      group.userData.legs = legs;
-      return group;
-    }
-    // 3. Indian Zebu Cow / Desi Bull (~360 kg > 150 kg -> NET LOCKED! Only Electricity 800m-80m)
+    // ------------------------------------------------------------------
+    // 2. Indian Zebu Cow / Desi Cattle (~360 kg > 150 kg -> NET LOCKED! Only Electricity)
+    // Massive barrel ribs, prominent Zebu hump with organic curve, folding dewlap,
+    // curved lyre horns, drooping leaf ears, almond eyes, cloven hooves & switch tail
+    // ------------------------------------------------------------------
     buildCowMesh(poseMode = "mid", config = {}) {
       const group = new Group();
       group.name = "stylizedAnimal";
@@ -40602,184 +47062,559 @@ void main() {
       const muzzleMat = this.materials.cowMuzzlePink;
       const darkMat = this.materials.dogNoseDark;
       const hoofMat = this.materials.hoofDark;
-      const bodyGeo = new CylinderGeometry(0.42, 0.38, 1.4, 18);
-      bodyGeo.rotateX(Math.PI / 2);
-      const body = new Mesh(bodyGeo, hideMat);
-      body.position.set(0, 1.02, 0);
-      body.castShadow = true;
-      group.add(body);
-      const humpGeo = new SphereGeometry(0.26, 16, 14);
-      humpGeo.scale(0.85, 1.25, 0.95);
+      const ribcage = new Mesh(
+        new CylinderGeometry(0.44, 0.4, 0.95, 20).rotateX(Math.PI / 2),
+        hideMat
+      );
+      ribcage.position.set(0, 1.05, 0.14);
+      ribcage.castShadow = true;
+      group.add(ribcage);
+      const rump = new Mesh(
+        new CylinderGeometry(0.39, 0.36, 0.65, 18).rotateX(Math.PI / 2),
+        hideMat
+      );
+      rump.position.set(0, 1.04, -0.48);
+      rump.castShadow = true;
+      group.add(rump);
+      [-0.36, 0.36].forEach((hx) => {
+        const hookBone = new Mesh(
+          new SphereGeometry(0.065, 10, 8),
+          hideMat
+        );
+        hookBone.position.set(hx, 1.18, -0.42);
+        group.add(hookBone);
+      });
+      const humpGeo = new SphereGeometry(0.32, 22, 18);
+      humpGeo.scale(0.8, 1.35, 1.08);
       const hump = new Mesh(humpGeo, greyMat);
-      hump.position.set(0, 1.48, 0.38);
+      hump.position.set(0, 1.54, 0.34);
+      hump.rotation.x = -0.15;
       hump.castShadow = true;
       group.add(hump);
-      const dewlap = new Mesh(new BoxGeometry(0.07, 0.3, 0.48), hideMat);
-      dewlap.position.set(0, 0.86, 0.62);
-      dewlap.rotation.x = -0.35;
-      group.add(dewlap);
-      const neck = new Mesh(new CylinderGeometry(0.24, 0.33, 0.42, 14), hideMat);
-      neck.position.set(0, 1.18, 0.66);
-      neck.rotation.x = -0.45;
+      const dewlapUpper = new Mesh(
+        new CylinderGeometry(0.04, 0.05, 0.54, 12).rotateX(Math.PI / 2),
+        hideMat
+      );
+      dewlapUpper.position.set(0, 0.98, 0.72);
+      dewlapUpper.scale.set(0.65, 3.2, 1);
+      group.add(dewlapUpper);
+      const dewlapBrisket = new Mesh(
+        new CylinderGeometry(0.04, 0.05, 0.42, 12).rotateX(Math.PI / 2),
+        hideMat
+      );
+      dewlapBrisket.position.set(0, 0.75, 0.42);
+      dewlapBrisket.scale.set(0.65, 2.5, 1);
+      group.add(dewlapBrisket);
+      const neck = new Mesh(
+        new CylinderGeometry(0.26, 0.36, 0.46, 16),
+        hideMat
+      );
+      neck.position.set(0, 1.2, 0.68);
+      neck.rotation.x = -0.48;
+      neck.castShadow = true;
       group.add(neck);
       const headGroup = new Group();
-      headGroup.position.set(0, 1.3, 0.94);
-      const skull = new Mesh(new BoxGeometry(0.3, 0.32, 0.4), hideMat);
-      headGroup.add(skull);
-      const muzzle = new Mesh(new BoxGeometry(0.28, 0.2, 0.22), muzzleMat);
-      muzzle.position.set(0, -0.09, 0.24);
+      headGroup.position.set(0, 1.32, 0.96);
+      const forehead = new Mesh(
+        new SphereGeometry(0.19, 18, 14),
+        hideMat
+      );
+      forehead.position.set(0, 0.08, 0.06);
+      forehead.scale.set(0.95, 0.9, 1.15);
+      forehead.castShadow = true;
+      headGroup.add(forehead);
+      const nasalBridge = new Mesh(
+        new CylinderGeometry(0.12, 0.165, 0.34, 14).rotateX(Math.PI / 2),
+        hideMat
+      );
+      nasalBridge.position.set(0, -0.04, 0.26);
+      headGroup.add(nasalBridge);
+      const muzzle = new Mesh(
+        new SphereGeometry(0.14, 16, 12),
+        muzzleMat
+      );
+      muzzle.position.set(0, -0.12, 0.4);
+      muzzle.scale.set(1.15, 0.8, 0.85);
       headGroup.add(muzzle);
-      [-0.065, 0.065].forEach((side) => {
-        const nostril = new Mesh(new SphereGeometry(0.03, 10, 8), darkMat);
-        nostril.position.set(side, -0.075, 0.34);
+      [-0.058, 0.058].forEach((nx) => {
+        const nostril = new Mesh(
+          new SphereGeometry(0.024, 10, 8),
+          darkMat
+        );
+        nostril.position.set(nx, -0.11, 0.48);
         headGroup.add(nostril);
       });
-      [-0.16, 0.16].forEach((side) => {
-        const eye = new Mesh(new SphereGeometry(0.038, 10, 8), darkMat);
-        eye.position.set(side, 0.05, 0.08);
-        headGroup.add(eye);
+      [-0.17, 0.17].forEach((side) => {
+        const eyeGroup = new Group();
+        eyeGroup.position.set(side, 0.06, 0.12);
+        eyeGroup.rotation.y = side * 0.35;
+        const orbital = new Mesh(
+          new SphereGeometry(0.046, 12, 8),
+          hideMat
+        );
+        orbital.scale.set(0.6, 1.1, 1.2);
+        eyeGroup.add(orbital);
+        const eye = new Mesh(
+          new SphereGeometry(0.038, 12, 10),
+          darkMat
+        );
+        eye.scale.set(0.5, 1, 1);
+        eyeGroup.add(eye);
+        const catchlight = new Mesh(
+          new SphereGeometry(8e-3, 6, 6),
+          this.materials.humanEyesWhite
+        );
+        catchlight.position.set(side * 0.015, 0.012, 0.022);
+        eyeGroup.add(catchlight);
+        headGroup.add(eyeGroup);
       });
       [-1, 1].forEach((side) => {
-        const ear = new Mesh(new BoxGeometry(0.035, 0.2, 0.08), hideMat);
-        ear.position.set(side * 0.2, -0.04, -0.05);
-        ear.rotation.set(-0.35, 0, side * 0.85);
-        headGroup.add(ear);
+        const earGroup = new Group();
+        earGroup.position.set(side * 0.21, -0.05, -0.04);
+        earGroup.rotation.set(-0.35, 0, side * 0.88);
+        const earCurve = new CatmullRomCurve3([
+          new Vector3(0, 0, 0),
+          new Vector3(side * 0.08, -0.12, 0.02),
+          new Vector3(side * 0.14, -0.26, 0.01),
+          new Vector3(side * 0.12, -0.34, -0.01)
+        ]);
+        const earGeo = this.createTaperedTubeGeometry(
+          earCurve,
+          14,
+          0.055,
+          0.012,
+          8,
+          true
+        );
+        earGroup.add(new Mesh(earGeo, hideMat));
+        headGroup.add(earGroup);
       });
       [-1, 1].forEach((side) => {
         const hornCurve = new CatmullRomCurve3([
-          new Vector3(side * 0.13, 0.15, -0.05),
-          new Vector3(side * 0.26, 0.26, -0.02),
-          new Vector3(side * 0.22, 0.4, 0.05)
+          new Vector3(side * 0.12, 0.18, -0.05),
+          new Vector3(side * 0.28, 0.28, -0.02),
+          new Vector3(side * 0.26, 0.44, 0.04),
+          new Vector3(side * 0.2, 0.54, 0.08)
         ]);
-        const horn = new Mesh(new TubeGeometry(hornCurve, 12, 0.032, 8, false), hornMat);
-        headGroup.add(horn);
+        const hornGeo = this.createTaperedTubeGeometry(
+          hornCurve,
+          16,
+          0.044,
+          6e-3,
+          10,
+          true
+        );
+        const hornMesh = new Mesh(hornGeo, hornMat);
+        hornMesh.castShadow = true;
+        headGroup.add(hornMesh);
       });
       group.add(headGroup);
       const tailGroup = new Group();
-      tailGroup.position.set(0, 1.2, -0.68);
-      const tailRope = new Mesh(new CylinderGeometry(0.02, 0.015, 0.62, 8), hideMat);
-      tailRope.position.set(0, -0.3, -0.04);
-      tailGroup.add(tailRope);
-      const tailTuft = new Mesh(new ConeGeometry(0.042, 0.16, 8), darkMat);
-      tailTuft.position.set(0, -0.62, -0.04);
+      tailGroup.position.set(0, 1.22, -0.74);
+      const tailPts = [
+        new Vector3(0, 0, 0),
+        new Vector3(0, -0.3, -0.04),
+        new Vector3(0, -0.62, -0.02)
+      ];
+      const tailRope = this.createTaperedTubeGeometry(
+        new CatmullRomCurve3(tailPts),
+        12,
+        0.022,
+        0.014,
+        8,
+        true
+      );
+      tailGroup.add(new Mesh(tailRope, hideMat));
+      const tailTuft = new Mesh(
+        new ConeGeometry(0.065, 0.24, 10),
+        darkMat
+      );
+      tailTuft.position.set(0, -0.74, -0.02);
       tailGroup.add(tailTuft);
       group.add(tailGroup);
-      const legGeo = new CylinderGeometry(0.08, 0.065, 0.92, 12);
-      const hoofGeo = new BoxGeometry(0.13, 0.075, 0.15);
       const legs = {};
       const legConfigs = [
-        { name: "legFL", x: -0.2, z: 0.45 },
-        { name: "legFR", x: 0.2, z: 0.45 },
-        { name: "legBL", x: -0.2, z: -0.45 },
-        { name: "legBR", x: 0.2, z: -0.45 }
+        { name: "legFL", x: -0.22, z: 0.46, isFront: true },
+        { name: "legFR", x: 0.22, z: 0.46, isFront: true },
+        { name: "legBL", x: -0.22, z: -0.46, isFront: false },
+        { name: "legBR", x: 0.22, z: -0.46, isFront: false }
       ];
       legConfigs.forEach((c) => {
         const legPivot = new Group();
-        legPivot.position.set(c.x, 0.98, c.z);
-        const limb = new Mesh(legGeo, hideMat);
-        limb.position.set(0, -0.44, 0);
-        limb.castShadow = true;
-        legPivot.add(limb);
-        const hoof = new Mesh(hoofGeo, hoofMat);
-        hoof.position.set(0, -0.93, 0.01);
-        legPivot.add(hoof);
+        legPivot.position.set(c.x, 1.02, c.z);
+        const upperLimb = new Mesh(
+          new CylinderGeometry(0.11, 0.082, 0.44, 14),
+          hideMat
+        );
+        upperLimb.position.set(0, -0.22, 0);
+        upperLimb.castShadow = true;
+        legPivot.add(upperLimb);
+        const joint = new Mesh(
+          new SphereGeometry(0.082, 12, 10),
+          hideMat
+        );
+        joint.position.set(0, -0.44, 0);
+        legPivot.add(joint);
+        const cannon = new Mesh(
+          new CylinderGeometry(0.076, 0.065, 0.46, 12),
+          hideMat
+        );
+        cannon.position.set(0, -0.67, 0);
+        cannon.castShadow = true;
+        legPivot.add(cannon);
+        [-0.038, 0.038].forEach((hx) => {
+          const hoofClaw = new Mesh(
+            new BoxGeometry(0.068, 0.072, 0.14),
+            hoofMat
+          );
+          hoofClaw.position.set(hx, -0.93, 0.015);
+          legPivot.add(hoofClaw);
+        });
+        const dewclaw = new Mesh(
+          new BoxGeometry(0.05, 0.024, 0.03),
+          hoofMat
+        );
+        dewclaw.position.set(0, -0.86, -0.06);
+        legPivot.add(dewclaw);
         group.add(legPivot);
         legs[c.name] = legPivot;
       });
       group.userData.type = "cow";
       group.userData.headGroup = headGroup;
       group.userData.tail = tailGroup;
-      group.userData.legs = legs;
       group.userData.hump = hump;
+      group.userData.legs = legs;
       return group;
     }
-    // 4. Asian Wild Elephant (~3,800 kg > 150 kg -> NET LOCKED! Quad E-Shock Only 800m-80m)
+    // ------------------------------------------------------------------
+    // 3. Asian Wild Elephant / Elephas maximus (~3,800 kg > 150 kg -> NET LOCKED! Quad E-Shock)
+    // Convex arched back, twin cranial domes, weathered wrinkled hide, authentic Asian fan ears
+    // with depigmentation mottling, prehensile trunk with finger, ivory tusks & 5/4-toenail feet
+    // ------------------------------------------------------------------
     buildElephantMesh(poseMode = "mid", config = {}) {
       const group = new Group();
       group.name = "stylizedAnimal";
       const hideMat = this.materials.elephantHideGrey;
+      const earMat = this.materials.elephantEar || hideMat;
       const ivoryMat = this.materials.elephantIvory;
       const darkMat = this.materials.dogNoseDark;
       const toeMat = this.materials.humanShoeSole;
-      const bodyGeo = new CylinderGeometry(0.9, 0.82, 2.3, 20);
-      bodyGeo.rotateX(Math.PI / 2);
-      const body = new Mesh(bodyGeo, hideMat);
-      body.position.set(0, 1.82, 0);
-      body.castShadow = true;
-      group.add(body);
-      const shoulder = new Mesh(new SphereGeometry(0.9, 16, 12), hideMat);
-      shoulder.position.set(0, 1.83, 0.82);
+      const centralTorso = new Mesh(
+        new CylinderGeometry(0.96, 0.92, 1.45, 24).rotateX(Math.PI / 2),
+        hideMat
+      );
+      centralTorso.position.set(0, 1.88, 0);
+      centralTorso.castShadow = true;
+      group.add(centralTorso);
+      const spineRidge = new Mesh(
+        new CylinderGeometry(0.35, 0.42, 1.35, 16).rotateX(Math.PI / 2),
+        hideMat
+      );
+      spineRidge.position.set(0, 2.58, 0.05);
+      spineRidge.scale.set(0.85, 0.6, 1);
+      spineRidge.castShadow = true;
+      group.add(spineRidge);
+      const shoulder = new Mesh(
+        new SphereGeometry(0.96, 22, 18),
+        hideMat
+      );
+      shoulder.position.set(0, 1.92, 0.72);
+      shoulder.scale.set(0.95, 1.05, 1);
+      shoulder.castShadow = true;
       group.add(shoulder);
-      const rump = new Mesh(new SphereGeometry(0.85, 16, 12), hideMat);
-      rump.position.set(0, 1.81, -0.82);
+      const rump = new Mesh(
+        new SphereGeometry(0.93, 22, 18),
+        hideMat
+      );
+      rump.position.set(0, 1.84, -0.72);
+      rump.scale.set(0.92, 1.02, 1);
+      rump.castShadow = true;
       group.add(rump);
+      const belly = new Mesh(
+        new CylinderGeometry(0.94, 0.88, 1.25, 22).rotateX(Math.PI / 2),
+        hideMat
+      );
+      belly.position.set(0, 1.48, 0.05);
+      belly.scale.set(0.96, 0.72, 1);
+      belly.castShadow = true;
+      group.add(belly);
+      const neckCollar = new Mesh(
+        new TorusGeometry(0.72, 0.14, 12, 24),
+        hideMat
+      );
+      neckCollar.position.set(0, 1.96, 1.12);
+      neckCollar.rotation.x = 0.28;
+      neckCollar.castShadow = true;
+      group.add(neckCollar);
       const headGroup = new Group();
-      headGroup.position.set(0, 2.1, 1.6);
-      [-0.26, 0.26].forEach((side) => {
-        const dome = new Mesh(new SphereGeometry(0.4, 14, 10), hideMat);
-        dome.position.set(side, 0.2, 0);
-        headGroup.add(dome);
+      headGroup.position.set(0, 2.15, 1.55);
+      [-0.28, 0.28].forEach((side) => {
+        const cranialDome = new Mesh(
+          new SphereGeometry(0.42, 20, 16),
+          hideMat
+        );
+        cranialDome.position.set(side, 0.24, 0.02);
+        cranialDome.scale.set(0.92, 1.1, 1);
+        cranialDome.castShadow = true;
+        headGroup.add(cranialDome);
       });
-      const skull = new Mesh(new BoxGeometry(0.72, 0.72, 0.68), hideMat);
+      const skull = new Mesh(
+        new CylinderGeometry(0.38, 0.32, 0.65, 18).rotateX(Math.PI / 2),
+        hideMat
+      );
+      skull.position.set(0, 0, 0.22);
       headGroup.add(skull);
-      [-0.38, 0.38].forEach((side) => {
-        const eye = new Mesh(new SphereGeometry(0.042, 10, 8), darkMat);
-        eye.position.set(side, 0.08, 0.26);
-        headGroup.add(eye);
+      [-0.34, 0.34].forEach((side) => {
+        const fossa = new Mesh(
+          new SphereGeometry(0.14, 12, 10),
+          this.materials.humanSkinShadow || hideMat
+        );
+        fossa.position.set(side, 0.14, -0.02);
+        fossa.scale.set(0.42, 0.88, 0.72);
+        headGroup.add(fossa);
       });
-      const earL = new Mesh(new BoxGeometry(0.035, 0.82, 0.62), hideMat);
-      earL.position.set(-0.52, 0.05, -0.14);
-      earL.rotation.y = 0.45;
+      [-0.38, 0.38].forEach((side) => {
+        const orbit = new Mesh(
+          new TorusGeometry(0.065, 0.022, 10, 18),
+          hideMat
+        );
+        orbit.position.set(side, 0.08, 0.31);
+        orbit.rotation.y = side * 0.35;
+        headGroup.add(orbit);
+        const eyeWhite = new Mesh(
+          new SphereGeometry(0.04, 12, 10),
+          this.materials.humanEyesWhite
+        );
+        eyeWhite.position.set(side * 1.01, 0.08, 0.32);
+        headGroup.add(eyeWhite);
+        const eye = new Mesh(
+          new SphereGeometry(0.034, 12, 10),
+          this.materials.humanEyesIris
+        );
+        eye.position.set(side * 1.02, 0.08, 0.34);
+        headGroup.add(eye);
+        const pupil = new Mesh(
+          new SphereGeometry(0.016, 8, 8),
+          darkMat
+        );
+        pupil.position.set(side * 1.03, 0.08, 0.36);
+        headGroup.add(pupil);
+        const hl = new Mesh(
+          new SphereGeometry(7e-3, 6, 6),
+          this.materials.humanEyeReflex
+        );
+        hl.position.set(side * 1.03 + 8e-3, 0.09, 0.37);
+        headGroup.add(hl);
+      });
+      const lowerLip = new Mesh(
+        new ConeGeometry(0.14, 0.32, 14).rotateX(Math.PI / 2),
+        hideMat
+      );
+      lowerLip.position.set(0, -0.38, 0.38);
+      lowerLip.scale.set(0.85, 0.65, 1);
+      headGroup.add(lowerLip);
+      const earShapeL = new Shape();
+      earShapeL.moveTo(0, 0.35);
+      earShapeL.bezierCurveTo(-0.15, 0.45, -0.35, 0.42, -0.48, 0.36);
+      earShapeL.bezierCurveTo(-0.58, 0.28, -0.62, 0.15, -0.6, 0.02);
+      earShapeL.bezierCurveTo(-0.58, -0.15, -0.52, -0.32, -0.42, -0.45);
+      earShapeL.bezierCurveTo(-0.32, -0.58, -0.18, -0.62, -0.08, -0.55);
+      earShapeL.bezierCurveTo(-0.02, -0.42, -0.01, -0.18, 0, 0);
+      earShapeL.closePath();
+      const earGeoL = new ExtrudeGeometry(earShapeL, {
+        depth: 0.025,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        steps: 1,
+        bevelSize: 0.015,
+        bevelThickness: 0.015
+      });
+      const earL = new Mesh(earGeoL, earMat);
+      earL.position.set(-0.56, -0.05, -0.12);
+      earL.rotation.set(-0.1, 0.45, -0.1);
+      earL.castShadow = true;
       headGroup.add(earL);
-      const earR = new Mesh(new BoxGeometry(0.035, 0.82, 0.62), hideMat);
-      earR.position.set(0.52, 0.05, -0.14);
-      earR.rotation.y = -0.45;
+      const earShapeR = new Shape();
+      earShapeR.moveTo(0, 0.35);
+      earShapeR.bezierCurveTo(0.15, 0.45, 0.35, 0.42, 0.48, 0.36);
+      earShapeR.bezierCurveTo(0.58, 0.28, 0.62, 0.15, 0.6, 0.02);
+      earShapeR.bezierCurveTo(0.58, -0.15, 0.52, -0.32, 0.42, -0.45);
+      earShapeR.bezierCurveTo(0.32, -0.58, 0.18, -0.62, 0.08, -0.55);
+      earShapeR.bezierCurveTo(0.02, -0.42, 0.01, -0.18, 0, 0);
+      earShapeR.closePath();
+      const earGeoR = new ExtrudeGeometry(earShapeR, {
+        depth: 0.025,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        steps: 1,
+        bevelSize: 0.015,
+        bevelThickness: 0.015
+      });
+      const earR = new Mesh(earGeoR, earMat);
+      earR.position.set(0.56, -0.05, -0.12);
+      earR.rotation.set(-0.1, -0.45, 0.1);
+      earR.castShadow = true;
       headGroup.add(earR);
       const trunkGroup = new Group();
-      trunkGroup.position.set(0, -0.2, 0.38);
+      trunkGroup.position.set(0, -0.22, 0.42);
       const trunkPts = [
         new Vector3(0, 0, 0),
-        new Vector3(0, -0.52, 0.14),
-        new Vector3(0, -1.02, 0.16),
-        new Vector3(0, -1.3, 0.32)
+        new Vector3(0, -0.38, 0.14),
+        new Vector3(0, -0.78, 0.35),
+        new Vector3(0, -1.12, 0.52),
+        new Vector3(0, -1.38, 0.68)
       ];
       const trunkCurve = new CatmullRomCurve3(trunkPts);
-      const trunk = new Mesh(new TubeGeometry(trunkCurve, 16, 0.13, 10, false), hideMat);
-      trunkGroup.add(trunk);
+      const trunkGeo = this.createTaperedTubeGeometry(
+        trunkCurve,
+        28,
+        0.165,
+        0.04,
+        16,
+        true
+      );
+      const trunkMesh = new Mesh(trunkGeo, hideMat);
+      trunkMesh.castShadow = true;
+      trunkGroup.add(trunkMesh);
+      [0.12, 0.24, 0.36, 0.48, 0.6, 0.72, 0.84, 0.96, 1.08, 1.2].forEach((tVal) => {
+        const u = tVal / 1.38;
+        const pt = trunkCurve.getPoint(u);
+        const ringR = 0.165 * (1 - u) + 0.04 * u + 7e-3;
+        const ring = new Mesh(
+          new TorusGeometry(ringR, 8e-3, 8, 14),
+          hideMat
+        );
+        ring.position.copy(pt);
+        ring.rotation.x = Math.PI / 2;
+        trunkGroup.add(ring);
+      });
+      const trunkFinger = new Mesh(
+        new BoxGeometry(0.032, 0.045, 0.045),
+        hideMat
+      );
+      trunkFinger.position.set(0, -1.38, 0.68);
+      trunkFinger.rotation.x = -0.3;
+      trunkGroup.add(trunkFinger);
+      [-0.014, 0.014].forEach((nx) => {
+        const nostril = new Mesh(
+          new SphereGeometry(8e-3, 8, 6),
+          darkMat
+        );
+        nostril.position.set(nx, -1.395, 0.65);
+        trunkGroup.add(nostril);
+      });
       headGroup.add(trunkGroup);
       [-1, 1].forEach((side) => {
+        const tuskSheath = new Mesh(
+          new SphereGeometry(0.12, 12, 10),
+          hideMat
+        );
+        tuskSheath.position.set(side * 0.22, -0.22, 0.3);
+        tuskSheath.scale.set(0.9, 1.2, 1.2);
+        headGroup.add(tuskSheath);
         const tuskCurve = new CatmullRomCurve3([
-          new Vector3(side * 0.22, -0.24, 0.32),
-          new Vector3(side * 0.26, -0.62, 0.66),
-          new Vector3(side * 0.3, -0.68, 0.9)
+          new Vector3(side * 0.22, -0.26, 0.34),
+          new Vector3(side * 0.3, -0.65, 0.68),
+          new Vector3(side * 0.34, -0.72, 1.05)
         ]);
-        const tusk = new Mesh(new TubeGeometry(tuskCurve, 12, 0.042, 8, false), ivoryMat);
-        headGroup.add(tusk);
+        const tuskGeo = this.createTaperedTubeGeometry(
+          tuskCurve,
+          18,
+          0.055,
+          8e-3,
+          10,
+          true
+        );
+        const tuskMesh = new Mesh(tuskGeo, ivoryMat);
+        tuskMesh.castShadow = true;
+        headGroup.add(tuskMesh);
       });
       group.add(headGroup);
-      const legGeo = new CylinderGeometry(0.23, 0.21, 1.65, 16);
       const legs = {};
       const legConfigs = [
-        { name: "legFL", x: -0.52, z: 0.78 },
-        { name: "legFR", x: 0.52, z: 0.78 },
-        { name: "legBL", x: -0.52, z: -0.78 },
-        { name: "legBR", x: 0.52, z: -0.78 }
+        { name: "legFL", x: -0.54, z: 0.78, isFront: true },
+        { name: "legFR", x: 0.54, z: 0.78, isFront: true },
+        { name: "legBL", x: -0.54, z: -0.78, isFront: false },
+        { name: "legBR", x: 0.54, z: -0.78, isFront: false }
       ];
       legConfigs.forEach((c) => {
         const legPivot = new Group();
-        legPivot.position.set(c.x, 1.65, c.z);
-        const limb = new Mesh(legGeo, hideMat);
-        limb.position.set(0, -0.82, 0);
+        legPivot.position.set(c.x, 1.7, c.z);
+        const limb = new Mesh(
+          new CylinderGeometry(0.25, 0.22, 1.68, 20),
+          hideMat
+        );
+        limb.position.set(0, -0.84, 0);
         limb.castShadow = true;
         legPivot.add(limb);
-        [-0.09, 0, 0.09].forEach((tx) => {
-          const nail = new Mesh(new SphereGeometry(0.042, 8, 6), toeMat);
-          nail.position.set(tx, -1.61, 0.19);
+        if (c.isFront) {
+          const elbow = new Mesh(
+            new SphereGeometry(0.14, 12, 10),
+            hideMat
+          );
+          elbow.position.set(0, -0.58, -0.16);
+          elbow.scale.set(0.9, 1.2, 0.8);
+          legPivot.add(elbow);
+        } else {
+          const stifle = new Mesh(
+            new SphereGeometry(0.14, 12, 10),
+            hideMat
+          );
+          stifle.position.set(0, -0.62, 0.16);
+          stifle.scale.set(0.9, 1.2, 0.8);
+          legPivot.add(stifle);
+        }
+        const ankleRoll = new Mesh(
+          new TorusGeometry(0.23, 0.024, 8, 16),
+          hideMat
+        );
+        ankleRoll.position.set(0, -1.52, 0);
+        ankleRoll.rotation.x = Math.PI / 2;
+        legPivot.add(ankleRoll);
+        const footPad = new Mesh(
+          new CylinderGeometry(0.24, 0.25, 0.12, 20),
+          hideMat
+        );
+        footPad.position.set(0, -1.62, 0);
+        legPivot.add(footPad);
+        const nailAngles = c.isFront ? [-0.65, -0.32, 0, 0.32, 0.65] : [-0.5, -0.18, 0.18, 0.5];
+        nailAngles.forEach((ang) => {
+          const nail = new Mesh(
+            new SphereGeometry(0.044, 10, 8),
+            toeMat
+          );
+          const nx = Math.sin(ang) * 0.24;
+          const nz = Math.cos(ang) * 0.24;
+          nail.position.set(nx, -1.64, nz);
+          nail.scale.set(0.9, 0.65, 0.9);
           legPivot.add(nail);
         });
         group.add(legPivot);
         legs[c.name] = legPivot;
       });
+      const tailGroup = new Group();
+      tailGroup.position.set(0, 1.82, -1.18);
+      const tailPts = [
+        new Vector3(0, 0, 0),
+        new Vector3(0, -0.5, -0.05),
+        new Vector3(0, -1.05, -0.02)
+      ];
+      const tailGeo = this.createTaperedTubeGeometry(
+        new CatmullRomCurve3(tailPts),
+        14,
+        0.035,
+        0.016,
+        8,
+        true
+      );
+      tailGroup.add(new Mesh(tailGeo, hideMat));
+      const switchTuft = new Mesh(
+        new ConeGeometry(0.08, 0.35, 10),
+        darkMat
+      );
+      switchTuft.position.set(0, -1.2, -0.02);
+      tailGroup.add(switchTuft);
+      group.add(tailGroup);
       group.userData.type = "elephant";
       group.userData.headGroup = headGroup;
       group.userData.trunk = trunkGroup;
@@ -40789,15 +47624,305 @@ void main() {
       return group;
     }
     // ------------------------------------------------------------------
+    // 4. Indian Spotted Deer / Chital (~48 kg < 150 kg -> Net Scoopable)
+    // Slender elegant cervid anatomy, multi-tined branched antlers, doe eyes, spotted coat
+    // ------------------------------------------------------------------
+    buildDeerMesh(poseMode = "mid", config = {}) {
+      const group = new Group();
+      group.name = "stylizedAnimal";
+      const furMat = this.materials.deerFurFawn;
+      const creamMat = this.materials.deerSpotsCream;
+      const antlerMat = this.materials.deerAntlersDark;
+      const darkMat = this.materials.dogNoseDark;
+      const hoofMat = this.materials.hoofDark;
+      const ribcage = new Mesh(
+        new CylinderGeometry(0.19, 0.16, 0.76, 18).rotateX(Math.PI / 2),
+        furMat
+      );
+      ribcage.position.set(0, 0.72, 0);
+      ribcage.castShadow = true;
+      group.add(ribcage);
+      const bellyBib = new Mesh(
+        new CylinderGeometry(0.14, 0.12, 0.55, 16).rotateX(Math.PI / 2),
+        creamMat
+      );
+      bellyBib.position.set(0, 0.65, 0);
+      bellyBib.scale.set(0.7, 0.5, 1);
+      group.add(bellyBib);
+      [-1, 1].forEach((side) => {
+        for (let s = 0; s < 8; s++) {
+          const spot = new Mesh(
+            new SphereGeometry(0.025, 8, 6),
+            creamMat
+          );
+          spot.position.set(
+            side * 0.185,
+            0.72 + s % 2 * 0.05,
+            -0.28 + s * 0.08
+          );
+          group.add(spot);
+        }
+      });
+      const neck = new Mesh(
+        new CylinderGeometry(0.095, 0.135, 0.44, 14),
+        furMat
+      );
+      neck.position.set(0, 0.94, 0.38);
+      neck.rotation.x = -0.55;
+      neck.castShadow = true;
+      group.add(neck);
+      const throatPatch = new Mesh(
+        new SphereGeometry(0.065, 10, 8),
+        creamMat
+      );
+      throatPatch.position.set(0, 0.98, 0.46);
+      throatPatch.scale.set(0.6, 1.2, 0.7);
+      group.add(throatPatch);
+      const headGroup = new Group();
+      headGroup.position.set(0, 1.15, 0.54);
+      const skull = new Mesh(
+        new SphereGeometry(0.11, 16, 12),
+        furMat
+      );
+      skull.scale.set(0.85, 0.95, 1.2);
+      skull.castShadow = true;
+      headGroup.add(skull);
+      const muzzle = new Mesh(
+        new ConeGeometry(0.075, 0.22, 12).rotateX(Math.PI / 2),
+        furMat
+      );
+      muzzle.position.set(0, -0.035, 0.14);
+      headGroup.add(muzzle);
+      const nose = new Mesh(
+        new SphereGeometry(0.025, 10, 8),
+        darkMat
+      );
+      nose.position.set(0, -0.035, 0.25);
+      headGroup.add(nose);
+      [-0.062, 0.062].forEach((side) => {
+        const eye = new Mesh(
+          new SphereGeometry(0.028, 12, 8),
+          darkMat
+        );
+        eye.position.set(side, 0.038, 0.08);
+        headGroup.add(eye);
+        const catchlight = new Mesh(
+          new SphereGeometry(9e-3, 6, 6),
+          this.materials.humanEyesWhite
+        );
+        catchlight.position.set(side * 1.05, 0.046, 0.102);
+        headGroup.add(catchlight);
+      });
+      [-1, 1].forEach((side) => {
+        const ear = new Mesh(new ConeGeometry(0.05, 0.18, 8), furMat);
+        ear.position.set(side * 0.11, 0.13, -0.03);
+        ear.rotation.set(-0.35, 0, side * -0.65);
+        headGroup.add(ear);
+        const earInner = new Mesh(
+          new ConeGeometry(0.036, 0.15, 8),
+          creamMat
+        );
+        earInner.position.set(side * 0.105, 0.13, -0.02);
+        earInner.rotation.set(-0.35, 0, side * -0.65);
+        headGroup.add(earInner);
+      });
+      [-1, 1].forEach((side) => {
+        const mainBeam = new Mesh(
+          new CylinderGeometry(0.015, 0.022, 0.44, 8),
+          antlerMat
+        );
+        mainBeam.position.set(side * 0.068, 0.25, 0.02);
+        mainBeam.rotation.set(-0.32, side * 0.1, side * 0.22);
+        mainBeam.castShadow = true;
+        headGroup.add(mainBeam);
+        const browTine = new Mesh(
+          new CylinderGeometry(9e-3, 0.013, 0.15, 8),
+          antlerMat
+        );
+        browTine.position.set(side * 0.105, 0.26, 0.07);
+        browTine.rotation.set(0.42, 0, side * 0.35);
+        headGroup.add(browTine);
+        const trezTine = new Mesh(
+          new CylinderGeometry(8e-3, 0.011, 0.12, 8),
+          antlerMat
+        );
+        trezTine.position.set(side * 0.12, 0.42, 0.02);
+        trezTine.rotation.set(-0.15, 0, side * 0.45);
+        headGroup.add(trezTine);
+      });
+      group.add(headGroup);
+      const legs = {};
+      const legConfigs = [
+        { name: "legFL", x: -0.11, z: 0.26 },
+        { name: "legFR", x: 0.11, z: 0.26 },
+        { name: "legBL", x: -0.11, z: -0.26 },
+        { name: "legBR", x: 0.11, z: -0.26 }
+      ];
+      legConfigs.forEach((c) => {
+        const legPivot = new Group();
+        legPivot.position.set(c.x, 0.7, c.z);
+        const limb = new Mesh(
+          new CylinderGeometry(0.034, 0.022, 0.68, 10),
+          furMat
+        );
+        limb.position.set(0, -0.32, 0);
+        limb.castShadow = true;
+        legPivot.add(limb);
+        const hoof = new Mesh(
+          new BoxGeometry(0.046, 0.046, 0.068),
+          hoofMat
+        );
+        hoof.position.set(0, -0.67, 0.01);
+        legPivot.add(hoof);
+        group.add(legPivot);
+        legs[c.name] = legPivot;
+      });
+      group.userData.type = "deer";
+      group.userData.headGroup = headGroup;
+      group.userData.legs = legs;
+      return group;
+    }
+    // ------------------------------------------------------------------
+    // 5. Indian Wild Boar / Sus scrofa cristatus (~95 kg < 150 kg -> Net Scoopable)
+    // Stocky muscular barrel, coarse bristle coat, dorsal crest mane, wedge snout & tusks
+    // ------------------------------------------------------------------
+    buildBoarMesh(poseMode = "mid", config = {}) {
+      const group = new Group();
+      group.name = "stylizedAnimal";
+      const bristleMat = this.materials.boarBristleDark;
+      const darkMat = this.materials.dogNoseDark;
+      const ivoryMat = this.materials.elephantIvory;
+      const hoofMat = this.materials.hoofDark;
+      const torso = new Mesh(
+        new CylinderGeometry(0.24, 0.2, 0.65, 16).rotateX(Math.PI / 2),
+        bristleMat
+      );
+      torso.position.set(0, 0.46, 0);
+      torso.castShadow = true;
+      group.add(torso);
+      const mane = new Mesh(
+        new BoxGeometry(0.04, 0.1, 0.6),
+        bristleMat
+      );
+      mane.position.set(0, 0.64, 0.02);
+      group.add(mane);
+      const headGroup = new Group();
+      headGroup.position.set(0, 0.52, 0.36);
+      const skull = new Mesh(
+        new ConeGeometry(0.16, 0.38, 14).rotateX(Math.PI / 2),
+        bristleMat
+      );
+      skull.position.set(0, -0.04, 0.12);
+      headGroup.add(skull);
+      const snoutDisc = new Mesh(
+        new CylinderGeometry(0.048, 0.052, 0.03, 12).rotateX(Math.PI / 2),
+        darkMat
+      );
+      snoutDisc.position.set(0, -0.04, 0.31);
+      headGroup.add(snoutDisc);
+      [-1, 1].forEach((side) => {
+        const tuskCurve = new CatmullRomCurve3([
+          new Vector3(side * 0.05, -0.06, 0.22),
+          new Vector3(side * 0.08, -0.02, 0.24),
+          new Vector3(side * 0.07, 0.04, 0.23)
+        ]);
+        const tuskGeo = this.createTaperedTubeGeometry(
+          tuskCurve,
+          10,
+          0.016,
+          4e-3,
+          8,
+          true
+        );
+        headGroup.add(new Mesh(tuskGeo, ivoryMat));
+        const eye = new Mesh(
+          new SphereGeometry(0.018, 10, 8),
+          darkMat
+        );
+        eye.position.set(side * 0.09, 0.03, 0.08);
+        headGroup.add(eye);
+        const ear = new Mesh(
+          new ConeGeometry(0.036, 0.1, 8),
+          bristleMat
+        );
+        ear.position.set(side * 0.1, 0.1, -0.04);
+        ear.rotation.set(-0.35, 0, side * -0.55);
+        headGroup.add(ear);
+      });
+      group.add(headGroup);
+      const legs = {};
+      const legConfigs = [
+        { name: "legFL", x: -0.12, z: 0.22 },
+        { name: "legFR", x: 0.12, z: 0.22 },
+        { name: "legBL", x: -0.12, z: -0.22 },
+        { name: "legBR", x: 0.12, z: -0.22 }
+      ];
+      legConfigs.forEach((c) => {
+        const legPivot = new Group();
+        legPivot.position.set(c.x, 0.42, c.z);
+        const limb = new Mesh(
+          new CylinderGeometry(0.055, 0.042, 0.42, 12),
+          bristleMat
+        );
+        limb.position.set(0, -0.21, 0);
+        limb.castShadow = true;
+        legPivot.add(limb);
+        const hoof = new Mesh(
+          new BoxGeometry(0.055, 0.045, 0.075),
+          hoofMat
+        );
+        hoof.position.set(0, -0.42, 0.01);
+        legPivot.add(hoof);
+        group.add(legPivot);
+        legs[c.name] = legPivot;
+      });
+      const tailGroup = new Group();
+      tailGroup.position.set(0, 0.48, -0.32);
+      const tailPts = [
+        new Vector3(0, 0, 0),
+        new Vector3(0, -0.14, -0.04),
+        new Vector3(0, -0.24, -0.02)
+      ];
+      const tailGeo = this.createTaperedTubeGeometry(
+        new CatmullRomCurve3(tailPts),
+        10,
+        0.016,
+        8e-3,
+        8,
+        true
+      );
+      tailGroup.add(new Mesh(tailGeo, bristleMat));
+      group.add(tailGroup);
+      group.userData.type = "boar";
+      group.userData.headGroup = headGroup;
+      group.userData.legs = legs;
+      group.userData.tail = tailGroup;
+      return group;
+    }
+    // ------------------------------------------------------------------
     // Programmatic Obstacle Spawner (Supports Human & Animals in Multiple States)
     // ------------------------------------------------------------------
     spawnObstacle(type = "human", trackProgress = 0, moveOffTrack = null, lateralOffset = null, customMass = null, customName = null, humanPose = "mid") {
       let mesh;
       let name = customName;
       let mass = customMass;
+      const hasGLTF = !!this.loadedModels[type];
+      let gltfMixer = null;
+      if (hasGLTF) {
+        const gltf = this.loadedModels[type];
+        mesh = gltf.scene.clone(true);
+        mesh.name = "gltfObstacle";
+        mesh.userData.type = type;
+        mesh.userData.isGLTF = true;
+        if (gltf.animations && gltf.animations.length > 0) {
+          gltfMixer = new AnimationMixer(mesh);
+          gltfMixer.clipAction(gltf.animations[0]).play();
+          mesh.userData.mixer = gltfMixer;
+        }
+      }
       if (type === "human") {
         const pose2 = humanPose || "mid";
-        mesh = this.buildHumanMesh(pose2);
+        if (!hasGLTF) mesh = this.buildHumanMesh(pose2);
         if (mass === null || mass === void 0) mass = 72;
         if (lateralOffset === null || lateralOffset === void 0) {
           if (pose2 === "enter" || pose2 === 1) lateralOffset = 0.98;
@@ -40806,14 +47931,17 @@ void main() {
           else lateralOffset = 0;
         }
         if (!name) {
-          if (pose2 === "enter" || pose2 === 1) name = "1. Human Entering Track (Leg on Rail, Leg on Ground)";
-          else if (pose2 === "exit" || pose2 === 2) name = "2. Human Exiting Track (Leg on Ground, Leg on Rail)";
-          else if (pose2 === "sudden" || pose2 === 4) name = "4. Sudden Jaywalker on Track (Emergency Dash)";
+          if (pose2 === "enter" || pose2 === 1)
+            name = "1. Human Entering Track (Leg on Rail, Leg on Ground)";
+          else if (pose2 === "exit" || pose2 === 2)
+            name = "2. Human Exiting Track (Leg on Ground, Leg on Rail)";
+          else if (pose2 === "sudden" || pose2 === 4)
+            name = "4. Sudden Jaywalker on Track (Emergency Dash)";
           else name = "3. Human Mid-Track (Between Rails)";
         }
       } else if (type === "dog") {
         const pose2 = humanPose || "mid";
-        mesh = this.buildDogMesh(pose2);
+        if (!hasGLTF) mesh = this.buildDogMesh(pose2);
         if (mass === null || mass === void 0) mass = 22;
         if (lateralOffset === null || lateralOffset === void 0) {
           lateralOffset = pose2 === "sudden" || pose2 === 4 ? 2.8 : 0;
@@ -40821,7 +47949,7 @@ void main() {
         if (!name) name = "Indian Stray Dog (22 kg)";
       } else if (type === "deer") {
         const pose2 = humanPose || "mid";
-        mesh = this.buildDeerMesh(pose2);
+        if (!hasGLTF) mesh = this.buildDeerMesh(pose2);
         if (mass === null || mass === void 0) mass = 48;
         if (lateralOffset === null || lateralOffset === void 0) {
           lateralOffset = pose2 === "sudden" || pose2 === 4 ? 3 : 0;
@@ -40829,7 +47957,7 @@ void main() {
         if (!name) name = "Indian Spotted Deer (48 kg)";
       } else if (type === "cow") {
         const pose2 = humanPose || "mid";
-        mesh = this.buildCowMesh(pose2);
+        if (!hasGLTF) mesh = this.buildCowMesh(pose2);
         if (mass === null || mass === void 0) mass = 360;
         if (lateralOffset === null || lateralOffset === void 0) {
           lateralOffset = pose2 === "sudden" || pose2 === 4 ? 3.2 : 0;
@@ -40837,22 +47965,35 @@ void main() {
         if (!name) name = "Indian Zebu Cow (360 kg)";
       } else if (type === "elephant") {
         const pose2 = humanPose || "mid";
-        mesh = this.buildElephantMesh(pose2);
+        if (!hasGLTF) mesh = this.buildElephantMesh(pose2);
         if (mass === null || mass === void 0) mass = 3800;
-        if (lateralOffset === null || lateralOffset === void 0) lateralOffset = 0;
+        if (lateralOffset === null || lateralOffset === void 0)
+          lateralOffset = 0;
         if (!name) name = "Wild Asian Elephant (3,800 kg)";
+      } else if (type === "boar") {
+        const pose2 = humanPose || "mid";
+        if (!hasGLTF) mesh = this.buildBoarMesh(pose2);
+        if (mass === null || mass === void 0) mass = 95;
+        if (lateralOffset === null || lateralOffset === void 0) {
+          lateralOffset = pose2 === "sudden" || pose2 === 4 ? 3 : 0;
+        }
+        if (!name) name = "Indian Wild Boar (95 kg)";
       } else {
-        mesh = new Object3D();
+        if (!hasGLTF) mesh = new Object3D();
         if (!name) name = "Track Target";
         if (mass === null || mass === void 0) mass = 40;
-        if (lateralOffset === null || lateralOffset === void 0) lateralOffset = 0;
+        if (lateralOffset === null || lateralOffset === void 0)
+          lateralOffset = 0;
       }
       const transform = this.track.getTrackTransform(trackProgress, 0);
       mesh.position.copy(transform.position);
       if (lateralOffset !== 0 && transform.normal) {
         mesh.position.add(transform.normal.clone().multiplyScalar(lateralOffset));
       }
-      mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
+      mesh.quaternion.setFromUnitVectors(
+        new Vector3(0, 0, 1),
+        transform.tangent
+      );
       const pose = humanPose || "mid";
       if (type === "human") {
         if (pose === "enter" || pose === 1) {
@@ -40901,7 +48042,15 @@ void main() {
     }
     // Convenience helper to spawn a human in one of the 4 modes
     spawnHuman(mode = "mid", trackProgress = 0, lateralOffset = null, moveOffTrack = null, customMass = 72, customName = null) {
-      return this.spawnObstacle("human", trackProgress, moveOffTrack, lateralOffset, customMass, customName, mode);
+      return this.spawnObstacle(
+        "human",
+        trackProgress,
+        moveOffTrack,
+        lateralOffset,
+        customMass,
+        customName,
+        mode
+      );
     }
     // Spawns a human obstacle ahead of the moving train
     spawnHumanAhead(mode = "mid", trainProgress = 0, trackLength = 3600, distanceMeters = null, moveOffTrack = null) {
@@ -40912,12 +48061,28 @@ void main() {
       }
       const deltaProgress = dist / actualTrackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      return this.spawnObstacle("human", targetProgress, moveOffTrack, null, 72, null, mode);
+      return this.spawnObstacle(
+        "human",
+        targetProgress,
+        moveOffTrack,
+        null,
+        72,
+        null,
+        mode
+      );
     }
     spawnAheadOfTrain(trainProgress, trackLength, type = "human", distanceMeters = 85, moveOffTrack = null, customMass = null, customName = null) {
       const deltaProgress = distanceMeters / trackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      return this.spawnObstacle(type, targetProgress, moveOffTrack, 0, customMass, customName, "mid");
+      return this.spawnObstacle(
+        type,
+        targetProgress,
+        moveOffTrack,
+        0,
+        customMass,
+        customName,
+        "mid"
+      );
     }
     spawnBesideCoach(trainProgress, trackLength, coachIndex = 1, lateralOffset = 2.4) {
       const locoLen = 20.5;
@@ -40926,7 +48091,15 @@ void main() {
       const distBack = locoLen / 2 + couplerGap + coachLen / 2 + coachIndex * (coachLen + couplerGap);
       const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
       const coachProgress = (trainProgress - distBack / actualTrackLength + 1) % 1;
-      return this.spawnObstacle("human", coachProgress, true, lateralOffset, 72, "Coach Flank Human (2-3m)", "enter");
+      return this.spawnObstacle(
+        "human",
+        coachProgress,
+        true,
+        lateralOffset,
+        72,
+        "Coach Flank Human (2-3m)",
+        "enter"
+      );
     }
     // Clear all obstacles from track
     clearAllObstacles() {
@@ -41045,7 +48218,15 @@ void main() {
       }
       const deltaProgress = dist / actualTrackLength;
       const targetProgress = (trainProgress + deltaProgress) % 1;
-      const obs = this.spawnObstacle(type, targetProgress, moveOffTrack, latOffset, mass, name, mode);
+      const obs = this.spawnObstacle(
+        type,
+        targetProgress,
+        moveOffTrack,
+        latOffset,
+        mass,
+        name,
+        mode
+      );
       obs.scenarioIndex = index;
       obs.isScenario = true;
       obs.isSuddenScenario = isSuddenScenario;
@@ -41186,9 +48367,7 @@ void main() {
         fallbackOrigin.y += 0.5;
         fallbackOrigin.z += 10.5;
       } else {
-        fallbackOrigin.copy(
-          this.track.getTrackTransform(obs.progress, 0).position
-        ).sub(
+        fallbackOrigin.copy(this.track.getTrackTransform(obs.progress, 0).position).sub(
           this.track.getTrackTransform(obs.progress, 0).tangent.clone().normalize().multiplyScalar(obs.forwardMeters || 60)
         );
         fallbackOrigin.y += 0.5;
@@ -41306,12 +48485,17 @@ void main() {
       this.fxGroup.add(flare);
       const targetFlash = new PointLight(3718648, 5, 10);
       targetFlash.position.copy(targetPos);
-      targetFlash.userData = { isSideTargetLight: true, obs, targetOffset };
+      targetFlash.userData = {
+        isSideTargetLight: true,
+        obs,
+        targetOffset
+      };
       this.fxGroup.add(targetFlash);
     }
     // Coach Side Electric Shock Perimeter Guard: checks 2-3m proximity alongside coaches
     checkCoachSideProximity(train, audio) {
-      if (!train || !train.coachSideEmitters || train.coachSideEmitters.length === 0) return;
+      if (!train || !train.coachSideEmitters || train.coachSideEmitters.length === 0)
+        return;
       const obsWorldPos = new Vector3();
       for (let i = 0; i < this.obstacles.length; i++) {
         const obs = this.obstacles[i];
@@ -41364,6 +48548,9 @@ void main() {
       this.obstacles.forEach((obs) => {
         if (obs.isCollected || !obs.mesh || !obs.mesh.userData) return;
         const ud = obs.mesh.userData;
+        if (ud.mixer) {
+          ud.mixer.update(dt);
+        }
         const dist = obs.forwardMeters !== void 0 ? obs.forwardMeters : 100;
         const isTrainClose = dist < 95;
         const isUrgent = dist < 50;
@@ -41381,12 +48568,20 @@ void main() {
               ud.faceData.tex.needsUpdate = true;
               ud.faceData.lastBlink = blinkFactor;
             }
+            if (ud.eyelidL && ud.eyelidR) {
+              ud.eyelidL.rotation.x = 0.2 + blinkFactor * 0.7;
+              ud.eyelidR.rotation.x = 0.2 + blinkFactor * 0.7;
+            }
           }
           if (obs.isSuddenEmerging) {
             obs.suddenTimer = (obs.suddenTimer || 0) + dt;
             const duration = 0.45;
             const p = Math.min(1, obs.suddenTimer / duration);
-            const curOffset = MathUtils.lerp(obs.startLateralOffset || 2.4, 0, p);
+            const curOffset = MathUtils.lerp(
+              obs.startLateralOffset || 2.4,
+              0,
+              p
+            );
             obs.lateralOffset = curOffset;
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const normal = transform.normal ? transform.normal.clone() : new Vector3(1, 0, 0);
@@ -41394,30 +48589,40 @@ void main() {
             if (p < 1) {
               const runCycle = obs.suddenTimer * 18;
               if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
-              if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0, -Math.sin(runCycle) * 1.1);
+              if (ud.lowerLegL)
+                ud.lowerLegL.rotation.x = -Math.max(0, -Math.sin(runCycle) * 1.1);
               if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
-              if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0, Math.sin(runCycle) * 1.1);
+              if (ud.lowerLegR)
+                ud.lowerLegR.rotation.x = -Math.max(0, Math.sin(runCycle) * 1.1);
               if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
               if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
               if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.25;
             } else {
               obs.isSuddenEmerging = false;
               this.applyHumanPose(obs.mesh, "sudden");
-              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                transform.tangent
+              );
               obs.mesh.rotateY(Math.PI);
             }
             return;
           }
           if (obs.isSideRepelled && obs.sideRepelDir) {
             const repelT = this.animTime - obs.sideRepelStartTime;
-            obs.mesh.position.add(obs.sideRepelDir.clone().multiplyScalar(4 * dt));
+            obs.mesh.position.add(
+              obs.sideRepelDir.clone().multiplyScalar(4 * dt)
+            );
             if (repelT < 0.4) {
               obs.mesh.position.y += Math.sin(repelT / 0.4 * Math.PI) * 0.18;
               if (ud.headGroup) ud.headGroup.rotation.x = -0.35;
               if (ud.armL) ud.armL.rotation.set(-1.1, 0, -0.6);
               if (ud.armR) ud.armR.rotation.set(-1.1, 0, 0.6);
             } else {
-              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), obs.sideRepelDir);
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                obs.sideRepelDir
+              );
               const runCycle = this.animTime * 14 % (Math.PI * 2);
               if (ud.armL) ud.armL.rotation.x = Math.sin(runCycle) * 0.9;
               if (ud.armR) ud.armR.rotation.x = -Math.sin(runCycle) * 0.9;
@@ -41435,11 +48640,18 @@ void main() {
             const fleeDir = obs.fleeDirection || 1;
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const tangent = transform.tangent.clone().normalize();
-            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+            const sideDir = new Vector3(
+              -tangent.z,
+              0,
+              tangent.x
+            ).normalize();
             if (obs.moveOffTrackOnShock) {
               const fleeDist = Math.min(5.5, fleeT * 4.2);
               const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.28, fleeDist * 0.08));
+              lateralPos.y = Math.max(
+                0.05,
+                transform.position.y - Math.min(0.28, fleeDist * 0.08)
+              );
               obs.mesh.position.copy(lateralPos);
               if (fleeDist >= 2.5) {
                 obs.isCleared = true;
@@ -41451,19 +48663,33 @@ void main() {
                 if (ud.armR) ud.armR.rotation.set(-0.8, 0, 0.6);
               } else if (fleeT < 2.5) {
                 const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
+                obs.mesh.quaternion.setFromUnitVectors(
+                  new Vector3(0, 0, 1),
+                  fleeHeading
+                );
                 const runCycle = (fleeT - 0.35) * 14;
                 if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
-                if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0, -Math.sin(runCycle) * 1.1);
+                if (ud.lowerLegL)
+                  ud.lowerLegL.rotation.x = -Math.max(
+                    0,
+                    -Math.sin(runCycle) * 1.1
+                  );
                 if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
-                if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0, Math.sin(runCycle) * 1.1);
+                if (ud.lowerLegR)
+                  ud.lowerLegR.rotation.x = -Math.max(
+                    0,
+                    Math.sin(runCycle) * 1.1
+                  );
                 if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
                 if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
                 if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.22;
                 if (ud.headGroup) ud.headGroup.rotation.x = 0.1;
               } else {
                 const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), safeHeading);
+                obs.mesh.quaternion.setFromUnitVectors(
+                  new Vector3(0, 0, 1),
+                  safeHeading
+                );
                 if (ud.headGroup) {
                   ud.headGroup.rotation.y = -fleeDir * 0.8;
                   ud.headGroup.rotation.x = -0.1;
@@ -41479,7 +48705,9 @@ void main() {
               obs.isCleared = false;
               const basePos = transform.position.clone();
               if (obs.lateralOffset !== 0 && transform.normal) {
-                basePos.add(transform.normal.clone().multiplyScalar(obs.lateralOffset));
+                basePos.add(
+                  transform.normal.clone().multiplyScalar(obs.lateralOffset)
+                );
               }
               if (fleeT < 0.35) {
                 basePos.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.18;
@@ -41487,15 +48715,29 @@ void main() {
               obs.mesh.position.copy(basePos);
               const shiver = Math.sin(localT * 25) * 0.04;
               if (ud.headGroup) {
-                ud.headGroup.rotation.set(-0.25 + shiver, Math.sin(localT * 8) * 0.08, 0);
+                ud.headGroup.rotation.set(
+                  -0.25 + shiver,
+                  Math.sin(localT * 8) * 0.08,
+                  0
+                );
               }
               if (ud.torsoGroup) {
                 ud.torsoGroup.rotation.x = -0.15 + shiver;
                 ud.torsoGroup.rotation.z = Math.sin(localT * 12) * 0.03;
               }
-              if (ud.armL) ud.armL.rotation.set(-0.75 + Math.sin(localT * 14) * 0.1, 0, -0.25);
+              if (ud.armL)
+                ud.armL.rotation.set(
+                  -0.75 + Math.sin(localT * 14) * 0.1,
+                  0,
+                  -0.25
+                );
               if (ud.forearmL) ud.forearmL.rotation.x = -1.2;
-              if (ud.armR) ud.armR.rotation.set(-0.65 + Math.sin(localT * 8) * 0.08, 0, 0.25);
+              if (ud.armR)
+                ud.armR.rotation.set(
+                  -0.65 + Math.sin(localT * 8) * 0.08,
+                  0,
+                  0.25
+                );
               if (ud.forearmR) ud.forearmR.rotation.x = -1.1;
               if (ud.legL) ud.legL.rotation.x = 0.38 + shiver * 0.5;
               if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.65;
@@ -41506,7 +48748,11 @@ void main() {
           }
           const breath = Math.sin(localT * 2.2);
           if (ud.torsoGroup) {
-            ud.torsoGroup.scale.set(1 + 0.015 * breath, 1 + 8e-3 * breath, 1 + 0.015 * breath);
+            ud.torsoGroup.scale.set(
+              1 + 0.015 * breath,
+              1 + 8e-3 * breath,
+              1 + 0.015 * breath
+            );
           }
           const pose = obs.humanPose;
           if (pose === "enter" || pose === 1) {
@@ -41532,7 +48778,12 @@ void main() {
             if (isTrainClose) {
               if (ud.headGroup) ud.headGroup.rotation.set(0.04, -0.65, 0);
             } else {
-              if (ud.headGroup) ud.headGroup.rotation.set(0.1, 0.28 + Math.sin(localT * 0.6) * 0.12, 0);
+              if (ud.headGroup)
+                ud.headGroup.rotation.set(
+                  0.1,
+                  0.28 + Math.sin(localT * 0.6) * 0.12,
+                  0
+                );
             }
           } else if (pose === "exit" || pose === 2) {
             const stepRhythm = localT * 1.6;
@@ -41557,30 +48808,66 @@ void main() {
             if (isTrainClose) {
               if (ud.headGroup) ud.headGroup.rotation.set(0.04, -0.75, 0);
             } else {
-              if (ud.headGroup) ud.headGroup.rotation.set(0.1, -0.35 + Math.sin(localT * 0.7) * 0.1, 0);
+              if (ud.headGroup)
+                ud.headGroup.rotation.set(
+                  0.1,
+                  -0.35 + Math.sin(localT * 0.7) * 0.1,
+                  0
+                );
             }
           } else if (pose === "sudden" || pose === 4) {
             const hyperBreath = Math.sin(localT * 10);
             if (ud.torsoGroup) {
-              ud.torsoGroup.scale.set(1 + 0.03 * hyperBreath, 1 + 0.015 * hyperBreath, 1 + 0.03 * hyperBreath);
+              ud.torsoGroup.scale.set(
+                1 + 0.03 * hyperBreath,
+                1 + 0.015 * hyperBreath,
+                1 + 0.03 * hyperBreath
+              );
               ud.torsoGroup.rotation.x = -0.3 + Math.sin(localT * 14) * 0.02;
             }
             if (ud.headGroup) {
               ud.headGroup.rotation.x = -0.32 + Math.sin(localT * 12) * 0.03;
               ud.headGroup.rotation.y = Math.sin(localT * 6) * 0.06;
             }
-            if (ud.armL) ud.armL.rotation.set(-1.2 + Math.sin(localT * 8) * 0.12, 0.15, -0.55);
-            if (ud.armR) ud.armR.rotation.set(-1.15 - Math.sin(localT * 8) * 0.12, -0.15, 0.55);
+            if (ud.armL)
+              ud.armL.rotation.set(
+                -1.2 + Math.sin(localT * 8) * 0.12,
+                0.15,
+                -0.55
+              );
+            if (ud.armR)
+              ud.armR.rotation.set(
+                -1.15 - Math.sin(localT * 8) * 0.12,
+                -0.15,
+                0.55
+              );
             if (ud.lowerLegL) ud.lowerLegL.position.set(0, -0.4, 0.012);
             if (ud.lowerLegR) ud.lowerLegR.position.set(0, -0.4, 0.012);
           } else {
             if (!isTrainClose) {
               const lookYaw = Math.sin(localT * 0.35) * 0.35 + Math.sin(localT * 0.9) * 0.12;
-              if (ud.headGroup) ud.headGroup.rotation.set(0.05 + Math.sin(localT * 0.6) * 0.05, lookYaw, 0);
-              if (ud.armL) ud.armL.rotation.x = 0.05 + Math.sin(localT * 0.8) * 0.06;
-              if (ud.armR) ud.armR.rotation.x = 0.05 - Math.sin(localT * 0.7) * 0.06;
-              if (ud.legL) ud.legL.rotation.set(0.02 + Math.sin(localT * 1.2) * 0.03, 0, -0.02);
-              if (ud.legR) ud.legR.rotation.set(-0.02 - Math.sin(localT * 1.2) * 0.03, 0, 0.02);
+              if (ud.headGroup)
+                ud.headGroup.rotation.set(
+                  0.05 + Math.sin(localT * 0.6) * 0.05,
+                  lookYaw,
+                  0
+                );
+              if (ud.armL)
+                ud.armL.rotation.x = 0.05 + Math.sin(localT * 0.8) * 0.06;
+              if (ud.armR)
+                ud.armR.rotation.x = 0.05 - Math.sin(localT * 0.7) * 0.06;
+              if (ud.legL)
+                ud.legL.rotation.set(
+                  0.02 + Math.sin(localT * 1.2) * 0.03,
+                  0,
+                  -0.02
+                );
+              if (ud.legR)
+                ud.legR.rotation.set(
+                  -0.02 - Math.sin(localT * 1.2) * 0.03,
+                  0,
+                  0.02
+                );
             } else {
               const wave = Math.sin(localT * 9) * 0.45;
               if (ud.headGroup) ud.headGroup.rotation.set(-0.25, 0, 0);
@@ -41604,7 +48891,11 @@ void main() {
             const duration = 0.52;
             const p = Math.min(1, obs.suddenTimer / duration);
             const easeP = Math.sin(p * Math.PI * 0.5);
-            const curOffset = MathUtils.lerp(obs.startLateralOffset || 3, 0, easeP);
+            const curOffset = MathUtils.lerp(
+              obs.startLateralOffset || 3,
+              0,
+              easeP
+            );
             obs.lateralOffset = curOffset;
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const normal = transform.normal ? transform.normal.clone() : new Vector3(1, 0, 0);
@@ -41613,14 +48904,21 @@ void main() {
               const speedScale = ud.type === "dog" ? 22 : ud.type === "deer" ? 18 : ud.type === "cow" ? 14 : 8;
               const runCycle = obs.suddenTimer * speedScale;
               if (ud.legs) {
-                if (ud.legs.legFL) ud.legs.legFL.rotation.x = Math.sin(runCycle) * 0.6;
-                if (ud.legs.legBR) ud.legs.legBR.rotation.x = Math.sin(runCycle) * 0.6;
-                if (ud.legs.legFR) ud.legs.legFR.rotation.x = -Math.sin(runCycle) * 0.6;
-                if (ud.legs.legBL) ud.legs.legBL.rotation.x = -Math.sin(runCycle) * 0.6;
+                if (ud.legs.legFL)
+                  ud.legs.legFL.rotation.x = Math.sin(runCycle) * 0.6;
+                if (ud.legs.legBR)
+                  ud.legs.legBR.rotation.x = Math.sin(runCycle) * 0.6;
+                if (ud.legs.legFR)
+                  ud.legs.legFR.rotation.x = -Math.sin(runCycle) * 0.6;
+                if (ud.legs.legBL)
+                  ud.legs.legBL.rotation.x = -Math.sin(runCycle) * 0.6;
               }
             } else {
               obs.isSuddenEmerging = false;
-              obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), transform.tangent);
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                transform.tangent
+              );
               obs.mesh.rotateY(Math.PI * 0.75);
               if (ud.legs) {
                 Object.values(ud.legs).forEach((l) => {
@@ -41635,11 +48933,18 @@ void main() {
             const fleeDir = obs.fleeDirection || 1;
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const tangent = transform.tangent.clone().normalize();
-            const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+            const sideDir = new Vector3(
+              -tangent.z,
+              0,
+              tangent.x
+            ).normalize();
             if (obs.moveOffTrackOnShock) {
               const fleeDist = Math.min(6.8, fleeT * 5);
               const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
-              lateralPos.y = Math.max(0.05, transform.position.y - Math.min(0.28, fleeDist * 0.08));
+              lateralPos.y = Math.max(
+                0.05,
+                transform.position.y - Math.min(0.28, fleeDist * 0.08)
+              );
               obs.mesh.position.copy(lateralPos);
               if (fleeDist >= 2.8) {
                 obs.isCleared = true;
@@ -41649,13 +48954,20 @@ void main() {
                 if (ud.headGroup) ud.headGroup.rotation.y = -fleeDir * 0.4;
               } else if (fleeT < 2.5) {
                 const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), fleeHeading);
+                obs.mesh.quaternion.setFromUnitVectors(
+                  new Vector3(0, 0, 1),
+                  fleeHeading
+                );
                 const runCycle = (fleeT - 0.35) * (ud.type === "dog" ? 24 : ud.type === "deer" ? 20 : 12);
                 if (ud.legs) {
-                  if (ud.legs.legFL) ud.legs.legFL.rotation.x = Math.sin(runCycle) * 0.75;
-                  if (ud.legs.legBR) ud.legs.legBR.rotation.x = Math.sin(runCycle) * 0.75;
-                  if (ud.legs.legFR) ud.legs.legFR.rotation.x = -Math.sin(runCycle) * 0.75;
-                  if (ud.legs.legBL) ud.legs.legBL.rotation.x = -Math.sin(runCycle) * 0.75;
+                  if (ud.legs.legFL)
+                    ud.legs.legFL.rotation.x = Math.sin(runCycle) * 0.75;
+                  if (ud.legs.legBR)
+                    ud.legs.legBR.rotation.x = Math.sin(runCycle) * 0.75;
+                  if (ud.legs.legFR)
+                    ud.legs.legFR.rotation.x = -Math.sin(runCycle) * 0.75;
+                  if (ud.legs.legBL)
+                    ud.legs.legBL.rotation.x = -Math.sin(runCycle) * 0.75;
                 }
               } else {
                 if (ud.legs) {
@@ -41669,7 +48981,8 @@ void main() {
           }
           if (ud.type === "dog") {
             if (ud.tail) ud.tail.rotation.y = Math.sin(localT * 8) * 0.35;
-            if (ud.headGroup) ud.headGroup.rotation.y = Math.sin(localT * 1.5) * 0.2;
+            if (ud.headGroup)
+              ud.headGroup.rotation.y = Math.sin(localT * 1.5) * 0.2;
             if (isTrainClose && ud.headGroup) ud.headGroup.rotation.x = -0.25;
           } else if (ud.type === "deer") {
             if (ud.headGroup) {
@@ -41678,7 +48991,11 @@ void main() {
           } else if (ud.type === "cow") {
             if (ud.tail) ud.tail.rotation.z = Math.sin(localT * 2.2) * 0.4;
             if (ud.headGroup) {
-              ud.headGroup.rotation.set(Math.sin(localT * 1.2) * 0.08, Math.sin(localT * 0.6) * 0.12, 0);
+              ud.headGroup.rotation.set(
+                Math.sin(localT * 1.2) * 0.08,
+                Math.sin(localT * 0.6) * 0.12,
+                0
+              );
             }
           } else if (ud.type === "elephant") {
             if (ud.trunk) {
@@ -41686,7 +49003,8 @@ void main() {
               ud.trunk.rotation.z = Math.sin(localT * 0.9) * 0.1;
             }
             if (ud.earL) ud.earL.rotation.y = 0.45 + Math.sin(localT * 1) * 0.2;
-            if (ud.earR) ud.earR.rotation.y = -0.45 - Math.sin(localT * 1) * 0.2;
+            if (ud.earR)
+              ud.earR.rotation.y = -0.45 - Math.sin(localT * 1) * 0.2;
             if (ud.headGroup) {
               ud.headGroup.rotation.y = Math.sin(localT * 0.5) * 0.1;
             }
@@ -41816,7 +49134,11 @@ void main() {
                 if (closestObstacle.mesh && closestObstacle.mesh.parent) {
                   closestObstacle.mesh.parent.remove(closestObstacle.mesh);
                 }
-                if (captureNet) captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+                if (captureNet)
+                  captureNet.collectObstacle(
+                    closestObstacle.mesh,
+                    closestObstacle
+                  );
                 closestObstacle.isCollected = true;
                 if (audio) audio.playRescueSuccessChime();
                 this.telemetry.collectedCount++;
@@ -41879,7 +49201,11 @@ void main() {
                   if (closestObstacle.mesh && closestObstacle.mesh.parent) {
                     closestObstacle.mesh.parent.remove(closestObstacle.mesh);
                   }
-                  if (captureNet) captureNet.collectObstacle(closestObstacle.mesh, closestObstacle);
+                  if (captureNet)
+                    captureNet.collectObstacle(
+                      closestObstacle.mesh,
+                      closestObstacle
+                    );
                   closestObstacle.isCollected = true;
                   if (audio) audio.playRescueSuccessChime();
                   this.telemetry.collectedCount++;
