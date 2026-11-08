@@ -165,7 +165,7 @@
           <span class="sensor-badge active" id="badge-shock"
             >⚡ 4x Front Senders</span
           >
-          <span class="sensor-badge active" id="badge-side-guard"
+          <span class="sensor-badge active" id="badge-side-guard" title="Coach flank directional power sources (2-3m repulsion guard)"
             >⚡ Coach Side Guards (2-3m)</span
           >
           <span class="sensor-badge active" id="badge-net"
@@ -291,6 +291,7 @@
             ⚠️ 9. Cow Sudden (360kg > 150kg Net Locked)
           </button>
         </div>
+
         <div class="kavach-spawner-grid">
           <button
             class="spawn-btn clear"
@@ -308,7 +309,7 @@
         class="floating-console-container hud-interactive"
         id="floating-console-container"
       >
-        <!-- Tier 0: Scenario Stepper Bar (Apply 1-by-1 Scenarios 1 through 9) -->
+        <!-- Tier 0: Scenario Stepper Bar (Apply 1-by-1 Scenarios 1 through 10) -->
         <div class="scenario-stepper-bar">
           <span class="scenario-label">SCENARIOS:</span>
           <button class="scenario-nav-btn" id="btn-scen-prev" title="Previous Scenario [Key []">◀ PREV</button>
@@ -321,6 +322,7 @@
           <button class="scenario-btn" id="btn-scen-7" data-scenario="7" title="7. Indian Cow (360kg: 800m-80m Electricity Only, Net Locked) [Key 7]">🐄 7. COW</button>
           <button class="scenario-btn" id="btn-scen-8" data-scenario="8" title="8. Wild Elephant (3,800kg: Quad Electricity Only, Net Locked) [Key 8]">🐘 8. ELEPHANT</button>
           <button class="scenario-btn hazard" id="btn-scen-9" data-scenario="9" title="9. Cow Sudden (>150kg: Net Locked Hazard, No Electricity, E-Brake) [Key 9]">⚠️ 9. COW SUDDEN</button>
+          <button class="scenario-btn" id="btn-scen-10" data-scenario="10" title="10. Flank Human & Animal: 2-3M Coach Power Source Repel [Key 0]">⚡ 10. SIDE 2-3M</button>
           <button class="scenario-nav-btn" id="btn-scen-next" title="Next Scenario [Key ]]">NEXT ▶</button>
           <div class="scenario-sep"></div>
           <button class="scenario-action-btn cam" id="btn-scen-cam" title="View Target Head-to-Toe in RX TARGET View">🎥 RX TARGET</button>
@@ -631,6 +633,10 @@
           <span class="kbd-badge">9</span>
         </div>
         <div class="shortcut-row">
+          <span class="shortcut-desc">Apply Scenario 10: Coach Flank Human & Animal (2-3m Side Power Source Repel)</span>
+          <span class="kbd-badge">0</span>
+        </div>
+        <div class="shortcut-row">
           <span class="shortcut-desc">Step Previous / Next Scenario (1-by-1)</span>
           <span class="kbd-badge">[ / ]</span>
         </div>
@@ -658,6 +664,6 @@
       });
     </script>
     <!-- Main Self-Contained Bundle with Cache-Buster -->
-    <script src="bundle.js?v=20261107_v5"></script>
+    <script src="bundle.js?v=20261108_2to3m_guard_v2"></script>
   </body>
 </html>

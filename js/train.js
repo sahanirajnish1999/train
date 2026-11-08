@@ -1439,11 +1439,20 @@ export class TrainModel {
   // - Down-Left (buffer beam left)
   // - Down-Right (buffer beam right)
   // ---------------------------------------------------------
-  createShockSenderDevice(id, position, rotation, label = '') {
+  createShockSenderDevice(id, position, rotation, label = '', scale = 1.0) {
     const devGroup = new THREE.Group();
     devGroup.name = `shockSender_${id}`;
     devGroup.position.copy(position);
-    if (rotation) devGroup.rotation.copy(rotation);
+    if (rotation) {
+      if (rotation.isEuler) {
+        devGroup.rotation.copy(rotation);
+      } else if (rotation.isQuaternion) {
+        devGroup.quaternion.copy(rotation);
+      }
+    }
+    if (scale !== 1.0) {
+      devGroup.scale.setScalar(scale);
+    }
 
     // 1. Heavy Base Mounting Bracket / Flange (Gunmetal alloy)
     const baseMat = new THREE.MeshStandardMaterial({
@@ -1526,9 +1535,16 @@ export class TrainModel {
     devGroup.add(nozzle);
 
     // Polished Conductive Cyan Bezel Rim
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      metalness: 0.7,
+      roughness: 0.3,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.25
+    });
     const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(0.15, 0.014, 8, 20),
-      new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.7, roughness: 0.3 })
+      new THREE.TorusGeometry(0.15, 0.016, 12, 28),
+      rimMat
     );
     rim.position.set(0, 0, 0.42);
     devGroup.add(rim);
@@ -1536,7 +1552,7 @@ export class TrainModel {
     // 5. Plasma Core Electrode (Glowing cyan cathode)
     const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     const core = new THREE.Mesh(
-      new THREE.SphereGeometry(0.045, 12, 12),
+      new THREE.SphereGeometry(0.046, 14, 14),
       plasmaMat
     );
     core.position.set(0, 0, 0.32);
@@ -1554,7 +1570,9 @@ export class TrainModel {
       group: devGroup,
       tip,
       core,
-      mat: plasmaMat
+      rim,
+      mat: plasmaMat,
+      rimMat: rimMat
     };
   }
 
@@ -1581,10 +1599,18 @@ export class TrainModel {
       if (e.core && e.mat) {
         if (isActive && intensity > 0.05) {
           e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
-          e.core.scale.setScalar(1.0 + intensity * 0.8);
+          e.core.scale.setScalar(1.0 + intensity * 0.9);
+          if (e.rimMat) {
+            e.rimMat.emissive.setHex(intensity > 0.5 ? 0x38bdf8 : 0x0284c7);
+            e.rimMat.emissiveIntensity = 0.25 + intensity * 2.2;
+          }
         } else {
           e.mat.color.setHex(0x38bdf8);
           e.core.scale.setScalar(1.0);
+          if (e.rimMat) {
+            e.rimMat.emissive.setHex(0x0284c7);
+            e.rimMat.emissiveIntensity = 0.25;
+          }
         }
       }
     });
@@ -1592,12 +1618,14 @@ export class TrainModel {
 
   // ---------------------------------------------------------
   // Coach Side Electric Shock Mechanisms (2-3m Perimeter Guard)
-  // Installed along both flanks (Left & Right) of each coach car
+  // Installed along both flanks (Left & Right) of every coach car
   // ---------------------------------------------------------
   buildCoachSideShockMechanisms(coachGroup, length, width, coachIndex = 0) {
     const halfW = width / 2; // ~1.62m
-    const zOffsets = [-8.8, -3.2, 3.2, 8.8]; // 4 emitter stations along coach length
-    const ySill = 1.05; // Lower coach waistband/chassis sill
+    // 7 High-Powered Directional Power Source Stations along each coach flank (every 3.2m along 23.5m length)
+    const zOffsets = [-9.6, -6.4, -3.2, 0.0, 3.2, 6.4, 9.6];
+    const ySill = 0.72; // Placed down along lower coach chassis solebar / underframe skirt
+    const devScale = 0.55; // Compact miniaturized scale (~55% size)
 
     const conduitMat = new THREE.MeshStandardMaterial({
       color: 0x1e293b,
@@ -1609,25 +1637,15 @@ export class TrainModel {
       metalness: 0.2,
       roughness: 0.4
     });
-    const insulatorMat = new THREE.MeshStandardMaterial({
-      color: 0x78350f, // Terracotta high-voltage insulator
-      roughness: 0.25,
-      metalness: 0.15
-    });
-    const alloyMat = new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      metalness: 0.88,
-      roughness: 0.25
-    });
 
     [-1, 1].forEach(sideSign => {
       const isLeft = sideSign < 0;
       const sideName = isLeft ? 'left' : 'right';
-      const sideX = sideSign * (halfW + 0.02);
+      const sideX = sideSign * (halfW + 0.015);
 
-      // 1. High-Voltage Perimeter Warning Conduit Rail (runs full length of coach)
+      // 1. High-Voltage Perimeter Warning Conduit Rail (runs full length of coach along lower solebar)
       const conduit = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, 0.05, length - 1.8),
+        new THREE.BoxGeometry(0.035, 0.045, length - 1.2),
         conduitMat
       );
       conduit.position.set(sideX, ySill, 0);
@@ -1635,76 +1653,43 @@ export class TrainModel {
 
       // Yellow/Black Danger Hazard Trim
       const hazardStrip = new THREE.Mesh(
-        new THREE.BoxGeometry(0.042, 0.02, length - 2.0),
+        new THREE.BoxGeometry(0.038, 0.018, length - 1.4),
         hazardMat
       );
       hazardStrip.position.set(sideX + sideSign * 0.002, ySill, 0);
       coachGroup.add(hazardStrip);
 
-      // 2. High-Voltage Directional Emitter Pods along coach flank
+      // 2. Authentic Directional Power Source Devices (Concentric Insulator + Cyan Torus Rim + Plasma Cathode)
       zOffsets.forEach((z, podIdx) => {
-        const podGroup = new THREE.Group();
-        podGroup.name = `coach_${coachIndex}_side_${sideName}_pod_${podIdx}`;
-        podGroup.position.set(sideX, ySill, z);
-        podGroup.rotation.z = sideSign * -0.20; // Angled slightly down towards trespassers
+        const id = `coach_${coachIndex}_${sideName}_${podIdx}`;
+        const pos = new THREE.Vector3(sideX, ySill, z);
 
-        // Heavy Base Mounting Flange
-        const flange = new THREE.Mesh(
-          new THREE.BoxGeometry(0.03, 0.16, 0.22),
+        // Point outward from coach flank with a slight 2.5° downward aim to target track intrusions
+        const dir = new THREE.Vector3(sideSign, -0.04, 0).normalize();
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+
+        const sender = this.createShockSenderDevice(
+          id,
+          pos,
+          quat,
+          `Coach #${coachIndex + 1} ${sideName.toUpperCase()} Power Source #${podIdx + 1}`,
+          devScale
+        );
+        sender.coachIndex = coachIndex;
+        sender.side = sideName;
+        sender.podIndex = podIdx;
+
+        // Heavy industrial alloy backing bracket connecting device to coach wall
+        const bracket = new THREE.Mesh(
+          new THREE.BoxGeometry(0.03, 0.14, 0.16),
           conduitMat
         );
-        podGroup.add(flange);
+        bracket.position.set(sideX - sideSign * 0.01, ySill, z);
+        coachGroup.add(bracket);
 
-        // Porcelain Insulator Column
-        const insulator = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.055, 0.055, 0.08, 14).rotateZ(sideSign * Math.PI / 2),
-          insulatorMat
-        );
-        insulator.position.set(sideSign * 0.04, 0, 0);
-        podGroup.add(insulator);
+        coachGroup.add(sender.group);
 
-        // Insulator Ribbed Ring
-        const shed = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.075, 0.075, 0.015, 14).rotateZ(sideSign * Math.PI / 2),
-          insulatorMat
-        );
-        shed.position.set(sideSign * 0.04, 0, 0);
-        podGroup.add(shed);
-
-        // Projector Collimator Nozzle
-        const nozzle = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.045, 0.065, 0.08, 14).rotateZ(sideSign * Math.PI / 2),
-          alloyMat
-        );
-        nozzle.position.set(sideSign * 0.09, 0, 0);
-        podGroup.add(nozzle);
-
-        // Glowing Cyan Plasma Cathode Core
-        const plasmaMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-        const core = new THREE.Mesh(
-          new THREE.SphereGeometry(0.028, 10, 10),
-          plasmaMat
-        );
-        core.position.set(sideSign * 0.09, 0, 0);
-        podGroup.add(core);
-
-        // Tip Anchor Node for sub-millimeter 3D world space arc attachment
-        const tip = new THREE.Object3D();
-        tip.name = `coachSideTip_${coachIndex}_${sideName}_${podIdx}`;
-        tip.position.set(sideSign * 0.14, 0, 0);
-        podGroup.add(tip);
-
-        coachGroup.add(podGroup);
-
-        this.coachSideEmitters.push({
-          coachIndex,
-          side: sideName,
-          podIndex: podIdx,
-          group: podGroup,
-          tip,
-          core,
-          mat: plasmaMat
-        });
+        this.coachSideEmitters.push(sender);
       });
     });
   }
@@ -1734,13 +1719,23 @@ export class TrainModel {
   pulseCoachSideEmitters(coachIndex, side = 'all', intensity = 1.0) {
     if (!this.coachSideEmitters) return;
     this.coachSideEmitters.forEach(e => {
-      if ((coachIndex === undefined || coachIndex === null || e.coachIndex === coachIndex) && (side === 'all' || e.side === side)) {
+      const matchCoach = coachIndex === undefined || coachIndex === null || e.coachIndex === coachIndex;
+      const matchSide = side === 'all' || e.side === side;
+      if (matchCoach && matchSide) {
         if (intensity > 0.05) {
-          e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
-          e.core.scale.setScalar(1.0 + intensity * 0.9);
+          if (e.mat) e.mat.color.setHex(intensity > 0.6 ? 0xffffff : 0x38bdf8);
+          if (e.core) e.core.scale.setScalar(1.0 + intensity * 1.0);
+          if (e.rimMat) {
+            e.rimMat.emissive.setHex(intensity > 0.5 ? 0x38bdf8 : 0x0284c7);
+            e.rimMat.emissiveIntensity = 0.25 + intensity * 2.5;
+          }
         } else {
-          e.mat.color.setHex(0x38bdf8);
-          e.core.scale.setScalar(1.0);
+          if (e.mat) e.mat.color.setHex(0x38bdf8);
+          if (e.core) e.core.scale.setScalar(1.0);
+          if (e.rimMat) {
+            e.rimMat.emissive.setHex(0x0284c7);
+            e.rimMat.emissiveIntensity = 0.25;
+          }
         }
       }
     });

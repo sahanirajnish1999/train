@@ -98,7 +98,7 @@ class SimulatorApp {
       btnAnimalElephant: document.getElementById('btn-animal-elephant'),
       btnAnimalCowSudden: document.getElementById('btn-animal-cow-sudden'),
       btnClearObstacles: document.getElementById('btn-clear-obstacles'),
-      // Scenario Stepper Dock Elements (1-by-1 Scenarios 1 to 9)
+      // Scenario Stepper Dock Elements (1-by-1 Scenarios 1 to 10)
       btnScenPrev: document.getElementById('btn-scen-prev'),
       btnScenNext: document.getElementById('btn-scen-next'),
       btnScen1: document.getElementById('btn-scen-1'),
@@ -110,6 +110,7 @@ class SimulatorApp {
       btnScen7: document.getElementById('btn-scen-7'),
       btnScen8: document.getElementById('btn-scen-8'),
       btnScen9: document.getElementById('btn-scen-9'),
+      btnScen10: document.getElementById('btn-scen-10'),
       btnScenCam: document.getElementById('btn-scen-cam'),
       btnScenShock: document.getElementById('btn-scen-shock'),
       btnScenReplay: document.getElementById('btn-scen-replay'),
@@ -263,6 +264,10 @@ class SimulatorApp {
         case 'Digit9':
         case 'Numpad9':
           this.applyScenario(9);
+          break;
+        case 'Digit0':
+        case 'Numpad0':
+          this.applyScenario(10);
           break;
         case 'BracketLeft':
           this.prevScenario();
@@ -452,14 +457,14 @@ class SimulatorApp {
       });
     }
 
-    // Scenario Stepper Dock Buttons (1-by-1 Scenarios Toolbar 1 to 9)
+    // Scenario Stepper Dock Buttons (1-by-1 Scenarios Toolbar 1 to 10)
     if (this.dom.btnScenPrev) {
       this.dom.btnScenPrev.addEventListener('click', () => this.prevScenario());
     }
     if (this.dom.btnScenNext) {
       this.dom.btnScenNext.addEventListener('click', () => this.nextScenario());
     }
-    for (let i = 1; i <= 9; i++) {
+    for (let i = 1; i <= 10; i++) {
       const btn = document.getElementById(`btn-scen-${i}`);
       if (btn) {
         btn.addEventListener('click', () => this.applyScenario(i));
@@ -693,12 +698,22 @@ class SimulatorApp {
     this.currentScenario = index;
     const obs = this.obstacles.applyScenario(index, this.physics.trackProgress, this.track.totalLength);
 
-    // Auto-switch to RX TARGET view to immediately observe the scenario and its animations
-    this.setCameraMode('target');
-    this.focusOnTarget(forceRepositionCam);
+    if (index === 10) {
+      // Auto-switch to Coach Shield flank view to observe the Coach Side Power Sources in action
+      this.setCameraMode('action');
+      if (this.dom.btnCamAction) {
+        document.querySelectorAll('.viewport-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.cam === 'action');
+        });
+      }
+    } else {
+      // Auto-switch to RX TARGET view to immediately observe the scenario and its animations
+      this.setCameraMode('target');
+      this.focusOnTarget(forceRepositionCam);
+    }
 
-    // Synchronize Scenario UI Buttons (1 through 9)
-    for (let i = 1; i <= 9; i++) {
+    // Synchronize Scenario UI Buttons (1 through 10)
+    for (let i = 1; i <= 10; i++) {
       const btn = document.getElementById(`btn-scen-${i}`);
       if (btn) btn.classList.toggle('active', i === index);
     }
@@ -718,12 +733,12 @@ class SimulatorApp {
   }
 
   prevScenario() {
-    const nextIdx = this.currentScenario <= 1 ? 9 : this.currentScenario - 1;
+    const nextIdx = this.currentScenario <= 1 ? 10 : this.currentScenario - 1;
     this.applyScenario(nextIdx, true);
   }
 
   nextScenario() {
-    const nextIdx = this.currentScenario >= 9 ? 1 : this.currentScenario + 1;
+    const nextIdx = this.currentScenario >= 10 ? 1 : this.currentScenario + 1;
     this.applyScenario(nextIdx, true);
   }
 
@@ -741,67 +756,74 @@ class SimulatorApp {
     const meta = [
       null,
       {
-        badge: 'SCENARIO 1 / 9 • 800M-80M ELECTRICITY ONLY',
+        badge: 'SCENARIO 1 / 10 • 800M-80M ELECTRICITY ONLY',
         title: '1. HUMAN ENTER ON TRACK (72 KG)',
         lead: 'LEAD LEG: ON RAIL HEAD (+32 cm)',
         trail: 'TRAILING LEG: ON GROUND (0 cm)',
         desc: 'Inside lead foot steps UP onto elevated rail (+32cm). Trailing foot on ground (0cm). Early detection at 800m-80m uses ONLY non-lethal electricity to deter human safely.'
       },
       {
-        badge: 'SCENARIO 2 / 9 • 800M-80M ELECTRICITY ONLY',
+        badge: 'SCENARIO 2 / 10 • 800M-80M ELECTRICITY ONLY',
         title: '2. HUMAN EXIT TO TRACK (70 KG)',
         lead: 'LEAD LEG: ON GROUND LEVEL (0 cm)',
         trail: 'TRAILING LEG: ON RAIL HEAD (+32 cm)',
         desc: 'Outside lead foot reaches DOWN to ground (0cm). Trailing foot pushes off elevated rail (+32cm). Early 800m-80m electricity ensures rapid egress off track.'
       },
       {
-        badge: 'SCENARIO 3 / 9 • 800M-80M ELECTRICITY ONLY',
+        badge: 'SCENARIO 3 / 10 • 800M-80M ELECTRICITY ONLY',
         title: '3. HUMAN MID-TRACK (74 KG)',
         lead: 'POSITION: TRACK CENTERLINE (x = 0.00m)',
         trail: 'FEET: PLANTED ON SLEEPERS BETWEEN RAILS',
         desc: 'Walking along track centerline between rails. AI LiDAR & Camera detect at 800m; non-lethal electric shock pulse deters off track before 80m. No capture net used.'
       },
       {
-        badge: 'SCENARIO 4 / 9 • 80M-0M SUDDEN (NET OPEN)',
+        badge: 'SCENARIO 4 / 10 • 80M-0M SUDDEN (NET OPEN)',
         title: '4. HUMAN SUDDEN DASH (72 KG ≤ 150 KG)',
         lead: 'INTRUSION: FAST SPRINT FROM BUSHES (<80M)',
         trail: 'SAFETY: NO ELECTRICITY • CAPTURE NET DEPLOYS',
         desc: 'Sudden emergence at 75m! High-voltage shock is DISABLED for sudden safety. Weight 72kg ≤ 150kg triggers automatic capture net deployment and scoop at 14m.'
       },
       {
-        badge: 'SCENARIO 5 / 9 • 80M-0M SUDDEN (NET OPEN)',
+        badge: 'SCENARIO 5 / 10 • 80M-0M SUDDEN (NET OPEN)',
         title: '5. STRAY DOG SUDDEN INTRUSION (22 KG)',
         lead: 'SPECIES: CANIS LUPUS FAMILIARIS (22 KG)',
         trail: 'SAFETY: NO ELECTRICITY • CAPTURE NET DEPLOYS',
         desc: 'Stray dog darts across ballast at 72m! NO electricity is fired. Weight 22kg is well under 150kg limit, opening front capture net to rescue dog into cradle.'
       },
       {
-        badge: 'SCENARIO 6 / 9 • 80M-0M SUDDEN (NET OPEN)',
+        badge: 'SCENARIO 6 / 10 • 80M-0M SUDDEN (NET OPEN)',
         title: '6. SPOTTED DEER SUDDEN BOUND (48 KG)',
         lead: 'SPECIES: AXIS AXIS / CHITAL (48 KG)',
         trail: 'SAFETY: NO ELECTRICITY • CAPTURE NET DEPLOYS',
         desc: 'Spotted deer bounds onto track at 76m! NO electricity is used. Payload 48kg is within 150kg safety rating, smoothly scooping deer without harm.'
       },
       {
-        badge: 'SCENARIO 7 / 9 • 800M-80M ONLY ELECTRICITY',
+        badge: 'SCENARIO 7 / 10 • 800M-80M ONLY ELECTRICITY',
         title: '7. INDIAN ZEBU COW ON TRACK (360 KG)',
         lead: 'SPECIES: BOS INDICUS (360 KG > 150 KG)',
         trail: 'SAFETY: ONLY ELECTRICITY (800M-80M) • NET LOCKED',
         desc: 'Heavy cattle grazing 650m ahead. Weight 360kg > 150kg: Net is LOCKED. Non-lethal electric shock (4 power sources) clears cow off track safely before 80m.'
       },
       {
-        badge: 'SCENARIO 8 / 9 • 800M-80M ONLY ELECTRICITY',
+        badge: 'SCENARIO 8 / 10 • 800M-80M ONLY ELECTRICITY',
         title: '8. WILD ASIAN ELEPHANT (3,800 KG)',
         lead: 'SPECIES: ELEPHAS MAXIMUS (3,800 KG > 150 KG)',
         trail: 'SAFETY: QUAD ELECTRICITY (800M-80M) • NET LOCKED',
         desc: 'Massive elephant 720m ahead. Net is strictly LOCKED (>150kg limit). Quad 7.8kV/3.8mA non-lethal shock pulse deters elephant off track without injury.'
       },
       {
-        badge: 'SCENARIO 9 / 9 • WEIGHT LIMIT TEST (>150KG)',
+        badge: 'SCENARIO 9 / 10 • WEIGHT LIMIT TEST (>150KG)',
         title: '9. COW SUDDEN INTRUSION (360 KG > 150 KG)',
         lead: 'SUDDEN (<80M): 360 KG EXCEEDS 150 KG CAPACITY',
         trail: 'SAFETY: NET LOCKED • NO ELECTRICITY • E-BRAKE',
         desc: 'CRITICAL WEIGHT LIMIT TEST: 360kg cow enters suddenly at 75m. Net CANNOT open (>150kg structural lock prevents damage). NO electricity. Emergency brakes slam!'
+      },
+      {
+        badge: 'SCENARIO 10 / 10 • ACTIVE 2-3M PERIMETER GUARD',
+        title: '10. COACH FLANK HUMAN & ANIMAL (2-3M REPEL)',
+        lead: 'TARGETS: HUMAN (2.3M) & COW (2.5M) BESIDE COACHES',
+        trail: 'POWER: ACTIVE 2-3M FIRED • PUSHED AWAY INTO SAFETY',
+        desc: 'Both a human (2.3m) and a 360kg cow (2.5m) intrude into the coach flank 2-3M danger zone. The nearest coach Power Sources fire high-voltage electro-kinetic pulses and push both away from the train!'
       }
     ][index];
 
