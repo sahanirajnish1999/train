@@ -1,8 +1,8 @@
 // ====================================================================
 // Indian Railways Real-World Track Corridor, OHE, Scenery & Infrastructure
-// Features: Grand Mountain Pass with Rock Cutting Approach, Real Open-Arch
-// Stone Masonry Portals with Red/White Warning Stripes & Bilingual Signage,
-// Massive Natural Mountain Ridge, 100% Unbroken Tracks & Zero Disappearing Cars
+// Features: Open Scenic Rural Corridor, Continuous OHE Catenary Masts,
+// Lush Indian Flora, Level Crossings, Bilingual IR Junction Station,
+// 100% Unbroken Tracks & Zero Disappearing Cars
 // ====================================================================
 
 import * as THREE from "three";
@@ -25,8 +25,6 @@ export class TrackSystem {
     // Infrastructure anchors
     this.stationProgress = 0.85;
     this.crossingProgress = 0.45;
-    this.tunnelStart = 0.21;
-    this.tunnelEnd = 0.29; // ~280 meters mountain tunnel
     this.signals = [];
 
     // Procedural textures cache
@@ -37,7 +35,6 @@ export class TrackSystem {
     this.buildBallastEmbankment();
     this.buildSleepersAndRails();
     this.buildOHECatenary();
-    this.buildMountainTunnel(); // Grand Ghat Mountain Tunnel & Rock Cutting
     this.buildStation();
     this.buildLevelCrossing();
     this.buildSignals();
@@ -89,155 +86,7 @@ export class TrackSystem {
     ctxS.fillRect(192, 10, 24, 44);
     const sleeperTex = new THREE.CanvasTexture(canvasS);
 
-    // 3. Vaulted Tunnel Stone Lining Texture
-    const canvasT = document.createElement("canvas");
-    canvasT.width = 512;
-    canvasT.height = 512;
-    const ctxT = canvasT.getContext("2d");
-    ctxT.fillStyle = "#27272a"; // Weathered dark basalt stone
-    ctxT.fillRect(0, 0, 512, 512);
-    ctxT.strokeStyle = "#18181b";
-    ctxT.lineWidth = 3;
-    const rowH = 32;
-    for (let y = 0; y < 512; y += rowH) {
-      ctxT.beginPath();
-      ctxT.moveTo(0, y);
-      ctxT.lineTo(512, y);
-      ctxT.stroke();
-      const offset = (y / rowH) % 2 === 0 ? 0 : 32;
-      for (let x = offset; x < 512; x += 64) {
-        ctxT.beginPath();
-        ctxT.moveTo(x, y);
-        ctxT.lineTo(x, y + rowH);
-        ctxT.stroke();
-      }
-    }
-    // Water seepage and soot staining
-    for (let i = 0; i < 40; i++) {
-      const sx = Math.random() * 512;
-      const sw = 15 + Math.random() * 25;
-      ctxT.fillStyle = "rgba(10, 10, 10, 0.4)";
-      ctxT.fillRect(sx, 0, sw, 512);
-    }
-    const tunnelStoneTex = new THREE.CanvasTexture(canvasT);
-    tunnelStoneTex.wrapS = THREE.RepeatWrapping;
-    tunnelStoneTex.wrapT = THREE.RepeatWrapping;
-    tunnelStoneTex.repeat.set(4, 20);
-
-    // 4. Portal Dressed Ashlar Stone Masonry Texture
-    const canvasP = document.createElement("canvas");
-    canvasP.width = 512;
-    canvasP.height = 512;
-    const ctxP = canvasP.getContext("2d");
-    ctxP.fillStyle = "#64748b"; // Weathered granite grey
-    ctxP.fillRect(0, 0, 512, 512);
-    // Block courses
-    ctxP.strokeStyle = "#1e293b";
-    ctxP.lineWidth = 4;
-    const pRowH = 48;
-    for (let y = 0; y < 512; y += pRowH) {
-      ctxP.strokeRect(0, y, 512, pRowH);
-      const offset = (y / pRowH) % 2 === 0 ? 0 : 40;
-      for (let x = offset; x < 512; x += 80) {
-        ctxP.strokeRect(x, y, 80, pRowH);
-        // Chiseled stone texture shading
-        ctxP.fillStyle = "rgba(0, 0, 0, 0.08)";
-        ctxP.fillRect(x + 4, y + 4, 72, pRowH - 8);
-      }
-    }
-    const portalMasonryTex = new THREE.CanvasTexture(canvasP);
-    portalMasonryTex.wrapS = THREE.RepeatWrapping;
-    portalMasonryTex.wrapT = THREE.RepeatWrapping;
-    portalMasonryTex.repeat.set(4, 4);
-
-    // 5. Authentic Indian Railways Tunnel Signboard
-    const canvasSign = document.createElement("canvas");
-    canvasSign.width = 1024;
-    canvasSign.height = 256;
-    const ctxSign = canvasSign.getContext("2d");
-    // Mustard yellow enamel background
-    ctxSign.fillStyle = "#facc15";
-    ctxSign.fillRect(0, 0, 1024, 256);
-    // Black border
-    ctxSign.lineWidth = 12;
-    ctxSign.strokeStyle = "#000";
-    ctxSign.strokeRect(6, 6, 1012, 244);
-    // Inner pinstripe
-    ctxSign.lineWidth = 3;
-    ctxSign.strokeRect(18, 18, 988, 220);
-
-    ctxSign.fillStyle = "#000";
-    ctxSign.textAlign = "center";
-    ctxSign.font = "bold 28px sans-serif";
-    ctxSign.fillText("मध्य रेल  •  CENTRAL RAILWAY", 512, 56);
-
-    ctxSign.font = "bold 54px sans-serif";
-    ctxSign.fillText("सुरंग सं. ०४  |  TUNNEL NO. 04", 512, 134);
-
-    ctxSign.font = "bold 28px sans-serif";
-    ctxSign.fillText(
-      "लंबाई : 466 मी.  |  LENGTH : 466 M  •  घाट खंड (GHAT SECTION)",
-      512,
-      198,
-    );
-
-    const portalSignTex = new THREE.CanvasTexture(canvasSign);
-
-    // 6. Iconic Red & White Portal Arch Hazard Stripes
-    const canvasArch = document.createElement("canvas");
-    canvasArch.width = 512;
-    canvasArch.height = 64;
-    const ctxArch = canvasArch.getContext("2d");
-    const stripeW = 32;
-    for (let x = 0; x < 512; x += stripeW * 2) {
-      ctxArch.fillStyle = "#dc2626"; // Indian Railways Crimson Red
-      ctxArch.fillRect(x, 0, stripeW, 64);
-      ctxArch.fillStyle = "#f8fafc"; // Crisp White
-      ctxArch.fillRect(x + stripeW, 0, stripeW, 64);
-    }
-    const archStripeTex = new THREE.CanvasTexture(canvasArch);
-    archStripeTex.wrapS = THREE.RepeatWrapping;
-    archStripeTex.repeat.set(16, 1);
-
-    // 7. Mountain Rock Strata & Foliage Texture (Natural Western Ghats Basalt)
-    const canvasRock = document.createElement("canvas");
-    canvasRock.width = 512;
-    canvasRock.height = 512;
-    const ctxRock = canvasRock.getContext("2d");
-    // Rich earthy warm stone base
-    ctxRock.fillStyle = "#524a42";
-    ctxRock.fillRect(0, 0, 512, 512);
-    // Horizontal sedimentary rock strata
-    for (let y = 0; y < 512; y += 14) {
-      const shade = Math.floor(65 + Math.sin(y * 0.06) * 22);
-      ctxRock.fillStyle = `rgb(${shade + 10}, ${shade + 4}, ${shade})`;
-      ctxRock.fillRect(0, y, 512, 12);
-    }
-    // Mossy green vegetation patches
-    for (let i = 0; i < 260; i++) {
-      const rx = Math.random() * 512;
-      const ry = Math.random() * 512;
-      ctxRock.fillStyle = "rgba(40, 115, 45, 0.55)";
-      ctxRock.beginPath();
-      ctxRock.arc(rx, ry, 10 + Math.random() * 22, 0, Math.PI * 2);
-      ctxRock.fill();
-    }
-    // Deep fissure shadows
-    for (let i = 0; i < 25; i++) {
-      const fx = Math.random() * 512;
-      ctxRock.strokeStyle = "rgba(25, 20, 15, 0.4)";
-      ctxRock.lineWidth = 2 + Math.random() * 3;
-      ctxRock.beginPath();
-      ctxRock.moveTo(fx, 0);
-      ctxRock.lineTo(fx + (Math.random() - 0.5) * 60, 512);
-      ctxRock.stroke();
-    }
-    const mountainRockTex = new THREE.CanvasTexture(canvasRock);
-    mountainRockTex.wrapS = THREE.RepeatWrapping;
-    mountainRockTex.wrapT = THREE.RepeatWrapping;
-    mountainRockTex.repeat.set(8, 8);
-
-    // 8. Authentic Indian Railways Station Bilingual Enamel Board
+    // 3. Authentic Indian Railways Station Bilingual Enamel Board
     const canvasStBoard = document.createElement("canvas");
     canvasStBoard.width = 1024;
     canvasStBoard.height = 384;
@@ -273,7 +122,7 @@ export class TrackSystem {
     );
     const stationBoardTex = new THREE.CanvasTexture(canvasStBoard);
 
-    // 9. Station Main Building Brick & Sandstone Facade Texture
+    // 4. Station Main Building Brick & Sandstone Facade Texture
     const canvasBldg = document.createElement("canvas");
     canvasBldg.width = 512;
     canvasBldg.height = 512;
@@ -313,7 +162,7 @@ export class TrackSystem {
     stationBuildingTex.wrapT = THREE.RepeatWrapping;
     stationBuildingTex.repeat.set(4, 2);
 
-    // 10. Platform Concrete Paver Texture with Tactile Yellow Safety Strip
+    // 5. Platform Concrete Paver Texture with Tactile Yellow Safety Strip
     const canvasPaving = document.createElement("canvas");
     canvasPaving.width = 256;
     canvasPaving.height = 256;
@@ -338,7 +187,7 @@ export class TrackSystem {
     platformPaverTex.wrapT = THREE.RepeatWrapping;
     platformPaverTex.repeat.set(2, 40);
 
-    // 11. Station Round Clock Dial Texture
+    // 6. Station Round Clock Dial Texture
     const canvasClock = document.createElement("canvas");
     canvasClock.width = 256;
     canvasClock.height = 256;
@@ -374,7 +223,7 @@ export class TrackSystem {
     ctxClock.stroke();
     const stationClockTex = new THREE.CanvasTexture(canvasClock);
 
-    // 12. Electronic Train Departure Board Texture
+    // 7. Electronic Train Departure Board Texture
     const canvasDep = document.createElement("canvas");
     canvasDep.width = 512;
     canvasDep.height = 128;
@@ -398,11 +247,6 @@ export class TrackSystem {
     return {
       ballastTex,
       sleeperTex,
-      tunnelStoneTex,
-      portalMasonryTex,
-      portalSignTex,
-      archStripeTex,
-      mountainRockTex,
       stationBoardTex,
       stationBuildingTex,
       platformPaverTex,
@@ -418,8 +262,8 @@ export class TrackSystem {
     const waypoints = [
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0, 0, 700), // High speed straightaway
-      new THREE.Vector3(140, 0, 1100), // Deep Mountain Pass Approach
-      new THREE.Vector3(420, 0, 1350), // Inside Scenic Mountain Tunnel
+      new THREE.Vector3(140, 0, 1100), // Scenic curve approach
+      new THREE.Vector3(420, 0, 1350), // Open countryside bend
       new THREE.Vector3(780, 0, 1200), // Emerging into valley
       new THREE.Vector3(980, 0, 800), // Rural crossing section
       new THREE.Vector3(1050, 0, 200), // Long eastern straight
@@ -670,46 +514,42 @@ export class TrackSystem {
       const tangent = this.curve.getTangentAt(u).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
 
-      const inTunnel = u >= this.tunnelStart && u <= this.tunnelEnd;
+      const mastGroup = new THREE.Group();
+      const mastPos = pt
+        .clone()
+        .add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
+      mastGroup.position.copy(mastPos);
+      mastGroup.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        tangent,
+      );
 
-      if (!inTunnel) {
-        const mastGroup = new THREE.Group();
-        const mastPos = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
-        mastGroup.position.copy(mastPos);
-        mastGroup.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          tangent,
+      const pole = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 7.2, 0.18),
+        oheMastMat,
+      );
+      pole.position.y = 3.6;
+      pole.castShadow = true;
+      mastGroup.add(pole);
+
+      const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1),
+        oheMastMat,
+      );
+      arm.position.set((this.trackOffset + 3.4) / 2 - 0.2, 6.2, 0);
+      mastGroup.add(arm);
+
+      [2.6, 2.6 + this.trackOffset].forEach((x) => {
+        const ins = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8),
+          insMat,
         );
+        ins.position.set(x, 5.8, 0);
+        mastGroup.add(ins);
+      });
 
-        const pole = new THREE.Mesh(
-          new THREE.BoxGeometry(0.18, 7.2, 0.18),
-          oheMastMat,
-        );
-        pole.position.y = 3.6;
-        pole.castShadow = true;
-        mastGroup.add(pole);
-
-        const arm = new THREE.Mesh(
-          new THREE.BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1),
-          oheMastMat,
-        );
-        arm.position.set((this.trackOffset + 3.4) / 2 - 0.2, 6.2, 0);
-        mastGroup.add(arm);
-
-        [2.6, 2.6 + this.trackOffset].forEach((x) => {
-          const ins = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.05, 0.05, 0.35, 8),
-            insMat,
-          );
-          ins.position.set(x, 5.8, 0);
-          mastGroup.add(ins);
-        });
-
-        mastGroup.frustumCulled = false;
-        this.trackGroup.add(mastGroup);
-      }
+      mastGroup.frustumCulled = false;
+      this.trackGroup.add(mastGroup);
 
       const t1Pt = pt
         .clone()
@@ -738,620 +578,6 @@ export class TrackSystem {
     addWire(catenaryWire2);
   }
 
-  // ---------------------------------------------------------
-  // Grand Indian Railways Mountain Tunnel & Ghat Rock Cutting
-  // 100% Grounded Mountain Massif, Realistic Ghat Rock Cutting Approach,
-  // Dressed Ashlar Stone Portals with Open Horseshoe Arch, Regulation Hazard
-  // Chevron Stripes, Bilingual IR Signboard, Safety Refuge Niches & Interior Lighting
-  // ---------------------------------------------------------
-  buildMountainTunnel() {
-    const tunnelGroup = new THREE.Group();
-    const up = new THREE.Vector3(0, 1, 0);
-
-    const tunnelMat = new THREE.MeshStandardMaterial({
-      map: this.textures.tunnelStoneTex,
-      roughness: 0.92,
-      metalness: 0.08,
-      side: THREE.BackSide,
-    });
-
-    const portalMasonryMat = new THREE.MeshStandardMaterial({
-      map: this.textures.portalMasonryTex,
-      roughness: 0.82,
-      metalness: 0.18,
-    });
-
-    const mountainRockMat = new THREE.MeshStandardMaterial({
-      map: this.textures.mountainRockTex,
-      roughness: 0.92,
-      metalness: 0.08,
-    });
-
-    const archStripeMat = new THREE.MeshBasicMaterial({
-      map: this.textures.archStripeTex,
-    });
-
-    const signMat = new THREE.MeshBasicMaterial({
-      map: this.textures.portalSignTex,
-    });
-
-    // Broad Gauge Double Track Horseshoe Clearance Dimensions:
-    // 12.0m wide (spanning both 1676mm tracks + 4.2m offset + safety margins), 7.8m high arch crown
-    const wHalf = 6.0;
-    const wallH = 4.4;
-    const archH = 7.8;
-
-    // ---------------------------------------------------------
-    // 1. Ghat Rock Cutting Canyon Approach (145m Before & After Tunnel)
-    // Deep rock cliff walls with stepped benches flanking the track
-    // ---------------------------------------------------------
-    const buildRockCutting = (startU, endU, isEntry) => {
-      const cSteps = 24;
-      const cGeo = new THREE.BufferGeometry();
-      const cPos = [];
-      const cUVs = [];
-      const cIndices = [];
-
-      for (let i = 0; i <= cSteps; i++) {
-        const u = startU + (i / cSteps) * (endU - startU);
-        const pt = this.curve.getPointAt(u);
-        const tangent = this.curve.getTangentAt(u).normalize();
-        const normal = new THREE.Vector3()
-          .crossVectors(tangent, up)
-          .normalize();
-
-        // Taper cutting height: ground level (0.5m) at outer approach, 13.8m high at the portal headwall
-        const factor = isEntry ? i / cSteps : 1.0 - i / cSteps;
-        const cutH = 0.5 + Math.pow(factor, 1.2) * 13.3;
-
-        // 6 Profile vertices across cutting (with stepped geotechnical benches):
-        // 0: Left crest (x = -18.0, y = cutH)
-        // 1: Left bench top (x = -12.5, y = cutH * 0.55)
-        // 2: Left track toe (x = -7.5, y = 0.18)
-        // 3: Right track toe (x = 7.5, y = 0.18)
-        // 4: Right bench top (x = 12.5, y = cutH * 0.55)
-        // 5: Right crest (x = 18.0, y = cutH)
-        const vL0 = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(-18.0))
-          .setY(pt.y + cutH);
-        const vL1 = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(-12.5))
-          .setY(pt.y + cutH * 0.55);
-        const vL2 = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(-7.5))
-          .setY(pt.y + 0.18);
-        const vR0 = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(7.5))
-          .setY(pt.y + 0.18);
-        const vR1 = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(12.5))
-          .setY(pt.y + cutH * 0.55);
-        const vR2 = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(18.0))
-          .setY(pt.y + cutH);
-
-        [vL0, vL1, vL2, vR0, vR1, vR2].forEach((v, idx) => {
-          cPos.push(v.x, v.y, v.z);
-          cUVs.push(idx / 5, (i / cSteps) * 6);
-        });
-      }
-
-      for (let i = 0; i < cSteps; i++) {
-        // Left cliff wall (2 quads: crest->bench, bench->toe)
-        for (let q = 0; q < 2; q++) {
-          const l0 = i * 6 + q;
-          const l1 = l0 + 1;
-          const l2 = (i + 1) * 6 + q;
-          const l3 = l2 + 1;
-          cIndices.push(l0, l2, l1);
-          cIndices.push(l1, l2, l3);
-        }
-
-        // Right cliff wall (2 quads: toe->bench, bench->crest)
-        for (let q = 3; q < 5; q++) {
-          const r0 = i * 6 + q;
-          const r1 = r0 + 1;
-          const r2 = (i + 1) * 6 + q;
-          const r3 = r2 + 1;
-          cIndices.push(r0, r2, r1);
-          cIndices.push(r1, r2, r3);
-        }
-      }
-
-      cGeo.setAttribute("position", new THREE.Float32BufferAttribute(cPos, 3));
-      cGeo.setAttribute("uv", new THREE.Float32BufferAttribute(cUVs, 2));
-      cGeo.setIndex(cIndices);
-      cGeo.computeVertexNormals();
-
-      const cMesh = new THREE.Mesh(cGeo, mountainRockMat);
-      cMesh.castShadow = true;
-      cMesh.receiveShadow = true;
-      cMesh.frustumCulled = false;
-      tunnelGroup.add(cMesh);
-    };
-
-    buildRockCutting(this.tunnelStart - 0.025, this.tunnelStart, true); // 145m Entrance Cutting
-    buildRockCutting(this.tunnelEnd, this.tunnelEnd + 0.025, false); // 145m Exit Cutting
-
-    // ---------------------------------------------------------
-    // 2. Hollow Vaulted Horseshoe Tunnel Bore (466m Underground)
-    // ---------------------------------------------------------
-    const tSteps = 60;
-    const tunnelGeo = new THREE.BufferGeometry();
-    const tPos = [];
-    const tUVs = [];
-    const tIndices = [];
-
-    const archPoints = [];
-    archPoints.push({ x: -wHalf, y: 0.1 });
-    archPoints.push({ x: -wHalf, y: wallH });
-    for (let a = Math.PI; a >= 0; a -= Math.PI / 14) {
-      archPoints.push({
-        x: Math.cos(a) * wHalf,
-        y: wallH + Math.sin(a) * (archH - wallH),
-      });
-    }
-    archPoints.push({ x: wHalf, y: wallH });
-    archPoints.push({ x: wHalf, y: 0.1 });
-
-    for (let i = 0; i <= tSteps; i++) {
-      const u =
-        this.tunnelStart + (i / tSteps) * (this.tunnelEnd - this.tunnelStart);
-      const pt = this.curve.getPointAt(u);
-      const tangent = this.curve.getTangentAt(u).normalize();
-      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-
-      for (let p = 0; p < archPoints.length; p++) {
-        const offset = normal.clone().multiplyScalar(archPoints[p].x);
-        tPos.push(pt.x + offset.x, pt.y + archPoints[p].y, pt.z + offset.z);
-        tUVs.push(p / (archPoints.length - 1), (i / tSteps) * 24);
-      }
-
-      // Warm sodium bulkhead wall lamps every 5 steps (~38m)
-      if (i > 1 && i < tSteps - 1 && i % 5 === 0) {
-        [-wHalf + 0.22, wHalf - 0.22].forEach((lx) => {
-          const lampPos = pt
-            .clone()
-            .add(normal.clone().multiplyScalar(lx))
-            .setY(pt.y + 4.2);
-          const lampMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(0.35, 0.45, 0.35),
-            new THREE.MeshBasicMaterial({ color: 0xf59e0b }),
-          );
-          lampMesh.position.copy(lampPos);
-          lampMesh.frustumCulled = false;
-          tunnelGroup.add(lampMesh);
-
-          const pLight = new THREE.PointLight(0xf59e0b, 2.5, 36, 1.2);
-          pLight.position.copy(lampPos);
-          tunnelGroup.add(pLight);
-        });
-
-        // Trackman Safety Refuge Niche (Safety manhole in tunnel wall with bright yellow border)
-        const side = i % 2 === 0 ? 1 : -1;
-        const nicheX = side * (wHalf + 0.35);
-        const nichePos = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(nicheX))
-          .setY(pt.y + 1.2);
-        const nicheMesh = new THREE.Mesh(
-          new THREE.BoxGeometry(0.8, 2.4, 1.8),
-          new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 }),
-        );
-        nicheMesh.position.copy(nichePos);
-        nicheMesh.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          tangent,
-        );
-        nicheMesh.frustumCulled = false;
-        tunnelGroup.add(nicheMesh);
-
-        // Yellow warning border frame around niche
-        const frameMesh = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 2.5, 1.9),
-          new THREE.MeshBasicMaterial({ color: 0xfacc15 }),
-        );
-        frameMesh.position
-          .copy(pt)
-          .add(normal.clone().multiplyScalar(side * (wHalf - 0.05)))
-          .setY(pt.y + 1.2);
-        frameMesh.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 0, 1),
-          tangent,
-        );
-        frameMesh.frustumCulled = false;
-        tunnelGroup.add(frameMesh);
-      }
-    }
-
-    const nPoints = archPoints.length;
-    for (let i = 0; i < tSteps; i++) {
-      for (let p = 0; p < nPoints - 1; p++) {
-        const c = i * nPoints + p;
-        const n = c + nPoints;
-        tIndices.push(c, c + 1, n);
-        tIndices.push(c + 1, n + 1, n);
-      }
-    }
-
-    tunnelGeo.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(tPos, 3),
-    );
-    tunnelGeo.setAttribute("uv", new THREE.Float32BufferAttribute(tUVs, 2));
-    tunnelGeo.setIndex(tIndices);
-    tunnelGeo.computeVertexNormals();
-
-    const tunnelMesh = new THREE.Mesh(tunnelGeo, tunnelMat);
-    tunnelMesh.frustumCulled = false;
-    tunnelGroup.add(tunnelMesh);
-
-    // ---------------------------------------------------------
-    // 3. Grand Ghat Mountain Massif (100% Solid & Grounded)
-    // 240m Wide Mountain Massif completely enclosing the tunnel
-    // Every perimeter vertex touches ground level (y = -0.2) or anchors into the portal headwall!
-    // ---------------------------------------------------------
-    const mSteps = 44;
-    const mGeo = new THREE.BufferGeometry();
-    const mPos = [];
-    const mUVs = [];
-    const mIndices = [];
-
-    // Realistic Ghat mountain cross-section profile (relative to track center):
-    const mProfile = [
-      { x: -120.0, y: -0.2 }, // Ground toe left (flush with ground!)
-      { x: -85.0, y: 16.0 }, // Lower green mountain slope
-      { x: -50.0, y: 36.0 }, // Mid crags & rocky ledges
-      { x: -22.0, y: 54.0 }, // Left summit shoulder
-      { x: 0.0, y: 64.0 }, // Central Mountain Peak (56m above tunnel ceiling!)
-      { x: 22.0, y: 54.0 }, // Right summit shoulder
-      { x: 50.0, y: 36.0 }, // Mid crags & rocky ledges
-      { x: 85.0, y: 16.0 }, // Lower green mountain slope
-      { x: 120.0, y: -0.2 }, // Ground toe right (flush with ground!)
-    ];
-
-    for (let i = 0; i <= mSteps; i++) {
-      const u =
-        this.tunnelStart + (i / mSteps) * (this.tunnelEnd - this.tunnelStart);
-      const pt = this.curve.getPointAt(u);
-      const tangent = this.curve.getTangentAt(u).normalize();
-      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-
-      // Ridge undulation along the length (organic mountain ridge):
-      const ridgeWave =
-        1.0 + Math.sin(i * 0.28) * 0.08 + Math.cos(i * 0.15) * 0.05;
-
-      for (let p = 0; p < mProfile.length; p++) {
-        const offset = normal.clone().multiplyScalar(mProfile[p].x);
-        // Base ground points stay strictly at -0.2; elevated points scale with ridge
-        const baseH = mProfile[p].y;
-        const vy = baseH <= 0.0 ? -0.2 : pt.y + baseH * ridgeWave;
-        mPos.push(pt.x + offset.x, vy, pt.z + offset.z);
-        mUVs.push(p / (mProfile.length - 1), (i / mSteps) * 12);
-      }
-    }
-
-    const mVerts = mProfile.length;
-    for (let i = 0; i < mSteps; i++) {
-      for (let p = 0; p < mVerts - 1; p++) {
-        const c = i * mVerts + p;
-        const n = c + mVerts;
-        mIndices.push(c, n, c + 1);
-        mIndices.push(c + 1, n, n + 1);
-      }
-    }
-
-    mGeo.setAttribute("position", new THREE.Float32BufferAttribute(mPos, 3));
-    mGeo.setAttribute("uv", new THREE.Float32BufferAttribute(mUVs, 2));
-    mGeo.setIndex(mIndices);
-    mGeo.computeVertexNormals();
-
-    const mountainMesh = new THREE.Mesh(mGeo, mountainRockMat);
-    mountainMesh.castShadow = true;
-    mountainMesh.receiveShadow = true;
-    mountainMesh.frustumCulled = false;
-    tunnelGroup.add(mountainMesh);
-
-    // Front & Rear Mountain Cliff Endcaps (closing the mountain into the portals):
-    const buildMountainEndcap = (stepIdx, uVal, isExit) => {
-      const pt = this.curve.getPointAt(uVal);
-      const tangent = this.curve.getTangentAt(uVal).normalize();
-      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-      const capGeo = new THREE.BufferGeometry();
-      const cPos = [];
-      const cUVs = [];
-      const cInd = [];
-
-      // Upper rim from mountain profile at this step:
-      for (let p = 0; p < mProfile.length; p++) {
-        const vIdx = stepIdx * mVerts + p;
-        cPos.push(mPos[vIdx * 3], mPos[vIdx * 3 + 1], mPos[vIdx * 3 + 2]);
-        cUVs.push(p / (mProfile.length - 1), 1.0);
-      }
-
-      // Lower rim: Portal headwall top (13.8m) in the center, tapering down to ground (-0.2) on the flanks:
-      for (let p = 0; p < mProfile.length; p++) {
-        const px = mProfile[p].x;
-        let lowerY = -0.2;
-        if (Math.abs(px) <= 11.0) {
-          lowerY = 13.8; // Meets portal headwall top exactly!
-        } else if (Math.abs(px) <= 24.0) {
-          lowerY = 13.8 - ((Math.abs(px) - 11.0) / 13.0) * 14.0; // Slopes down with wing wall
-        }
-        const lowerPt = pt
-          .clone()
-          .add(normal.clone().multiplyScalar(px))
-          .setY(pt.y + lowerY);
-        cPos.push(lowerPt.x, lowerPt.y, lowerPt.z);
-        cUVs.push(p / (mProfile.length - 1), 0.0);
-      }
-
-      for (let p = 0; p < mProfile.length - 1; p++) {
-        const top1 = p;
-        const top2 = p + 1;
-        const bot1 = p + mProfile.length;
-        const bot2 = p + 1 + mProfile.length;
-        if (!isExit) {
-          cInd.push(top1, bot1, top2);
-          cInd.push(top2, bot1, bot2);
-        } else {
-          cInd.push(top1, top2, bot1);
-          cInd.push(top2, bot2, bot1);
-        }
-      }
-
-      capGeo.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(cPos, 3),
-      );
-      capGeo.setAttribute("uv", new THREE.Float32BufferAttribute(cUVs, 2));
-      capGeo.setIndex(cInd);
-      capGeo.computeVertexNormals();
-
-      const capMesh = new THREE.Mesh(capGeo, mountainRockMat);
-      capMesh.castShadow = true;
-      capMesh.receiveShadow = true;
-      capMesh.frustumCulled = false;
-      tunnelGroup.add(capMesh);
-    };
-
-    buildMountainEndcap(0, this.tunnelStart, false); // Front Mountain Cliff
-    buildMountainEndcap(mSteps, this.tunnelEnd, true); // Rear Mountain Cliff
-
-    // Ghat Mountain Pines & Boulders scattered naturally on slopes:
-    for (let b = 0; b < 36; b++) {
-      const bu =
-        this.tunnelStart + (b / 36) * (this.tunnelEnd - this.tunnelStart);
-      const bpt = this.curve.getPointAt(bu);
-      const btang = this.curve.getTangentAt(bu).normalize();
-      const bnorm = new THREE.Vector3().crossVectors(btang, up).normalize();
-
-      const bside = b % 2 === 0 ? 1 : -1;
-      const bDist = 28.0 + (b % 5) * 14.0;
-      const treeY = 18.0 + (b % 4) * 8.0;
-      const treePos = bpt
-        .clone()
-        .add(bnorm.clone().multiplyScalar(bside * bDist))
-        .setY(bpt.y + treeY);
-
-      const pine = new THREE.Mesh(
-        new THREE.ConeGeometry(4.2, 11.0, 7),
-        new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.85 }),
-      );
-      pine.position.copy(treePos);
-      pine.castShadow = true;
-      pine.frustumCulled = false;
-      tunnelGroup.add(pine);
-
-      // Large natural granite boulders on mountain ledges
-      if (b % 3 === 0) {
-        const boulder = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(3.2 + (b % 3), 1),
-          mountainRockMat,
-        );
-        boulder.position
-          .copy(treePos)
-          .add(new THREE.Vector3((b % 2) * 5, -3.0, (b % 3) * 4));
-        boulder.scale.set(1.4, 0.9, 1.2);
-        boulder.castShadow = true;
-        boulder.frustumCulled = false;
-        tunnelGroup.add(boulder);
-      }
-    }
-
-    // ---------------------------------------------------------
-    // 4. Authentic Indian Railways Architectural Stone Portals
-    // Solid Ashlar Stone Masonry Headwall with 12m Open Horseshoe Arch,
-    // Regulation Hazard Chevron Ring, Coping Parapet, Flared Retaining Wing Walls & Signboard
-    // ---------------------------------------------------------
-    const buildPortal = (uVal, isExit) => {
-      const pt = this.curve.getPointAt(uVal);
-      const tangent = this.curve.getTangentAt(uVal).normalize();
-      const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-
-      const portalGroup = new THREE.Group();
-      portalGroup.position.copy(pt);
-      const lookDir = isExit ? tangent.clone() : tangent.clone().negate();
-      portalGroup.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 0, 1),
-        lookDir,
-      );
-
-      // A. Massive Stone Headwall Shape with REAL HORSESHOE ARCH HOLE
-      const portalShape = new THREE.Shape();
-      const pWidthHalf = 11.0;
-      const pHeight = 13.8;
-
-      portalShape.moveTo(-pWidthHalf, 0.0);
-      portalShape.lineTo(pWidthHalf, 0.0);
-      portalShape.lineTo(pWidthHalf, pHeight);
-      portalShape.lineTo(-pWidthHalf, pHeight);
-      portalShape.closePath();
-
-      // Cutout Hole matching broad gauge double track horseshoe bore
-      const hole = new THREE.Path();
-      hole.moveTo(-wHalf, 0.0);
-      hole.lineTo(-wHalf, wallH);
-      for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-        hole.lineTo(Math.cos(a) * wHalf, wallH + Math.sin(a) * (archH - wallH));
-      }
-      hole.lineTo(wHalf, 0.0);
-      hole.closePath();
-      portalShape.holes.push(hole);
-
-      const portalGeo = new THREE.ExtrudeGeometry(portalShape, {
-        depth: 2.8,
-        bevelEnabled: true,
-        bevelThickness: 0.25,
-        bevelSize: 0.25,
-        bevelSegments: 3,
-      });
-
-      const portalMesh = new THREE.Mesh(portalGeo, portalMasonryMat);
-      portalMesh.position.z = -1.4;
-      portalMesh.castShadow = true;
-      portalMesh.receiveShadow = true;
-      portalMesh.frustumCulled = false;
-      portalGroup.add(portalMesh);
-
-      // B. Iconic Indian Railways Red-and-White Arch Hazard Stripe Border Ring
-      const ringShape = new THREE.Shape();
-      const rOuter = wHalf + 0.85;
-      ringShape.moveTo(-rOuter, 0.0);
-      ringShape.lineTo(-rOuter, wallH);
-      for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-        ringShape.lineTo(
-          Math.cos(a) * rOuter,
-          wallH + Math.sin(a) * (archH - wallH + 0.85),
-        );
-      }
-      ringShape.lineTo(rOuter, 0.0);
-      ringShape.closePath();
-
-      const ringHole = new THREE.Path();
-      ringHole.moveTo(-wHalf, 0.0);
-      ringHole.lineTo(-wHalf, wallH);
-      for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-        ringHole.lineTo(
-          Math.cos(a) * wHalf,
-          wallH + Math.sin(a) * (archH - wallH),
-        );
-      }
-      ringHole.lineTo(wHalf, 0.0);
-      ringHole.closePath();
-      ringShape.holes.push(ringHole);
-
-      const ringGeo = new THREE.ExtrudeGeometry(ringShape, {
-        depth: 0.18,
-        bevelEnabled: false,
-      });
-      const ringMesh = new THREE.Mesh(ringGeo, archStripeMat);
-      ringMesh.position.z = 1.5; // Prominently displayed on portal face
-      ringMesh.frustumCulled = false;
-      portalGroup.add(ringMesh);
-
-      // C. Heavy Stone Parapet Coping across the top of headwall
-      const parapet = new THREE.Mesh(
-        new THREE.BoxGeometry(23.0, 0.85, 3.4),
-        portalMasonryMat,
-      );
-      parapet.position.set(0, 14.2, 0.0);
-      parapet.castShadow = true;
-      parapet.frustumCulled = false;
-      portalGroup.add(parapet);
-
-      // End pillars on parapet
-      [-11.2, 11.2].forEach((px) => {
-        const pillar = new THREE.Mesh(
-          new THREE.BoxGeometry(1.6, 1.4, 3.6),
-          portalMasonryMat,
-        );
-        pillar.position.set(px, 14.8, 0.0);
-        pillar.castShadow = true;
-        portalGroup.add(pillar);
-      });
-
-      // D. Heavy Stepped Retaining Wing Walls (Flaring 16m out into the rock cutting)
-      [-11.0, 11.0].forEach((wx) => {
-        const sideSign = wx > 0 ? 1 : -1;
-
-        // 3 stepped tiers of stone retaining wall
-        for (let tier = 0; tier < 3; tier++) {
-          const tLen = 6.0;
-          const tHeight = 12.0 - tier * 3.2;
-          const tZ = -3.0 - tier * 5.2;
-          const tX = wx + sideSign * (1.8 + tier * 2.2);
-
-          const wing = new THREE.Mesh(
-            new THREE.BoxGeometry(2.4, tHeight, tLen),
-            portalMasonryMat,
-          );
-          wing.position.set(tX, tHeight / 2, tZ);
-          wing.rotation.y = sideSign * -0.38;
-          wing.castShadow = true;
-          wing.frustumCulled = false;
-          portalGroup.add(wing);
-
-          // Coping capstone on tier
-          const cap = new THREE.Mesh(
-            new THREE.BoxGeometry(2.8, 0.45, tLen + 0.4),
-            portalMasonryMat,
-          );
-          cap.position.set(tX, tHeight + 0.22, tZ);
-          cap.rotation.y = sideSign * -0.38;
-          cap.castShadow = true;
-          portalGroup.add(cap);
-        }
-      });
-
-      // E. Large Bilingual Indian Railways Enamel Signboard
-      const signBoard = new THREE.Mesh(
-        new THREE.BoxGeometry(10.5, 2.4, 0.18),
-        signMat,
-      );
-      signBoard.position.set(0, 10.6, 1.55); // Mounted prominently above the arch keystone
-      signBoard.castShadow = true;
-      signBoard.frustumCulled = false;
-      portalGroup.add(signBoard);
-
-      // F. 25kV Catenary Transition Assembly on Portal Face
-      const catBracketMat = new THREE.MeshStandardMaterial({
-        color: 0x475569,
-        metalness: 0.8,
-        roughness: 0.3,
-      });
-      const bracketArm = new THREE.Mesh(
-        new THREE.BoxGeometry(11.0, 0.16, 0.16),
-        catBracketMat,
-      );
-      bracketArm.position.set(0, 6.4, 1.45);
-      portalGroup.add(bracketArm);
-
-      [-this.trackOffset / 2, this.trackOffset / 2].forEach((cx) => {
-        const ins = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.08, 0.08, 0.5, 8),
-          new THREE.MeshStandardMaterial({ color: 0x78350f }),
-        );
-        ins.position.set(cx, 6.0, 1.45);
-        portalGroup.add(ins);
-      });
-
-      portalGroup.frustumCulled = false;
-      tunnelGroup.add(portalGroup);
-    };
-
-    buildPortal(this.tunnelStart, false); // Entrance Portal
-    buildPortal(this.tunnelEnd, true); // Exit Portal
-
-    tunnelGroup.frustumCulled = false;
-    this.trackGroup.add(tunnelGroup);
-  }
 
   // ---------------------------------------------------------
   // Indian Flora (Coconut Palms & Banyan Trees)
@@ -1375,10 +601,6 @@ export class TrackSystem {
 
     for (let i = 0; i < 150; i++) {
       const u = (i * 0.0067) % 1.0;
-
-      // Don't place roadside trees inside the tunnel section
-      if (u >= this.tunnelStart - 0.02 && u <= this.tunnelEnd + 0.02) continue;
-
       const pt = this.curve.getPointAt(u);
       const tangent = this.curve.getTangentAt(u).normalize();
       const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();

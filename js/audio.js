@@ -460,7 +460,7 @@ export class TrainAudio {
       this.resume();
       const now = this.ctx.currentTime;
       const isHuman = type === 'human';
-      const isLowMass = (mass || 72) < 150 || isHuman;
+      const isLowMass = (mass || 72) <= 150 || isHuman;
 
       // Tailored acoustics: Human gets a mild, high-frequency sensory static pulse; heavy mass gets a full capacitive arc crackle
       const duration = isHuman ? 0.22 : (isLowMass ? 0.30 : 0.45);

@@ -44,7 +44,6 @@ class SimulatorApp {
     this.isPaused = false;
     this.aiSensorAuto = true;
     this.autoSpin = false;
-    this.beamDischargingTimer = 0;
     this.activeSpeedPreset = 120;
 
     // Orbit Controls for Chase / Orbit Camera
@@ -54,7 +53,7 @@ class SimulatorApp {
     this.controls.maxDistance = 140;
     this.controls.minDistance = 3;
 
-    // Camera Modes: 'orbit', 'beam', 'cab', 'target', 'action', 'drone', 'net', 'railfan', 'window'
+    // Camera Modes: 'orbit', 'cab', 'target', 'action', 'drone', 'net'
     this.cameraMode = 'orbit';
     this.railfanPos = new THREE.Vector3();
     this.railfanLookTarget = new THREE.Vector3();
@@ -98,6 +97,11 @@ class SimulatorApp {
       btnAnimalElephant: document.getElementById('btn-animal-elephant'),
       btnAnimalCowSudden: document.getElementById('btn-animal-cow-sudden'),
       btnClearObstacles: document.getElementById('btn-clear-obstacles'),
+      // Power Source Weight Tier Test Buttons
+      btnTier1: document.getElementById('btn-tier-1'),
+      btnTier2: document.getElementById('btn-tier-2'),
+      btnTier3: document.getElementById('btn-tier-3'),
+      btnTier4: document.getElementById('btn-tier-4'),
       // Scenario Stepper Dock Elements (1-by-1 Scenarios 1 to 10)
       btnScenPrev: document.getElementById('btn-scen-prev'),
       btnScenNext: document.getElementById('btn-scen-next'),
@@ -119,7 +123,7 @@ class SimulatorApp {
       consoleSpeedVal: document.getElementById('console-speed-val'),
       btnRunPause: document.getElementById('btn-run-pause'),
       btnAiSensorMode: document.getElementById('btn-ai-sensor-mode'),
-      btnConsoleShock: document.getElementById('btn-console-shock') || document.getElementById('btn-console-beam'),
+      btnConsoleShock: document.getElementById('btn-console-shock'),
       btnConsoleNet: document.getElementById('btn-console-net'),
       btnConsoleHorn: document.getElementById('btn-console-horn'),
       btnConsoleEmergency: document.getElementById('btn-console-emergency'),
@@ -450,6 +454,11 @@ class SimulatorApp {
     if (this.dom.btnAnimalCow) this.dom.btnAnimalCow.addEventListener('click', () => this.applyScenario(7));
     if (this.dom.btnAnimalElephant) this.dom.btnAnimalElephant.addEventListener('click', () => this.applyScenario(8));
     if (this.dom.btnAnimalCowSudden) this.dom.btnAnimalCowSudden.addEventListener('click', () => this.applyScenario(9));
+    // Power Source Weight Tier Buttons
+    if (this.dom.btnTier1) this.dom.btnTier1.addEventListener('click', () => this.testWeightTier(1));
+    if (this.dom.btnTier2) this.dom.btnTier2.addEventListener('click', () => this.testWeightTier(2));
+    if (this.dom.btnTier3) this.dom.btnTier3.addEventListener('click', () => this.testWeightTier(3));
+    if (this.dom.btnTier4) this.dom.btnTier4.addEventListener('click', () => this.testWeightTier(4));
     if (this.dom.btnClearObstacles) {
       this.dom.btnClearObstacles.addEventListener('click', () => {
         this.obstacles.clearAllObstacles();
@@ -534,11 +543,13 @@ class SimulatorApp {
     if (!target) {
       target = this.obstacles.spawnHumanAhead('mid', this.physics.trackProgress, this.track.totalLength, 70, false);
     }
+    const specs = target ? this.obstacles.getTailoredShockSpecs(target) : null;
+    const activeIndices = specs ? specs.activeIndices : [0, 1, 2, 3];
     if (target) {
       this.obstacles.triggerDeterrence(target, this.audio, this.train);
     }
     if (this.train && this.train.pulseShockEmitters) {
-      this.train.pulseShockEmitters(1.0);
+      this.train.pulseShockEmitters(1.0, activeIndices);
       setTimeout(() => {
         if (this.train && this.train.pulseShockEmitters) this.train.pulseShockEmitters(0);
       }, 1000);
@@ -547,7 +558,8 @@ class SimulatorApp {
       this.audio.playElectricShockDischarge(target ? target.type : 'human', target ? target.mass : 72);
     }
     if (this.dom.btnConsoleShock) {
-      this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: FIRED';
+      const pCount = specs ? specs.powerSourcesCount : 4;
+      this.dom.btnConsoleShock.innerText = `⚡ E-SHOCK: FIRED (${pCount}X)`;
       setTimeout(() => {
         if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = '⚡ E-SHOCK: ACTIVE';
       }, 1200);
@@ -642,31 +654,36 @@ class SimulatorApp {
       return;
     }
 
-    let centerOffsetY = 0.95;
+    let centerOffsetY = 1.15;
     let camDist = 3.6;
     let latDist = 2.0;
     let heightOff = 0.45;
 
     if (targetObs.type === 'dog') {
-      centerOffsetY = 0.35;
+      centerOffsetY = 0.38;
       camDist = 2.4;
       latDist = 1.4;
       heightOff = 0.30;
     } else if (targetObs.type === 'deer') {
-      centerOffsetY = 0.70;
+      centerOffsetY = 0.82;
       camDist = 3.6;
       latDist = 1.8;
       heightOff = 0.40;
     } else if (targetObs.type === 'cow') {
-      centerOffsetY = 0.85;
+      centerOffsetY = 1.05;
       camDist = 5.0;
       latDist = 2.6;
       heightOff = 0.60;
     } else if (targetObs.type === 'elephant') {
-      centerOffsetY = 1.60;
+      centerOffsetY = 1.85;
       camDist = 8.5;
       latDist = 4.5;
       heightOff = 1.20;
+    } else if (targetObs.type === 'boar') {
+      centerOffsetY = 0.55;
+      camDist = 3.0;
+      latDist = 1.6;
+      heightOff = 0.35;
     }
 
     const targetPos = targetObs.mesh.position;
@@ -677,8 +694,8 @@ class SimulatorApp {
     const normal = transform.normal ? transform.normal.clone().normalize() : new THREE.Vector3(1, 0, 0);
     const up = new THREE.Vector3(0, 1, 0);
 
-    // 3/4 front-lateral perspective framing the full obstacle + rails + ground + approaching train
-    const camOffset = tangent.clone().multiplyScalar(camDist)
+    // 3/4 front-lateral perspective framing the full obstacle + face + eyes + antlers facing the approaching train
+    const camOffset = tangent.clone().negate().multiplyScalar(camDist)
       .add(normal.clone().multiplyScalar(latDist))
       .add(up.clone().multiplyScalar(heightOff));
     const idealCamPos = targetCenter.clone().add(camOffset);
@@ -728,8 +745,57 @@ class SimulatorApp {
     if (this.dom.btnAnimalElephant) this.dom.btnAnimalElephant.classList.toggle('active', index === 8);
     if (this.dom.btnAnimalCowSudden) this.dom.btnAnimalCowSudden.classList.toggle('active', index === 9);
 
+    // Deactivate power source tier buttons when running a numbered scenario
+    for (let t = 1; t <= 4; t++) {
+      const tb = document.getElementById(`btn-tier-${t}`);
+      if (tb) tb.classList.remove('active');
+    }
+
     // Update Scenario Information HUD Card
     this.updateScenarioHUD(index);
+  }
+
+  // Dedicated interactive tester for weight-tiered power sources (1x, 2x, 3x, 4x)
+  testWeightTier(tier = 1) {
+    const obs = this.obstacles.spawnWeightTierObstacle(
+      tier,
+      this.physics.trackProgress,
+      this.track.totalLength
+    );
+    this.currentScenario = null;
+
+    // Deselect standard scenario buttons
+    for (let i = 1; i <= 10; i++) {
+      const btn = document.getElementById(`btn-scen-${i}`);
+      if (btn) btn.classList.remove('active');
+    }
+    ['btnHumanEnter', 'btnHumanExit', 'btnHumanMid', 'btnHumanSudden', 'btnAnimalDog', 'btnAnimalDeer', 'btnAnimalCow', 'btnAnimalElephant', 'btnAnimalCowSudden'].forEach(k => {
+      if (this.dom[k]) this.dom[k].classList.remove('active');
+    });
+
+    // Highlight the active weight-tier button
+    for (let t = 1; t <= 4; t++) {
+      const tb = document.getElementById(`btn-tier-${t}`);
+      if (tb) tb.classList.toggle('active', t === tier);
+    }
+
+    // Auto-switch to RX TARGET view to observe deterrence arc
+    this.setCameraMode('target');
+    this.focusOnTarget(true);
+
+    const specs = this.obstacles.getTailoredShockSpecs(obs);
+
+    const badgeEl = document.getElementById('scen-card-badge');
+    const titleEl = document.getElementById('scen-card-title');
+    const leadEl = document.getElementById('scen-leg-lead');
+    const trailEl = document.getElementById('scen-leg-trail');
+    const descEl = document.getElementById('scen-card-desc');
+
+    if (badgeEl) badgeEl.innerText = `WEIGHT TIER TEST • TIER ${specs.tier} / 4`;
+    if (titleEl) titleEl.innerText = `${specs.tier}. ${obs.name.toUpperCase()}`;
+    if (leadEl) leadEl.innerText = `POWER SOURCES: ${specs.powerSourcesCount} / 4 ACTIVE [${specs.activeLabels.join(', ')}]`;
+    if (trailEl) trailEl.innerText = `SPECS: ${specs.voltage} • ${specs.current} • ${specs.energy} (${specs.compliance})`;
+    if (descEl) descEl.innerText = specs.desc;
   }
 
   prevScenario() {
@@ -800,9 +866,9 @@ class SimulatorApp {
       {
         badge: 'SCENARIO 7 / 10 • 800M-80M ONLY ELECTRICITY',
         title: '7. INDIAN ZEBU COW ON TRACK (360 KG)',
-        lead: 'SPECIES: BOS INDICUS (360 KG > 150 KG)',
+        lead: 'SPECIES: BOS INDICUS (360 KG > 350 KG)',
         trail: 'SAFETY: ONLY ELECTRICITY (800M-80M) • NET LOCKED',
-        desc: 'Heavy cattle grazing 650m ahead. Weight 360kg > 150kg: Net is LOCKED. Non-lethal electric shock (4 power sources) clears cow off track safely before 80m.'
+        desc: 'Heavy cattle grazing 650m ahead. Weight 360kg > 350kg: Net is LOCKED. Non-lethal electric shock (All 4 power sources active) clears cow off track safely before 80m.'
       },
       {
         badge: 'SCENARIO 8 / 10 • 800M-80M ONLY ELECTRICITY',
@@ -836,7 +902,7 @@ class SimulatorApp {
   }
 
   cycleCamera() {
-    const modes = ['orbit', 'beam', 'cab', 'target', 'action', 'drone', 'net'];
+    const modes = ['orbit', 'cab', 'target', 'action', 'drone', 'net'];
     const idx = modes.indexOf(this.cameraMode);
     const nextMode = modes[(idx + 1) % modes.length];
     this.setCameraMode(nextMode);
@@ -933,31 +999,16 @@ class SimulatorApp {
       this.controls.autoRotateSpeed = 2.0;
       this.controls.update();
 
-    } else if (this.cameraMode === 'beam') {
-      // BEAM POV: Forward POV mounted at front nose beam projector looking at upcoming obstacles
-      const fwdDist = this.train.locoLength / 2 + 0.6;
-      const camPos = locoPos.clone()
-        .add(forward.clone().multiplyScalar(fwdDist))
-        .add(up.clone().multiplyScalar(2.1));
-      this.camera.position.copy(camPos);
-
-      let targetObs = this.obstacles.obstacles.find(o => !o.isCollected && !o.isDeterred && o.mesh);
-      if (targetObs) {
-        this.camera.lookAt(targetObs.mesh.position.clone().add(up.clone().multiplyScalar(1.0)));
-      } else {
-        const lookTarget = camPos.clone().add(forward.clone().multiplyScalar(80)).add(up.clone().multiplyScalar(-0.4));
-        this.camera.lookAt(lookTarget);
-      }
-
     } else if (this.cameraMode === 'target') {
       // RX TARGET: Camera placed ahead at target/obstacle focused directly on the character/animal (head-to-toe 3/4 orbit)
       let targetObs = this.obstacles.obstacles.find(o => !o.isCollected && o.mesh);
       if (targetObs && targetObs.mesh) {
-        let centerOffsetY = 0.95;
-        if (targetObs.type === 'dog') centerOffsetY = 0.35;
-        else if (targetObs.type === 'deer') centerOffsetY = 0.70;
-        else if (targetObs.type === 'cow') centerOffsetY = 0.85;
-        else if (targetObs.type === 'elephant') centerOffsetY = 1.60;
+        let centerOffsetY = 1.15;
+        if (targetObs.type === 'dog') centerOffsetY = 0.38;
+        else if (targetObs.type === 'deer') centerOffsetY = 0.82;
+        else if (targetObs.type === 'cow') centerOffsetY = 1.05;
+        else if (targetObs.type === 'elephant') centerOffsetY = 1.85;
+        else if (targetObs.type === 'boar') centerOffsetY = 0.55;
 
         const targetPos = targetObs.mesh.position;
         const targetCenter = targetPos.clone().add(new THREE.Vector3(0, centerOffsetY, 0));
@@ -1182,16 +1233,6 @@ class SimulatorApp {
     requestAnimationFrame(this.animate);
 
     const rawDt = Math.min(this.clock.getDelta(), 0.1);
-
-    // Count down deterrence beam discharging indicator
-    if (this.beamDischargingTimer > 0) {
-      this.beamDischargingTimer -= rawDt;
-      if (this.beamDischargingTimer <= 0) {
-        if (this.dom.btnConsoleBeam) {
-          this.dom.btnConsoleBeam.innerText = '⚡ BEAM: ARMED';
-        }
-      }
-    }
 
     // Pause handling: keep camera active, but freeze physical world
     if (this.isPaused) {

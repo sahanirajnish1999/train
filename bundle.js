@@ -18361,6 +18361,82 @@
       );
     }
   };
+  var WireframeGeometry = class extends BufferGeometry {
+    /**
+     * Constructs a new wireframe geometry.
+     *
+     * @param {?BufferGeometry} [geometry=null] - The geometry.
+     */
+    constructor(geometry = null) {
+      super();
+      this.type = "WireframeGeometry";
+      this.parameters = {
+        geometry
+      };
+      if (geometry !== null) {
+        const vertices = [];
+        const edges = /* @__PURE__ */ new Set();
+        const start = new Vector3();
+        const end = new Vector3();
+        if (geometry.index !== null) {
+          const position = geometry.attributes.position;
+          const indices = geometry.index;
+          let groups = geometry.groups;
+          if (groups.length === 0) {
+            groups = [{ start: 0, count: indices.count, materialIndex: 0 }];
+          }
+          for (let o = 0, ol = groups.length; o < ol; ++o) {
+            const group = groups[o];
+            const groupStart = group.start;
+            const groupCount = group.count;
+            for (let i = groupStart, l = groupStart + groupCount; i < l; i += 3) {
+              for (let j = 0; j < 3; j++) {
+                const index1 = indices.getX(i + j);
+                const index2 = indices.getX(i + (j + 1) % 3);
+                start.fromBufferAttribute(position, index1);
+                end.fromBufferAttribute(position, index2);
+                if (isUniqueEdge(start, end, edges) === true) {
+                  vertices.push(start.x, start.y, start.z);
+                  vertices.push(end.x, end.y, end.z);
+                }
+              }
+            }
+          }
+        } else {
+          const position = geometry.attributes.position;
+          for (let i = 0, l = position.count / 3; i < l; i++) {
+            for (let j = 0; j < 3; j++) {
+              const index1 = 3 * i + j;
+              const index2 = 3 * i + (j + 1) % 3;
+              start.fromBufferAttribute(position, index1);
+              end.fromBufferAttribute(position, index2);
+              if (isUniqueEdge(start, end, edges) === true) {
+                vertices.push(start.x, start.y, start.z);
+                vertices.push(end.x, end.y, end.z);
+              }
+            }
+          }
+        }
+        this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+      }
+    }
+    copy(source) {
+      super.copy(source);
+      this.parameters = Object.assign({}, source.parameters);
+      return this;
+    }
+  };
+  function isUniqueEdge(start, end, edges) {
+    const hash1 = `${start.x},${start.y},${start.z}-${end.x},${end.y},${end.z}`;
+    const hash2 = `${end.x},${end.y},${end.z}-${start.x},${start.y},${start.z}`;
+    if (edges.has(hash1) === true || edges.has(hash2) === true) {
+      return false;
+    } else {
+      edges.add(hash1);
+      edges.add(hash2);
+      return true;
+    }
+  }
   function cloneUniforms(src) {
     const dst = {};
     for (const u in src) {
@@ -21729,6 +21805,28 @@
       return path + url;
     }
   };
+  var InstancedBufferGeometry = class extends BufferGeometry {
+    /**
+     * Constructs a new instanced buffer geometry.
+     */
+    constructor() {
+      super();
+      this.isInstancedBufferGeometry = true;
+      this.type = "InstancedBufferGeometry";
+      this.instanceCount = Infinity;
+    }
+    copy(source) {
+      super.copy(source);
+      this.instanceCount = source.instanceCount;
+      return this;
+    }
+    toJSON() {
+      const data = super.toJSON();
+      data.instanceCount = this.instanceCount;
+      data.isInstancedBufferGeometry = true;
+      return data;
+    }
+  };
   var _errorMap = /* @__PURE__ */ new WeakMap();
   var ImageBitmapLoader = class extends Loader {
     /**
@@ -23518,6 +23616,36 @@
       }
     }
   };
+  var InstancedInterleavedBuffer = class extends InterleavedBuffer {
+    /**
+     * Constructs a new instanced interleaved buffer.
+     *
+     * @param {TypedArray} array - A typed array with a shared buffer storing attribute data.
+     * @param {number} stride - The number of typed-array elements per vertex.
+     * @param {number} [meshPerAttribute=1] - Defines how often a value of this interleaved buffer should be repeated.
+     */
+    constructor(array, stride, meshPerAttribute = 1) {
+      super(array, stride);
+      this.isInstancedInterleavedBuffer = true;
+      this.meshPerAttribute = meshPerAttribute;
+    }
+    copy(source) {
+      super.copy(source);
+      this.meshPerAttribute = source.meshPerAttribute;
+      return this;
+    }
+    clone(data) {
+      const ib = super.clone(data);
+      ib.meshPerAttribute = this.meshPerAttribute;
+      return ib;
+    }
+    toJSON(data) {
+      const json = super.toJSON(data);
+      json.isInstancedInterleavedBuffer = true;
+      json.meshPerAttribute = this.meshPerAttribute;
+      return json;
+    }
+  };
   var Clock = class {
     /**
      * Constructs a new clock.
@@ -23738,6 +23866,208 @@
       te[1] = n21;
       te[3] = n22;
       return this;
+    }
+  };
+  var _startP = /* @__PURE__ */ new Vector3();
+  var _startEnd = /* @__PURE__ */ new Vector3();
+  var _d1 = /* @__PURE__ */ new Vector3();
+  var _d2 = /* @__PURE__ */ new Vector3();
+  var _r = /* @__PURE__ */ new Vector3();
+  var _c1 = /* @__PURE__ */ new Vector3();
+  var _c2 = /* @__PURE__ */ new Vector3();
+  var Line3 = class {
+    /**
+     * Constructs a new line segment.
+     *
+     * @param {Vector3} [start=(0,0,0)] - Start of the line segment.
+     * @param {Vector3} [end=(0,0,0)] - End of the line segment.
+     */
+    constructor(start = new Vector3(), end = new Vector3()) {
+      this.start = start;
+      this.end = end;
+    }
+    /**
+     * Sets the start and end values by copying the given vectors.
+     *
+     * @param {Vector3} start - The start point.
+     * @param {Vector3} end - The end point.
+     * @return {Line3} A reference to this line segment.
+     */
+    set(start, end) {
+      this.start.copy(start);
+      this.end.copy(end);
+      return this;
+    }
+    /**
+     * Copies the values of the given line segment to this instance.
+     *
+     * @param {Line3} line - The line segment to copy.
+     * @return {Line3} A reference to this line segment.
+     */
+    copy(line) {
+      this.start.copy(line.start);
+      this.end.copy(line.end);
+      return this;
+    }
+    /**
+     * Returns the center of the line segment.
+     *
+     * @param {Vector3} target - The target vector that is used to store the method's result.
+     * @return {Vector3} The center point.
+     */
+    getCenter(target) {
+      return target.addVectors(this.start, this.end).multiplyScalar(0.5);
+    }
+    /**
+     * Returns the delta vector of the line segment's start and end point.
+     *
+     * @param {Vector3} target - The target vector that is used to store the method's result.
+     * @return {Vector3} The delta vector.
+     */
+    delta(target) {
+      return target.subVectors(this.end, this.start);
+    }
+    /**
+     * Returns the squared Euclidean distance between the line' start and end point.
+     *
+     * @return {number} The squared Euclidean distance.
+     */
+    distanceSq() {
+      return this.start.distanceToSquared(this.end);
+    }
+    /**
+     * Returns the Euclidean distance between the line' start and end point.
+     *
+     * @return {number} The Euclidean distance.
+     */
+    distance() {
+      return this.start.distanceTo(this.end);
+    }
+    /**
+     * Returns a vector at a certain position along the line segment.
+     *
+     * @param {number} t - A value between `[0,1]` to represent a position along the line segment.
+     * @param {Vector3} target - The target vector that is used to store the method's result.
+     * @return {Vector3} The point along the line segment.
+     */
+    at(t, target) {
+      return this.delta(target).multiplyScalar(t).add(this.start);
+    }
+    /**
+     * Returns a point parameter based on the closest point as projected on the line segment.
+     *
+     * @param {Vector3} point - The point for which to return a point parameter.
+     * @param {boolean} clampToLine - Whether to clamp the result to the range `[0,1]` or not.
+     * @return {number} The point parameter.
+     */
+    closestPointToPointParameter(point, clampToLine) {
+      _startP.subVectors(point, this.start);
+      _startEnd.subVectors(this.end, this.start);
+      const startEnd2 = _startEnd.dot(_startEnd);
+      if (startEnd2 === 0) return 0;
+      const startEnd_startP = _startEnd.dot(_startP);
+      let t = startEnd_startP / startEnd2;
+      if (clampToLine) {
+        t = clamp(t, 0, 1);
+      }
+      return t;
+    }
+    /**
+     * Returns the closest point on the line for a given point.
+     *
+     * @param {Vector3} point - The point to compute the closest point on the line for.
+     * @param {boolean} clampToLine - Whether to clamp the result to the range `[0,1]` or not.
+     * @param {Vector3} target - The target vector that is used to store the method's result.
+     * @return {Vector3} The closest point on the line.
+     */
+    closestPointToPoint(point, clampToLine, target) {
+      const t = this.closestPointToPointParameter(point, clampToLine);
+      return this.delta(target).multiplyScalar(t).add(this.start);
+    }
+    /**
+     * Returns the closest squared distance between this line segment and the given one.
+     *
+     * @param {Line3} line - The line segment to compute the closest squared distance to.
+     * @param {Vector3} [c1] - The closest point on this line segment.
+     * @param {Vector3} [c2] - The closest point on the given line segment.
+     * @return {number} The squared distance between this line segment and the given one.
+     */
+    distanceSqToLine3(line, c1 = _c1, c2 = _c2) {
+      const EPSILON = 1e-8 * 1e-8;
+      let s, t;
+      const p1 = this.start;
+      const p2 = line.start;
+      const q1 = this.end;
+      const q2 = line.end;
+      _d1.subVectors(q1, p1);
+      _d2.subVectors(q2, p2);
+      _r.subVectors(p1, p2);
+      const a = _d1.dot(_d1);
+      const e = _d2.dot(_d2);
+      const f = _d2.dot(_r);
+      if (a <= EPSILON && e <= EPSILON) {
+        c1.copy(p1);
+        c2.copy(p2);
+        return c1.distanceToSquared(c2);
+      }
+      if (a <= EPSILON) {
+        s = 0;
+        t = f / e;
+        t = clamp(t, 0, 1);
+      } else {
+        const c = _d1.dot(_r);
+        if (e <= EPSILON) {
+          t = 0;
+          s = clamp(-c / a, 0, 1);
+        } else {
+          const b = _d1.dot(_d2);
+          const denom = a * e - b * b;
+          if (denom !== 0) {
+            s = clamp((b * f - c * e) / denom, 0, 1);
+          } else {
+            s = 0;
+          }
+          t = (b * s + f) / e;
+          if (t < 0) {
+            t = 0;
+            s = clamp(-c / a, 0, 1);
+          } else if (t > 1) {
+            t = 1;
+            s = clamp((b - c) / a, 0, 1);
+          }
+        }
+      }
+      c1.copy(p1).addScaledVector(_d1, s);
+      c2.copy(p2).addScaledVector(_d2, t);
+      return c1.distanceToSquared(c2);
+    }
+    /**
+     * Applies a 4x4 transformation matrix to this line segment.
+     *
+     * @param {Matrix4} matrix - The transformation matrix.
+     * @return {Line3} A reference to this line segment.
+     */
+    applyMatrix4(matrix) {
+      this.start.applyMatrix4(matrix);
+      this.end.applyMatrix4(matrix);
+      return this;
+    }
+    /**
+     * Returns `true` if this line segment is equal with the given one.
+     *
+     * @param {Line3} line - The line segment to test for equality.
+     * @return {boolean} Whether this line segment is equal with the given one.
+     */
+    equals(line) {
+      return line.start.equals(this.start) && line.end.equals(this.end);
+    }
+    /**
+     * Returns a new line segment with copied values from this instance.
+     *
+     * @return {Line3} A clone of this instance.
+     */
+    clone() {
+      return new this.constructor().copy(this);
     }
   };
   var Controls = class extends EventDispatcher {
@@ -29424,7 +29754,7 @@
   var _lookTarget2 = /* @__PURE__ */ new Vector3();
   function WebGLShadowMap(renderer, objects, capabilities) {
     let _frustum = new Frustum();
-    const _shadowMapSize = new Vector2(), _viewportSize = new Vector2(), _viewport = new Vector4(), _depthMaterial = new MeshDepthMaterial(), _distanceMaterial = new MeshDistanceMaterial(), _materialCache = {}, _maxTextureSize = capabilities.maxTextureSize;
+    const _shadowMapSize = new Vector2(), _viewportSize = new Vector2(), _viewport2 = new Vector4(), _depthMaterial = new MeshDepthMaterial(), _distanceMaterial = new MeshDistanceMaterial(), _materialCache = {}, _maxTextureSize = capabilities.maxTextureSize;
     const shadowSide = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
     const shadowMaterialVertical = new ShaderMaterial({
       defines: {
@@ -29598,13 +29928,13 @@
               renderer.clear();
             }
             const viewport = shadow.getViewport(face);
-            _viewport.set(
+            _viewport2.set(
               _viewportSize.x * viewport.x,
               _viewportSize.y * viewport.y,
               _viewportSize.x * viewport.z,
               _viewportSize.y * viewport.w
             );
-            _state.viewport(_viewport);
+            _state.viewport(_viewport2);
           }
           _frustum = shadow.getFrustum(face);
           renderObject(scene, camera, shadowCamera, light, layers, this.type);
@@ -33717,7 +34047,7 @@ void main() {
       let _pixelRatio = 1;
       let _opaqueSort = null;
       let _transparentSort = null;
-      const _viewport = new Vector4(0, 0, _width, _height);
+      const _viewport2 = new Vector4(0, 0, _width, _height);
       const _scissor = new Vector4(0, 0, _width, _height);
       let _scissorTest = false;
       const _frustum = new Frustum();
@@ -33893,15 +34223,15 @@ void main() {
         return target.copy(_currentViewport);
       };
       this.getViewport = function(target) {
-        return target.copy(_viewport);
+        return target.copy(_viewport2);
       };
       this.setViewport = function(x, y, width, height) {
         if (x.isVector4) {
-          _viewport.set(x.x, x.y, x.z, x.w);
+          _viewport2.set(x.x, x.y, x.z, x.w);
         } else {
-          _viewport.set(x, y, width, height);
+          _viewport2.set(x, y, width, height);
         }
-        state.viewport(_currentViewport.copy(_viewport).multiplyScalar(getTargetPixelRatio()).round());
+        state.viewport(_currentViewport.copy(_viewport2).multiplyScalar(getTargetPixelRatio()).round());
       };
       this.getScissor = function(target) {
         return target.copy(_scissor);
@@ -34978,7 +35308,7 @@ void main() {
           _currentScissor.copy(renderTarget.scissor);
           _currentScissorTest = renderTarget.scissorTest;
         } else {
-          _currentViewport.copy(_viewport).multiplyScalar(_pixelRatio).floor();
+          _currentViewport.copy(_viewport2).multiplyScalar(_pixelRatio).floor();
           _currentScissor.copy(_scissor).multiplyScalar(_pixelRatio).floor();
           _currentScissorTest = _scissorTest;
         }
@@ -36821,7 +37151,7 @@ void main() {
         this.resume();
         const now = this.ctx.currentTime;
         const isHuman = type === "human";
-        const isLowMass = (mass || 72) < 150 || isHuman;
+        const isLowMass = (mass || 72) <= 150 || isHuman;
         const duration = isHuman ? 0.22 : isLowMass ? 0.3 : 0.45;
         const bufferSize = Math.floor(this.ctx.sampleRate * duration);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -37003,8 +37333,6 @@ void main() {
       this.totalLength = 0;
       this.stationProgress = 0.85;
       this.crossingProgress = 0.45;
-      this.tunnelStart = 0.21;
-      this.tunnelEnd = 0.29;
       this.signals = [];
       this.textures = this.generateTextures();
       this.initTrackPath();
@@ -37012,7 +37340,6 @@ void main() {
       this.buildBallastEmbankment();
       this.buildSleepersAndRails();
       this.buildOHECatenary();
-      this.buildMountainTunnel();
       this.buildStation();
       this.buildLevelCrossing();
       this.buildSignals();
@@ -37057,130 +37384,6 @@ void main() {
       ctxS.fillRect(40, 10, 24, 44);
       ctxS.fillRect(192, 10, 24, 44);
       const sleeperTex = new CanvasTexture(canvasS);
-      const canvasT = document.createElement("canvas");
-      canvasT.width = 512;
-      canvasT.height = 512;
-      const ctxT = canvasT.getContext("2d");
-      ctxT.fillStyle = "#27272a";
-      ctxT.fillRect(0, 0, 512, 512);
-      ctxT.strokeStyle = "#18181b";
-      ctxT.lineWidth = 3;
-      const rowH = 32;
-      for (let y = 0; y < 512; y += rowH) {
-        ctxT.beginPath();
-        ctxT.moveTo(0, y);
-        ctxT.lineTo(512, y);
-        ctxT.stroke();
-        const offset = y / rowH % 2 === 0 ? 0 : 32;
-        for (let x = offset; x < 512; x += 64) {
-          ctxT.beginPath();
-          ctxT.moveTo(x, y);
-          ctxT.lineTo(x, y + rowH);
-          ctxT.stroke();
-        }
-      }
-      for (let i = 0; i < 40; i++) {
-        const sx = Math.random() * 512;
-        const sw = 15 + Math.random() * 25;
-        ctxT.fillStyle = "rgba(10, 10, 10, 0.4)";
-        ctxT.fillRect(sx, 0, sw, 512);
-      }
-      const tunnelStoneTex = new CanvasTexture(canvasT);
-      tunnelStoneTex.wrapS = RepeatWrapping;
-      tunnelStoneTex.wrapT = RepeatWrapping;
-      tunnelStoneTex.repeat.set(4, 20);
-      const canvasP = document.createElement("canvas");
-      canvasP.width = 512;
-      canvasP.height = 512;
-      const ctxP = canvasP.getContext("2d");
-      ctxP.fillStyle = "#64748b";
-      ctxP.fillRect(0, 0, 512, 512);
-      ctxP.strokeStyle = "#1e293b";
-      ctxP.lineWidth = 4;
-      const pRowH = 48;
-      for (let y = 0; y < 512; y += pRowH) {
-        ctxP.strokeRect(0, y, 512, pRowH);
-        const offset = y / pRowH % 2 === 0 ? 0 : 40;
-        for (let x = offset; x < 512; x += 80) {
-          ctxP.strokeRect(x, y, 80, pRowH);
-          ctxP.fillStyle = "rgba(0, 0, 0, 0.08)";
-          ctxP.fillRect(x + 4, y + 4, 72, pRowH - 8);
-        }
-      }
-      const portalMasonryTex = new CanvasTexture(canvasP);
-      portalMasonryTex.wrapS = RepeatWrapping;
-      portalMasonryTex.wrapT = RepeatWrapping;
-      portalMasonryTex.repeat.set(4, 4);
-      const canvasSign = document.createElement("canvas");
-      canvasSign.width = 1024;
-      canvasSign.height = 256;
-      const ctxSign = canvasSign.getContext("2d");
-      ctxSign.fillStyle = "#facc15";
-      ctxSign.fillRect(0, 0, 1024, 256);
-      ctxSign.lineWidth = 12;
-      ctxSign.strokeStyle = "#000";
-      ctxSign.strokeRect(6, 6, 1012, 244);
-      ctxSign.lineWidth = 3;
-      ctxSign.strokeRect(18, 18, 988, 220);
-      ctxSign.fillStyle = "#000";
-      ctxSign.textAlign = "center";
-      ctxSign.font = "bold 28px sans-serif";
-      ctxSign.fillText("\u092E\u0927\u094D\u092F \u0930\u0947\u0932  \u2022  CENTRAL RAILWAY", 512, 56);
-      ctxSign.font = "bold 54px sans-serif";
-      ctxSign.fillText("\u0938\u0941\u0930\u0902\u0917 \u0938\u0902. \u0966\u096A  |  TUNNEL NO. 04", 512, 134);
-      ctxSign.font = "bold 28px sans-serif";
-      ctxSign.fillText(
-        "\u0932\u0902\u092C\u093E\u0908 : 466 \u092E\u0940.  |  LENGTH : 466 M  \u2022  \u0918\u093E\u091F \u0916\u0902\u0921 (GHAT SECTION)",
-        512,
-        198
-      );
-      const portalSignTex = new CanvasTexture(canvasSign);
-      const canvasArch = document.createElement("canvas");
-      canvasArch.width = 512;
-      canvasArch.height = 64;
-      const ctxArch = canvasArch.getContext("2d");
-      const stripeW = 32;
-      for (let x = 0; x < 512; x += stripeW * 2) {
-        ctxArch.fillStyle = "#dc2626";
-        ctxArch.fillRect(x, 0, stripeW, 64);
-        ctxArch.fillStyle = "#f8fafc";
-        ctxArch.fillRect(x + stripeW, 0, stripeW, 64);
-      }
-      const archStripeTex = new CanvasTexture(canvasArch);
-      archStripeTex.wrapS = RepeatWrapping;
-      archStripeTex.repeat.set(16, 1);
-      const canvasRock = document.createElement("canvas");
-      canvasRock.width = 512;
-      canvasRock.height = 512;
-      const ctxRock = canvasRock.getContext("2d");
-      ctxRock.fillStyle = "#524a42";
-      ctxRock.fillRect(0, 0, 512, 512);
-      for (let y = 0; y < 512; y += 14) {
-        const shade = Math.floor(65 + Math.sin(y * 0.06) * 22);
-        ctxRock.fillStyle = `rgb(${shade + 10}, ${shade + 4}, ${shade})`;
-        ctxRock.fillRect(0, y, 512, 12);
-      }
-      for (let i = 0; i < 260; i++) {
-        const rx = Math.random() * 512;
-        const ry = Math.random() * 512;
-        ctxRock.fillStyle = "rgba(40, 115, 45, 0.55)";
-        ctxRock.beginPath();
-        ctxRock.arc(rx, ry, 10 + Math.random() * 22, 0, Math.PI * 2);
-        ctxRock.fill();
-      }
-      for (let i = 0; i < 25; i++) {
-        const fx = Math.random() * 512;
-        ctxRock.strokeStyle = "rgba(25, 20, 15, 0.4)";
-        ctxRock.lineWidth = 2 + Math.random() * 3;
-        ctxRock.beginPath();
-        ctxRock.moveTo(fx, 0);
-        ctxRock.lineTo(fx + (Math.random() - 0.5) * 60, 512);
-        ctxRock.stroke();
-      }
-      const mountainRockTex = new CanvasTexture(canvasRock);
-      mountainRockTex.wrapS = RepeatWrapping;
-      mountainRockTex.wrapT = RepeatWrapping;
-      mountainRockTex.repeat.set(8, 8);
       const canvasStBoard = document.createElement("canvas");
       canvasStBoard.width = 1024;
       canvasStBoard.height = 384;
@@ -37318,11 +37521,6 @@ void main() {
       return {
         ballastTex,
         sleeperTex,
-        tunnelStoneTex,
-        portalMasonryTex,
-        portalSignTex,
-        archStripeTex,
-        mountainRockTex,
         stationBoardTex,
         stationBuildingTex,
         platformPaverTex,
@@ -37339,9 +37537,9 @@ void main() {
         new Vector3(0, 0, 700),
         // High speed straightaway
         new Vector3(140, 0, 1100),
-        // Deep Mountain Pass Approach
+        // Scenic curve approach
         new Vector3(420, 0, 1350),
-        // Inside Scenic Mountain Tunnel
+        // Open countryside bend
         new Vector3(780, 0, 1200),
         // Emerging into valley
         new Vector3(980, 0, 800),
@@ -37555,39 +37753,36 @@ void main() {
         const pt = this.curve.getPointAt(u);
         const tangent = this.curve.getTangentAt(u).normalize();
         const normal = new Vector3().crossVectors(tangent, up).normalize();
-        const inTunnel = u >= this.tunnelStart && u <= this.tunnelEnd;
-        if (!inTunnel) {
-          const mastGroup = new Group();
-          const mastPos = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
-          mastGroup.position.copy(mastPos);
-          mastGroup.quaternion.setFromUnitVectors(
-            new Vector3(0, 0, 1),
-            tangent
+        const mastGroup = new Group();
+        const mastPos = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2 - 2.8));
+        mastGroup.position.copy(mastPos);
+        mastGroup.quaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          tangent
+        );
+        const pole = new Mesh(
+          new BoxGeometry(0.18, 7.2, 0.18),
+          oheMastMat
+        );
+        pole.position.y = 3.6;
+        pole.castShadow = true;
+        mastGroup.add(pole);
+        const arm = new Mesh(
+          new BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1),
+          oheMastMat
+        );
+        arm.position.set((this.trackOffset + 3.4) / 2 - 0.2, 6.2, 0);
+        mastGroup.add(arm);
+        [2.6, 2.6 + this.trackOffset].forEach((x) => {
+          const ins = new Mesh(
+            new CylinderGeometry(0.05, 0.05, 0.35, 8),
+            insMat
           );
-          const pole = new Mesh(
-            new BoxGeometry(0.18, 7.2, 0.18),
-            oheMastMat
-          );
-          pole.position.y = 3.6;
-          pole.castShadow = true;
-          mastGroup.add(pole);
-          const arm = new Mesh(
-            new BoxGeometry(this.trackOffset + 3.4, 0.1, 0.1),
-            oheMastMat
-          );
-          arm.position.set((this.trackOffset + 3.4) / 2 - 0.2, 6.2, 0);
-          mastGroup.add(arm);
-          [2.6, 2.6 + this.trackOffset].forEach((x) => {
-            const ins = new Mesh(
-              new CylinderGeometry(0.05, 0.05, 0.35, 8),
-              insMat
-            );
-            ins.position.set(x, 5.8, 0);
-            mastGroup.add(ins);
-          });
-          mastGroup.frustumCulled = false;
-          this.trackGroup.add(mastGroup);
-        }
+          ins.position.set(x, 5.8, 0);
+          mastGroup.add(ins);
+        });
+        mastGroup.frustumCulled = false;
+        this.trackGroup.add(mastGroup);
         const t1Pt = pt.clone().add(normal.clone().multiplyScalar(-this.trackOffset / 2));
         const t2Pt = pt.clone().add(normal.clone().multiplyScalar(this.trackOffset / 2));
         contactWire1.push(t1Pt.clone().setY(5.4));
@@ -37606,470 +37801,6 @@ void main() {
       addWire(contactWire2);
       addWire(catenaryWire1);
       addWire(catenaryWire2);
-    }
-    // ---------------------------------------------------------
-    // Grand Indian Railways Mountain Tunnel & Ghat Rock Cutting
-    // 100% Grounded Mountain Massif, Realistic Ghat Rock Cutting Approach,
-    // Dressed Ashlar Stone Portals with Open Horseshoe Arch, Regulation Hazard
-    // Chevron Stripes, Bilingual IR Signboard, Safety Refuge Niches & Interior Lighting
-    // ---------------------------------------------------------
-    buildMountainTunnel() {
-      const tunnelGroup = new Group();
-      const up = new Vector3(0, 1, 0);
-      const tunnelMat = new MeshStandardMaterial({
-        map: this.textures.tunnelStoneTex,
-        roughness: 0.92,
-        metalness: 0.08,
-        side: BackSide
-      });
-      const portalMasonryMat = new MeshStandardMaterial({
-        map: this.textures.portalMasonryTex,
-        roughness: 0.82,
-        metalness: 0.18
-      });
-      const mountainRockMat = new MeshStandardMaterial({
-        map: this.textures.mountainRockTex,
-        roughness: 0.92,
-        metalness: 0.08
-      });
-      const archStripeMat = new MeshBasicMaterial({
-        map: this.textures.archStripeTex
-      });
-      const signMat = new MeshBasicMaterial({
-        map: this.textures.portalSignTex
-      });
-      const wHalf = 6;
-      const wallH = 4.4;
-      const archH = 7.8;
-      const buildRockCutting = (startU, endU, isEntry) => {
-        const cSteps = 24;
-        const cGeo = new BufferGeometry();
-        const cPos = [];
-        const cUVs = [];
-        const cIndices = [];
-        for (let i = 0; i <= cSteps; i++) {
-          const u = startU + i / cSteps * (endU - startU);
-          const pt = this.curve.getPointAt(u);
-          const tangent = this.curve.getTangentAt(u).normalize();
-          const normal = new Vector3().crossVectors(tangent, up).normalize();
-          const factor = isEntry ? i / cSteps : 1 - i / cSteps;
-          const cutH = 0.5 + Math.pow(factor, 1.2) * 13.3;
-          const vL0 = pt.clone().add(normal.clone().multiplyScalar(-18)).setY(pt.y + cutH);
-          const vL1 = pt.clone().add(normal.clone().multiplyScalar(-12.5)).setY(pt.y + cutH * 0.55);
-          const vL2 = pt.clone().add(normal.clone().multiplyScalar(-7.5)).setY(pt.y + 0.18);
-          const vR0 = pt.clone().add(normal.clone().multiplyScalar(7.5)).setY(pt.y + 0.18);
-          const vR1 = pt.clone().add(normal.clone().multiplyScalar(12.5)).setY(pt.y + cutH * 0.55);
-          const vR2 = pt.clone().add(normal.clone().multiplyScalar(18)).setY(pt.y + cutH);
-          [vL0, vL1, vL2, vR0, vR1, vR2].forEach((v, idx) => {
-            cPos.push(v.x, v.y, v.z);
-            cUVs.push(idx / 5, i / cSteps * 6);
-          });
-        }
-        for (let i = 0; i < cSteps; i++) {
-          for (let q = 0; q < 2; q++) {
-            const l0 = i * 6 + q;
-            const l1 = l0 + 1;
-            const l2 = (i + 1) * 6 + q;
-            const l3 = l2 + 1;
-            cIndices.push(l0, l2, l1);
-            cIndices.push(l1, l2, l3);
-          }
-          for (let q = 3; q < 5; q++) {
-            const r0 = i * 6 + q;
-            const r1 = r0 + 1;
-            const r2 = (i + 1) * 6 + q;
-            const r3 = r2 + 1;
-            cIndices.push(r0, r2, r1);
-            cIndices.push(r1, r2, r3);
-          }
-        }
-        cGeo.setAttribute("position", new Float32BufferAttribute(cPos, 3));
-        cGeo.setAttribute("uv", new Float32BufferAttribute(cUVs, 2));
-        cGeo.setIndex(cIndices);
-        cGeo.computeVertexNormals();
-        const cMesh = new Mesh(cGeo, mountainRockMat);
-        cMesh.castShadow = true;
-        cMesh.receiveShadow = true;
-        cMesh.frustumCulled = false;
-        tunnelGroup.add(cMesh);
-      };
-      buildRockCutting(this.tunnelStart - 0.025, this.tunnelStart, true);
-      buildRockCutting(this.tunnelEnd, this.tunnelEnd + 0.025, false);
-      const tSteps = 60;
-      const tunnelGeo = new BufferGeometry();
-      const tPos = [];
-      const tUVs = [];
-      const tIndices = [];
-      const archPoints = [];
-      archPoints.push({ x: -wHalf, y: 0.1 });
-      archPoints.push({ x: -wHalf, y: wallH });
-      for (let a = Math.PI; a >= 0; a -= Math.PI / 14) {
-        archPoints.push({
-          x: Math.cos(a) * wHalf,
-          y: wallH + Math.sin(a) * (archH - wallH)
-        });
-      }
-      archPoints.push({ x: wHalf, y: wallH });
-      archPoints.push({ x: wHalf, y: 0.1 });
-      for (let i = 0; i <= tSteps; i++) {
-        const u = this.tunnelStart + i / tSteps * (this.tunnelEnd - this.tunnelStart);
-        const pt = this.curve.getPointAt(u);
-        const tangent = this.curve.getTangentAt(u).normalize();
-        const normal = new Vector3().crossVectors(tangent, up).normalize();
-        for (let p = 0; p < archPoints.length; p++) {
-          const offset = normal.clone().multiplyScalar(archPoints[p].x);
-          tPos.push(pt.x + offset.x, pt.y + archPoints[p].y, pt.z + offset.z);
-          tUVs.push(p / (archPoints.length - 1), i / tSteps * 24);
-        }
-        if (i > 1 && i < tSteps - 1 && i % 5 === 0) {
-          [-wHalf + 0.22, wHalf - 0.22].forEach((lx) => {
-            const lampPos = pt.clone().add(normal.clone().multiplyScalar(lx)).setY(pt.y + 4.2);
-            const lampMesh = new Mesh(
-              new BoxGeometry(0.35, 0.45, 0.35),
-              new MeshBasicMaterial({ color: 16096779 })
-            );
-            lampMesh.position.copy(lampPos);
-            lampMesh.frustumCulled = false;
-            tunnelGroup.add(lampMesh);
-            const pLight = new PointLight(16096779, 2.5, 36, 1.2);
-            pLight.position.copy(lampPos);
-            tunnelGroup.add(pLight);
-          });
-          const side = i % 2 === 0 ? 1 : -1;
-          const nicheX = side * (wHalf + 0.35);
-          const nichePos = pt.clone().add(normal.clone().multiplyScalar(nicheX)).setY(pt.y + 1.2);
-          const nicheMesh = new Mesh(
-            new BoxGeometry(0.8, 2.4, 1.8),
-            new MeshStandardMaterial({ color: 2042167, roughness: 0.9 })
-          );
-          nicheMesh.position.copy(nichePos);
-          nicheMesh.quaternion.setFromUnitVectors(
-            new Vector3(0, 0, 1),
-            tangent
-          );
-          nicheMesh.frustumCulled = false;
-          tunnelGroup.add(nicheMesh);
-          const frameMesh = new Mesh(
-            new BoxGeometry(0.08, 2.5, 1.9),
-            new MeshBasicMaterial({ color: 16436245 })
-          );
-          frameMesh.position.copy(pt).add(normal.clone().multiplyScalar(side * (wHalf - 0.05))).setY(pt.y + 1.2);
-          frameMesh.quaternion.setFromUnitVectors(
-            new Vector3(0, 0, 1),
-            tangent
-          );
-          frameMesh.frustumCulled = false;
-          tunnelGroup.add(frameMesh);
-        }
-      }
-      const nPoints = archPoints.length;
-      for (let i = 0; i < tSteps; i++) {
-        for (let p = 0; p < nPoints - 1; p++) {
-          const c = i * nPoints + p;
-          const n = c + nPoints;
-          tIndices.push(c, c + 1, n);
-          tIndices.push(c + 1, n + 1, n);
-        }
-      }
-      tunnelGeo.setAttribute(
-        "position",
-        new Float32BufferAttribute(tPos, 3)
-      );
-      tunnelGeo.setAttribute("uv", new Float32BufferAttribute(tUVs, 2));
-      tunnelGeo.setIndex(tIndices);
-      tunnelGeo.computeVertexNormals();
-      const tunnelMesh = new Mesh(tunnelGeo, tunnelMat);
-      tunnelMesh.frustumCulled = false;
-      tunnelGroup.add(tunnelMesh);
-      const mSteps = 44;
-      const mGeo = new BufferGeometry();
-      const mPos = [];
-      const mUVs = [];
-      const mIndices = [];
-      const mProfile = [
-        { x: -120, y: -0.2 },
-        // Ground toe left (flush with ground!)
-        { x: -85, y: 16 },
-        // Lower green mountain slope
-        { x: -50, y: 36 },
-        // Mid crags & rocky ledges
-        { x: -22, y: 54 },
-        // Left summit shoulder
-        { x: 0, y: 64 },
-        // Central Mountain Peak (56m above tunnel ceiling!)
-        { x: 22, y: 54 },
-        // Right summit shoulder
-        { x: 50, y: 36 },
-        // Mid crags & rocky ledges
-        { x: 85, y: 16 },
-        // Lower green mountain slope
-        { x: 120, y: -0.2 }
-        // Ground toe right (flush with ground!)
-      ];
-      for (let i = 0; i <= mSteps; i++) {
-        const u = this.tunnelStart + i / mSteps * (this.tunnelEnd - this.tunnelStart);
-        const pt = this.curve.getPointAt(u);
-        const tangent = this.curve.getTangentAt(u).normalize();
-        const normal = new Vector3().crossVectors(tangent, up).normalize();
-        const ridgeWave = 1 + Math.sin(i * 0.28) * 0.08 + Math.cos(i * 0.15) * 0.05;
-        for (let p = 0; p < mProfile.length; p++) {
-          const offset = normal.clone().multiplyScalar(mProfile[p].x);
-          const baseH = mProfile[p].y;
-          const vy = baseH <= 0 ? -0.2 : pt.y + baseH * ridgeWave;
-          mPos.push(pt.x + offset.x, vy, pt.z + offset.z);
-          mUVs.push(p / (mProfile.length - 1), i / mSteps * 12);
-        }
-      }
-      const mVerts = mProfile.length;
-      for (let i = 0; i < mSteps; i++) {
-        for (let p = 0; p < mVerts - 1; p++) {
-          const c = i * mVerts + p;
-          const n = c + mVerts;
-          mIndices.push(c, n, c + 1);
-          mIndices.push(c + 1, n, n + 1);
-        }
-      }
-      mGeo.setAttribute("position", new Float32BufferAttribute(mPos, 3));
-      mGeo.setAttribute("uv", new Float32BufferAttribute(mUVs, 2));
-      mGeo.setIndex(mIndices);
-      mGeo.computeVertexNormals();
-      const mountainMesh = new Mesh(mGeo, mountainRockMat);
-      mountainMesh.castShadow = true;
-      mountainMesh.receiveShadow = true;
-      mountainMesh.frustumCulled = false;
-      tunnelGroup.add(mountainMesh);
-      const buildMountainEndcap = (stepIdx, uVal, isExit) => {
-        const pt = this.curve.getPointAt(uVal);
-        const tangent = this.curve.getTangentAt(uVal).normalize();
-        const normal = new Vector3().crossVectors(tangent, up).normalize();
-        const capGeo = new BufferGeometry();
-        const cPos = [];
-        const cUVs = [];
-        const cInd = [];
-        for (let p = 0; p < mProfile.length; p++) {
-          const vIdx = stepIdx * mVerts + p;
-          cPos.push(mPos[vIdx * 3], mPos[vIdx * 3 + 1], mPos[vIdx * 3 + 2]);
-          cUVs.push(p / (mProfile.length - 1), 1);
-        }
-        for (let p = 0; p < mProfile.length; p++) {
-          const px2 = mProfile[p].x;
-          let lowerY = -0.2;
-          if (Math.abs(px2) <= 11) {
-            lowerY = 13.8;
-          } else if (Math.abs(px2) <= 24) {
-            lowerY = 13.8 - (Math.abs(px2) - 11) / 13 * 14;
-          }
-          const lowerPt = pt.clone().add(normal.clone().multiplyScalar(px2)).setY(pt.y + lowerY);
-          cPos.push(lowerPt.x, lowerPt.y, lowerPt.z);
-          cUVs.push(p / (mProfile.length - 1), 0);
-        }
-        for (let p = 0; p < mProfile.length - 1; p++) {
-          const top1 = p;
-          const top2 = p + 1;
-          const bot1 = p + mProfile.length;
-          const bot2 = p + 1 + mProfile.length;
-          if (!isExit) {
-            cInd.push(top1, bot1, top2);
-            cInd.push(top2, bot1, bot2);
-          } else {
-            cInd.push(top1, top2, bot1);
-            cInd.push(top2, bot2, bot1);
-          }
-        }
-        capGeo.setAttribute(
-          "position",
-          new Float32BufferAttribute(cPos, 3)
-        );
-        capGeo.setAttribute("uv", new Float32BufferAttribute(cUVs, 2));
-        capGeo.setIndex(cInd);
-        capGeo.computeVertexNormals();
-        const capMesh = new Mesh(capGeo, mountainRockMat);
-        capMesh.castShadow = true;
-        capMesh.receiveShadow = true;
-        capMesh.frustumCulled = false;
-        tunnelGroup.add(capMesh);
-      };
-      buildMountainEndcap(0, this.tunnelStart, false);
-      buildMountainEndcap(mSteps, this.tunnelEnd, true);
-      for (let b = 0; b < 36; b++) {
-        const bu = this.tunnelStart + b / 36 * (this.tunnelEnd - this.tunnelStart);
-        const bpt = this.curve.getPointAt(bu);
-        const btang = this.curve.getTangentAt(bu).normalize();
-        const bnorm = new Vector3().crossVectors(btang, up).normalize();
-        const bside = b % 2 === 0 ? 1 : -1;
-        const bDist = 28 + b % 5 * 14;
-        const treeY = 18 + b % 4 * 8;
-        const treePos = bpt.clone().add(bnorm.clone().multiplyScalar(bside * bDist)).setY(bpt.y + treeY);
-        const pine = new Mesh(
-          new ConeGeometry(4.2, 11, 7),
-          new MeshStandardMaterial({ color: 1332013, roughness: 0.85 })
-        );
-        pine.position.copy(treePos);
-        pine.castShadow = true;
-        pine.frustumCulled = false;
-        tunnelGroup.add(pine);
-        if (b % 3 === 0) {
-          const boulder = new Mesh(
-            new DodecahedronGeometry(3.2 + b % 3, 1),
-            mountainRockMat
-          );
-          boulder.position.copy(treePos).add(new Vector3(b % 2 * 5, -3, b % 3 * 4));
-          boulder.scale.set(1.4, 0.9, 1.2);
-          boulder.castShadow = true;
-          boulder.frustumCulled = false;
-          tunnelGroup.add(boulder);
-        }
-      }
-      const buildPortal = (uVal, isExit) => {
-        const pt = this.curve.getPointAt(uVal);
-        const tangent = this.curve.getTangentAt(uVal).normalize();
-        const normal = new Vector3().crossVectors(tangent, up).normalize();
-        const portalGroup = new Group();
-        portalGroup.position.copy(pt);
-        const lookDir = isExit ? tangent.clone() : tangent.clone().negate();
-        portalGroup.quaternion.setFromUnitVectors(
-          new Vector3(0, 0, 1),
-          lookDir
-        );
-        const portalShape = new Shape();
-        const pWidthHalf = 11;
-        const pHeight = 13.8;
-        portalShape.moveTo(-pWidthHalf, 0);
-        portalShape.lineTo(pWidthHalf, 0);
-        portalShape.lineTo(pWidthHalf, pHeight);
-        portalShape.lineTo(-pWidthHalf, pHeight);
-        portalShape.closePath();
-        const hole = new Path();
-        hole.moveTo(-wHalf, 0);
-        hole.lineTo(-wHalf, wallH);
-        for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-          hole.lineTo(Math.cos(a) * wHalf, wallH + Math.sin(a) * (archH - wallH));
-        }
-        hole.lineTo(wHalf, 0);
-        hole.closePath();
-        portalShape.holes.push(hole);
-        const portalGeo = new ExtrudeGeometry(portalShape, {
-          depth: 2.8,
-          bevelEnabled: true,
-          bevelThickness: 0.25,
-          bevelSize: 0.25,
-          bevelSegments: 3
-        });
-        const portalMesh = new Mesh(portalGeo, portalMasonryMat);
-        portalMesh.position.z = -1.4;
-        portalMesh.castShadow = true;
-        portalMesh.receiveShadow = true;
-        portalMesh.frustumCulled = false;
-        portalGroup.add(portalMesh);
-        const ringShape = new Shape();
-        const rOuter = wHalf + 0.85;
-        ringShape.moveTo(-rOuter, 0);
-        ringShape.lineTo(-rOuter, wallH);
-        for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-          ringShape.lineTo(
-            Math.cos(a) * rOuter,
-            wallH + Math.sin(a) * (archH - wallH + 0.85)
-          );
-        }
-        ringShape.lineTo(rOuter, 0);
-        ringShape.closePath();
-        const ringHole = new Path();
-        ringHole.moveTo(-wHalf, 0);
-        ringHole.lineTo(-wHalf, wallH);
-        for (let a = Math.PI; a >= 0; a -= Math.PI / 16) {
-          ringHole.lineTo(
-            Math.cos(a) * wHalf,
-            wallH + Math.sin(a) * (archH - wallH)
-          );
-        }
-        ringHole.lineTo(wHalf, 0);
-        ringHole.closePath();
-        ringShape.holes.push(ringHole);
-        const ringGeo = new ExtrudeGeometry(ringShape, {
-          depth: 0.18,
-          bevelEnabled: false
-        });
-        const ringMesh = new Mesh(ringGeo, archStripeMat);
-        ringMesh.position.z = 1.5;
-        ringMesh.frustumCulled = false;
-        portalGroup.add(ringMesh);
-        const parapet = new Mesh(
-          new BoxGeometry(23, 0.85, 3.4),
-          portalMasonryMat
-        );
-        parapet.position.set(0, 14.2, 0);
-        parapet.castShadow = true;
-        parapet.frustumCulled = false;
-        portalGroup.add(parapet);
-        [-11.2, 11.2].forEach((px2) => {
-          const pillar = new Mesh(
-            new BoxGeometry(1.6, 1.4, 3.6),
-            portalMasonryMat
-          );
-          pillar.position.set(px2, 14.8, 0);
-          pillar.castShadow = true;
-          portalGroup.add(pillar);
-        });
-        [-11, 11].forEach((wx) => {
-          const sideSign = wx > 0 ? 1 : -1;
-          for (let tier = 0; tier < 3; tier++) {
-            const tLen = 6;
-            const tHeight = 12 - tier * 3.2;
-            const tZ = -3 - tier * 5.2;
-            const tX = wx + sideSign * (1.8 + tier * 2.2);
-            const wing = new Mesh(
-              new BoxGeometry(2.4, tHeight, tLen),
-              portalMasonryMat
-            );
-            wing.position.set(tX, tHeight / 2, tZ);
-            wing.rotation.y = sideSign * -0.38;
-            wing.castShadow = true;
-            wing.frustumCulled = false;
-            portalGroup.add(wing);
-            const cap = new Mesh(
-              new BoxGeometry(2.8, 0.45, tLen + 0.4),
-              portalMasonryMat
-            );
-            cap.position.set(tX, tHeight + 0.22, tZ);
-            cap.rotation.y = sideSign * -0.38;
-            cap.castShadow = true;
-            portalGroup.add(cap);
-          }
-        });
-        const signBoard = new Mesh(
-          new BoxGeometry(10.5, 2.4, 0.18),
-          signMat
-        );
-        signBoard.position.set(0, 10.6, 1.55);
-        signBoard.castShadow = true;
-        signBoard.frustumCulled = false;
-        portalGroup.add(signBoard);
-        const catBracketMat = new MeshStandardMaterial({
-          color: 4674921,
-          metalness: 0.8,
-          roughness: 0.3
-        });
-        const bracketArm = new Mesh(
-          new BoxGeometry(11, 0.16, 0.16),
-          catBracketMat
-        );
-        bracketArm.position.set(0, 6.4, 1.45);
-        portalGroup.add(bracketArm);
-        [-this.trackOffset / 2, this.trackOffset / 2].forEach((cx) => {
-          const ins = new Mesh(
-            new CylinderGeometry(0.08, 0.08, 0.5, 8),
-            new MeshStandardMaterial({ color: 7877903 })
-          );
-          ins.position.set(cx, 6, 1.45);
-          portalGroup.add(ins);
-        });
-        portalGroup.frustumCulled = false;
-        tunnelGroup.add(portalGroup);
-      };
-      buildPortal(this.tunnelStart, false);
-      buildPortal(this.tunnelEnd, true);
-      tunnelGroup.frustumCulled = false;
-      this.trackGroup.add(tunnelGroup);
     }
     // ---------------------------------------------------------
     // Indian Flora (Coconut Palms & Banyan Trees)
@@ -38091,7 +37822,6 @@ void main() {
       const up = new Vector3(0, 1, 0);
       for (let i = 0; i < 150; i++) {
         const u = i * 67e-4 % 1;
-        if (u >= this.tunnelStart - 0.02 && u <= this.tunnelEnd + 0.02) continue;
         const pt = this.curve.getPointAt(u);
         const tangent = this.curve.getTangentAt(u).normalize();
         const normal = new Vector3().crossVectors(tangent, up).normalize();
@@ -45165,6 +44895,1116 @@ void main() {
     });
   }
 
+  // node_modules/three/examples/jsm/lines/LineSegmentsGeometry.js
+  var _box = new Box3();
+  var _vector = new Vector3();
+  var LineSegmentsGeometry = class extends InstancedBufferGeometry {
+    /**
+     * Constructs a new line segments geometry.
+     */
+    constructor() {
+      super();
+      this.isLineSegmentsGeometry = true;
+      this.type = "LineSegmentsGeometry";
+      const positions = [-1, 2, 0, 1, 2, 0, -1, 1, 0, 1, 1, 0, -1, 0, 0, 1, 0, 0, -1, -1, 0, 1, -1, 0];
+      const uvs = [-1, 2, 1, 2, -1, 1, 1, 1, -1, -1, 1, -1, -1, -2, 1, -2];
+      const index = [0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5];
+      this.setIndex(index);
+      this.setAttribute("position", new Float32BufferAttribute(positions, 3));
+      this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+    }
+    /**
+     * Applies the given 4x4 transformation matrix to the geometry.
+     *
+     * @param {Matrix4} matrix - The matrix to apply.
+     * @return {LineSegmentsGeometry} A reference to this instance.
+     */
+    applyMatrix4(matrix) {
+      const start = this.attributes.instanceStart;
+      const end = this.attributes.instanceEnd;
+      if (start !== void 0) {
+        start.applyMatrix4(matrix);
+        end.applyMatrix4(matrix);
+        start.needsUpdate = true;
+      }
+      if (this.boundingBox !== null) {
+        this.computeBoundingBox();
+      }
+      if (this.boundingSphere !== null) {
+        this.computeBoundingSphere();
+      }
+      return this;
+    }
+    /**
+     * Sets the given line positions for this geometry. The length must be a multiple of six since
+     * each line segment is defined by a start end vertex in the pattern `(xyz xyz)`.
+     *
+     * @param {Float32Array|Array<number>} array - The position data to set.
+     * @return {LineSegmentsGeometry} A reference to this geometry.
+     */
+    setPositions(array) {
+      let lineSegments;
+      if (array instanceof Float32Array) {
+        lineSegments = array;
+      } else if (Array.isArray(array)) {
+        lineSegments = new Float32Array(array);
+      }
+      const instanceBuffer = new InstancedInterleavedBuffer(lineSegments, 6, 1);
+      this.setAttribute("instanceStart", new InterleavedBufferAttribute(instanceBuffer, 3, 0));
+      this.setAttribute("instanceEnd", new InterleavedBufferAttribute(instanceBuffer, 3, 3));
+      this.instanceCount = this.attributes.instanceStart.count;
+      this.computeBoundingBox();
+      this.computeBoundingSphere();
+      return this;
+    }
+    /**
+     * Sets the given line colors for this geometry. The length must be a multiple of six since
+     * each line segment is defined by a start end color in the pattern `(rgb rgb)`.
+     *
+     * @param {Float32Array|Array<number>} array - The position data to set.
+     * @return {LineSegmentsGeometry} A reference to this geometry.
+     */
+    setColors(array) {
+      let colors;
+      if (array instanceof Float32Array) {
+        colors = array;
+      } else if (Array.isArray(array)) {
+        colors = new Float32Array(array);
+      }
+      const instanceColorBuffer = new InstancedInterleavedBuffer(colors, 6, 1);
+      this.setAttribute("instanceColorStart", new InterleavedBufferAttribute(instanceColorBuffer, 3, 0));
+      this.setAttribute("instanceColorEnd", new InterleavedBufferAttribute(instanceColorBuffer, 3, 3));
+      return this;
+    }
+    /**
+     * Setups this line segments geometry from the given wireframe geometry.
+     *
+     * @param {WireframeGeometry} geometry - The geometry that should be used as a data source for this geometry.
+     * @return {LineSegmentsGeometry} A reference to this geometry.
+     */
+    fromWireframeGeometry(geometry) {
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+    /**
+     * Setups this line segments geometry from the given edges geometry.
+     *
+     * @param {EdgesGeometry} geometry - The geometry that should be used as a data source for this geometry.
+     * @return {LineSegmentsGeometry} A reference to this geometry.
+     */
+    fromEdgesGeometry(geometry) {
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+    /**
+     * Setups this line segments geometry from the given mesh.
+     *
+     * @param {Mesh} mesh - The mesh geometry that should be used as a data source for this geometry.
+     * @return {LineSegmentsGeometry} A reference to this geometry.
+     */
+    fromMesh(mesh) {
+      this.fromWireframeGeometry(new WireframeGeometry(mesh.geometry));
+      return this;
+    }
+    /**
+     * Setups this line segments geometry from the given line segments.
+     *
+     * @param {LineSegments} lineSegments - The line segments that should be used as a data source for this geometry.
+     * Assumes the source geometry is not using indices.
+     * @return {LineSegmentsGeometry} A reference to this geometry.
+     */
+    fromLineSegments(lineSegments) {
+      const geometry = lineSegments.geometry;
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+    computeBoundingBox() {
+      if (this.boundingBox === null) {
+        this.boundingBox = new Box3();
+      }
+      const start = this.attributes.instanceStart;
+      const end = this.attributes.instanceEnd;
+      if (start !== void 0 && end !== void 0) {
+        this.boundingBox.setFromBufferAttribute(start);
+        _box.setFromBufferAttribute(end);
+        this.boundingBox.union(_box);
+      }
+    }
+    computeBoundingSphere() {
+      if (this.boundingSphere === null) {
+        this.boundingSphere = new Sphere();
+      }
+      if (this.boundingBox === null) {
+        this.computeBoundingBox();
+      }
+      const start = this.attributes.instanceStart;
+      const end = this.attributes.instanceEnd;
+      if (start !== void 0 && end !== void 0) {
+        const center = this.boundingSphere.center;
+        this.boundingBox.getCenter(center);
+        let maxRadiusSq = 0;
+        for (let i = 0, il = start.count; i < il; i++) {
+          _vector.fromBufferAttribute(start, i);
+          maxRadiusSq = Math.max(maxRadiusSq, center.distanceToSquared(_vector));
+          _vector.fromBufferAttribute(end, i);
+          maxRadiusSq = Math.max(maxRadiusSq, center.distanceToSquared(_vector));
+        }
+        this.boundingSphere.radius = Math.sqrt(maxRadiusSq);
+        if (isNaN(this.boundingSphere.radius)) {
+          console.error("THREE.LineSegmentsGeometry.computeBoundingSphere(): Computed radius is NaN. The instanced position data is likely to have NaN values.", this);
+        }
+      }
+    }
+    toJSON() {
+    }
+  };
+
+  // node_modules/three/examples/jsm/lines/LineMaterial.js
+  UniformsLib.line = {
+    worldUnits: { value: 1 },
+    linewidth: { value: 1 },
+    resolution: { value: new Vector2() },
+    dashOffset: { value: 0 },
+    dashScale: { value: 1 },
+    dashSize: { value: 1 },
+    gapSize: { value: 1 }
+    // todo FIX - maybe change to totalSize
+  };
+  ShaderLib["line"] = {
+    uniforms: UniformsUtils.merge([
+      UniformsLib.common,
+      UniformsLib.fog,
+      UniformsLib.line
+    ]),
+    vertexShader: (
+      /* glsl */
+      `
+		#include <common>
+		#include <color_pars_vertex>
+		#include <fog_pars_vertex>
+		#include <logdepthbuf_pars_vertex>
+		#include <clipping_planes_pars_vertex>
+
+		uniform float linewidth;
+		uniform vec2 resolution;
+
+		attribute vec3 instanceStart;
+		attribute vec3 instanceEnd;
+
+		attribute vec3 instanceColorStart;
+		attribute vec3 instanceColorEnd;
+
+		#ifdef WORLD_UNITS
+
+			varying vec4 worldPos;
+			varying vec3 worldStart;
+			varying vec3 worldEnd;
+
+			#ifdef USE_DASH
+
+				varying vec2 vUv;
+
+			#endif
+
+		#else
+
+			varying vec2 vUv;
+
+		#endif
+
+		#ifdef USE_DASH
+
+			uniform float dashScale;
+			attribute float instanceDistanceStart;
+			attribute float instanceDistanceEnd;
+			varying float vLineDistance;
+
+		#endif
+
+		float trimSegmentAlpha( const in vec4 start, const in vec4 end ) {
+
+			// compute the interpolation factor needed to trim the segment so it terminates
+			// between the camera plane and the near plane
+
+			// conservative estimate of the near plane
+			float a = projectionMatrix[ 2 ][ 2 ]; // 3nd entry in 3th column
+			float b = projectionMatrix[ 3 ][ 2 ]; // 3nd entry in 4th column
+
+			// we need different nearEstimate formula for reversed and default depth buffer
+			// a is positive with a reversed depth buffer so it can be used for controlling the code flow
+			float nearEstimate = ( a > 0.0 ) ? ( - b / ( a + 1.0 ) ) : ( - 0.5 * b / a );
+
+			return ( nearEstimate - start.z ) / ( end.z - start.z );
+
+		}
+
+		void main() {
+
+			#ifdef USE_COLOR
+
+				vColor.xyz = ( position.y < 0.5 ) ? instanceColorStart : instanceColorEnd;
+
+			#endif
+
+			float aspect = resolution.x / resolution.y;
+
+			// camera space
+			vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );
+			vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );
+
+			#ifdef USE_DASH
+
+				float lineDistanceStart = dashScale * instanceDistanceStart;
+				float lineDistanceEnd = dashScale * instanceDistanceEnd;
+
+			#endif
+
+			#ifdef WORLD_UNITS
+
+				worldStart = start.xyz;
+				worldEnd = end.xyz;
+
+			#else
+
+				vUv = uv;
+
+			#endif
+
+			// special case for perspective projection, and segments that terminate either in, or behind, the camera plane
+			// clearly the gpu firmware has a way of addressing this issue when projecting into ndc space
+			// but we need to perform ndc-space calculations in the shader, so we must address this issue directly
+			// perhaps there is a more elegant solution -- WestLangley
+
+			bool perspective = ( projectionMatrix[ 2 ][ 3 ] == - 1.0 ); // 4th entry in the 3rd column
+
+			if ( perspective ) {
+
+				if ( start.z < 0.0 && end.z >= 0.0 ) {
+
+					float alpha = trimSegmentAlpha( start, end );
+					end.xyz = mix( start.xyz, end.xyz, alpha );
+
+					#ifdef USE_DASH
+
+						lineDistanceEnd = mix( lineDistanceStart, lineDistanceEnd, alpha );
+
+					#endif
+
+				} else if ( end.z < 0.0 && start.z >= 0.0 ) {
+
+					float alpha = trimSegmentAlpha( end, start );
+					start.xyz = mix( end.xyz, start.xyz, alpha );
+
+					#ifdef USE_DASH
+
+						lineDistanceStart = mix( lineDistanceEnd, lineDistanceStart, alpha );
+
+					#endif
+
+				}
+
+			}
+
+			#ifdef USE_DASH
+
+				vLineDistance = ( position.y < 0.5 ) ? lineDistanceStart : lineDistanceEnd;
+				vUv = uv;
+
+			#endif
+
+			// clip space
+			vec4 clipStart = projectionMatrix * start;
+			vec4 clipEnd = projectionMatrix * end;
+
+			// ndc space
+			vec3 ndcStart = clipStart.xyz / clipStart.w;
+			vec3 ndcEnd = clipEnd.xyz / clipEnd.w;
+
+			// direction
+			vec2 dir = ndcEnd.xy - ndcStart.xy;
+
+			// account for clip-space aspect ratio
+			dir.x *= aspect;
+			dir = normalize( dir );
+
+			#ifdef WORLD_UNITS
+
+				vec3 worldDir = normalize( end.xyz - start.xyz );
+				vec3 tmpFwd = perspective ? normalize( mix( start.xyz, end.xyz, 0.5 ) ) : vec3( 0.0, 0.0, - 1.0 );
+				vec3 worldUp = normalize( cross( worldDir, tmpFwd ) );
+				vec3 worldFwd = cross( worldDir, worldUp );
+				worldPos = position.y < 0.5 ? start: end;
+
+				// height offset
+				float hw = linewidth * 0.5;
+				worldPos.xyz += position.x < 0.0 ? hw * worldUp : - hw * worldUp;
+
+				// don't extend the line if we're rendering dashes because we
+				// won't be rendering the endcaps
+				#ifndef USE_DASH
+
+					// cap extension
+					worldPos.xyz += position.y < 0.5 ? - hw * worldDir : hw * worldDir;
+
+					// add width to the box
+					worldPos.xyz += worldFwd * hw;
+
+					// endcaps
+					if ( position.y > 1.0 || position.y < 0.0 ) {
+
+						worldPos.xyz -= worldFwd * 2.0 * hw;
+
+					}
+
+				#endif
+
+				// project the worldpos
+				vec4 clip = projectionMatrix * worldPos;
+
+				// shift the depth of the projected points so the line
+				// segments overlap neatly
+				vec3 clipPose = ( position.y < 0.5 ) ? ndcStart : ndcEnd;
+
+				// only shift the depth of vertices in front of the camera (#35137)
+				if ( clip.w > 0.0 ) clip.z = clipPose.z * clip.w;
+
+			#else
+
+				vec2 offset = vec2( dir.y, - dir.x );
+				// undo aspect ratio adjustment
+				dir.x /= aspect;
+				offset.x /= aspect;
+
+				// sign flip
+				if ( position.x < 0.0 ) offset *= - 1.0;
+
+				// endcaps
+				if ( position.y < 0.0 ) {
+
+					offset += - dir;
+
+				} else if ( position.y > 1.0 ) {
+
+					offset += dir;
+
+				}
+
+				// adjust for linewidth
+				offset *= linewidth;
+
+				// adjust for clip-space to screen-space conversion // maybe resolution should be based on viewport ...
+				offset /= resolution.y;
+
+				// select end
+				vec4 clip = ( position.y < 0.5 ) ? clipStart : clipEnd;
+
+				// back to clip space
+				offset *= clip.w;
+
+				clip.xy += offset;
+
+			#endif
+
+			gl_Position = clip;
+
+			vec4 mvPosition = ( position.y < 0.5 ) ? start : end; // this is an approximation
+
+			#include <logdepthbuf_vertex>
+			#include <clipping_planes_vertex>
+			#include <fog_vertex>
+
+		}
+		`
+    ),
+    fragmentShader: (
+      /* glsl */
+      `
+		uniform vec3 diffuse;
+		uniform float opacity;
+		uniform float linewidth;
+
+		#ifdef USE_DASH
+
+			uniform float dashOffset;
+			uniform float dashSize;
+			uniform float gapSize;
+
+		#endif
+
+		varying float vLineDistance;
+
+		#ifdef WORLD_UNITS
+
+			varying vec4 worldPos;
+			varying vec3 worldStart;
+			varying vec3 worldEnd;
+
+			#ifdef USE_DASH
+
+				varying vec2 vUv;
+
+			#endif
+
+		#else
+
+			varying vec2 vUv;
+
+		#endif
+
+		#include <common>
+		#include <color_pars_fragment>
+		#include <fog_pars_fragment>
+		#include <logdepthbuf_pars_fragment>
+		#include <clipping_planes_pars_fragment>
+
+		vec2 closestLineToLine(vec3 p1, vec3 p2, vec3 p3, vec3 p4) {
+
+			float mua;
+			float mub;
+
+			vec3 p13 = p1 - p3;
+			vec3 p43 = p4 - p3;
+
+			vec3 p21 = p2 - p1;
+
+			float d1343 = dot( p13, p43 );
+			float d4321 = dot( p43, p21 );
+			float d1321 = dot( p13, p21 );
+			float d4343 = dot( p43, p43 );
+			float d2121 = dot( p21, p21 );
+
+			float denom = d2121 * d4343 - d4321 * d4321;
+
+			float numer = d1343 * d4321 - d1321 * d4343;
+
+			mua = numer / denom;
+			mua = clamp( mua, 0.0, 1.0 );
+			mub = ( d1343 + d4321 * ( mua ) ) / d4343;
+			mub = clamp( mub, 0.0, 1.0 );
+
+			return vec2( mua, mub );
+
+		}
+
+		void main() {
+
+			float alpha = opacity;
+			vec4 diffuseColor = vec4( diffuse, alpha );
+
+			#include <clipping_planes_fragment>
+
+			#ifdef USE_DASH
+
+				if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
+
+				if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX
+
+			#endif
+
+			#ifdef WORLD_UNITS
+
+				float len;
+
+				if ( isOrthographic ) {
+
+					// View rays are parallel to the z axis so the distance reduces to camera-space XY
+					vec2 lineDir = worldEnd.xy - worldStart.xy;
+					float t = clamp( dot( worldPos.xy - worldStart.xy, lineDir ) / dot( lineDir, lineDir ), 0.0, 1.0 );
+					len = length( worldStart.xy + lineDir * t - worldPos.xy );
+
+				} else {
+
+					// Find the closest points on the view ray and the line segment
+					vec3 rayEnd = normalize( worldPos.xyz ) * 1e5;
+					vec3 lineDir = worldEnd - worldStart;
+					vec2 params = closestLineToLine( worldStart, worldEnd, vec3( 0.0, 0.0, 0.0 ), rayEnd );
+
+					vec3 p1 = worldStart + lineDir * params.x;
+					vec3 p2 = rayEnd * params.y;
+					vec3 delta = p1 - p2;
+					len = length( delta );
+
+				}
+
+				float norm = len / linewidth;
+
+				#ifndef USE_DASH
+
+					#ifdef USE_ALPHA_TO_COVERAGE
+
+						float dnorm = fwidth( norm );
+						alpha = 1.0 - smoothstep( 0.5 - dnorm, 0.5 + dnorm, norm );
+
+					#else
+
+						if ( norm > 0.5 ) {
+
+							discard;
+
+						}
+
+					#endif
+
+				#endif
+
+			#else
+
+				#ifdef USE_ALPHA_TO_COVERAGE
+
+					// artifacts appear on some hardware if a derivative is taken within a conditional
+					float a = vUv.x;
+					float b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+					float len2 = a * a + b * b;
+					float dlen = fwidth( len2 );
+
+					if ( abs( vUv.y ) > 1.0 ) {
+
+						alpha = 1.0 - smoothstep( 1.0 - dlen, 1.0 + dlen, len2 );
+
+					}
+
+				#else
+
+					if ( abs( vUv.y ) > 1.0 ) {
+
+						float a = vUv.x;
+						float b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+						float len2 = a * a + b * b;
+
+						if ( len2 > 1.0 ) discard;
+
+					}
+
+				#endif
+
+			#endif
+
+			#include <logdepthbuf_fragment>
+			#include <color_fragment>
+
+			gl_FragColor = vec4( diffuseColor.rgb, alpha );
+
+			#include <tonemapping_fragment>
+			#include <colorspace_fragment>
+			#include <fog_fragment>
+			#include <premultiplied_alpha_fragment>
+
+		}
+		`
+    )
+  };
+  var LineMaterial = class extends ShaderMaterial {
+    /**
+     * Constructs a new line segments geometry.
+     *
+     * @param {Object} [parameters] - An object with one or more properties
+     * defining the material's appearance. Any property of the material
+     * (including any property from inherited materials) can be passed
+     * in here. Color values can be passed any type of value accepted
+     * by {@link Color#set}.
+     */
+    constructor(parameters) {
+      super({
+        type: "LineMaterial",
+        uniforms: UniformsUtils.clone(ShaderLib["line"].uniforms),
+        vertexShader: ShaderLib["line"].vertexShader,
+        fragmentShader: ShaderLib["line"].fragmentShader,
+        clipping: true
+        // required for clipping support
+      });
+      this.isLineMaterial = true;
+      this.setValues(parameters);
+    }
+    /**
+     * The material's color.
+     *
+     * @type {Color}
+     * @default (1,1,1)
+     */
+    get color() {
+      return this.uniforms.diffuse.value;
+    }
+    set color(value) {
+      this.uniforms.diffuse.value = value;
+    }
+    /**
+     * Whether the material's sizes (width, dash gaps) are in world units.
+     *
+     * @type {boolean}
+     * @default false
+     */
+    get worldUnits() {
+      return "WORLD_UNITS" in this.defines;
+    }
+    set worldUnits(value) {
+      if (value === true !== this.worldUnits) {
+        this.needsUpdate = true;
+      }
+      if (value === true) {
+        this.defines.WORLD_UNITS = "";
+      } else {
+        delete this.defines.WORLD_UNITS;
+      }
+    }
+    /**
+     * Controls line thickness in CSS pixel units when `worldUnits` is `false` (default),
+     * or in world units when `worldUnits` is `true`.
+     *
+     * @type {number}
+     * @default 1
+     */
+    get linewidth() {
+      return this.uniforms.linewidth.value;
+    }
+    set linewidth(value) {
+      if (!this.uniforms.linewidth) return;
+      this.uniforms.linewidth.value = value;
+    }
+    /**
+     * Whether the line is dashed, or solid.
+     *
+     * @type {boolean}
+     * @default false
+     */
+    get dashed() {
+      return "USE_DASH" in this.defines;
+    }
+    set dashed(value) {
+      if (value === true !== this.dashed) {
+        this.needsUpdate = true;
+      }
+      if (value === true) {
+        this.defines.USE_DASH = "";
+      } else {
+        delete this.defines.USE_DASH;
+      }
+    }
+    /**
+     * The scale of the dashes and gaps.
+     *
+     * @type {number}
+     * @default 1
+     */
+    get dashScale() {
+      return this.uniforms.dashScale.value;
+    }
+    set dashScale(value) {
+      this.uniforms.dashScale.value = value;
+    }
+    /**
+     * The size of the dash.
+     *
+     * @type {number}
+     * @default 1
+     */
+    get dashSize() {
+      return this.uniforms.dashSize.value;
+    }
+    set dashSize(value) {
+      this.uniforms.dashSize.value = value;
+    }
+    /**
+     * Where in the dash cycle the dash starts.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get dashOffset() {
+      return this.uniforms.dashOffset.value;
+    }
+    set dashOffset(value) {
+      this.uniforms.dashOffset.value = value;
+    }
+    /**
+     * The size of the gap.
+     *
+     * @type {number}
+     * @default 0
+     */
+    get gapSize() {
+      return this.uniforms.gapSize.value;
+    }
+    set gapSize(value) {
+      this.uniforms.gapSize.value = value;
+    }
+    /**
+     * The opacity.
+     *
+     * @type {number}
+     * @default 1
+     */
+    get opacity() {
+      return this.uniforms.opacity.value;
+    }
+    set opacity(value) {
+      if (!this.uniforms) return;
+      this.uniforms.opacity.value = value;
+    }
+    /**
+     * The size of the viewport, in screen pixels. This must be kept updated to make
+     * screen-space rendering accurate. The `LineSegments2.onBeforeRender` callback
+     * performs the update for visible objects.
+     *
+     * @type {Vector2}
+     */
+    get resolution() {
+      return this.uniforms.resolution.value;
+    }
+    set resolution(value) {
+      this.uniforms.resolution.value.copy(value);
+    }
+    /**
+     * Whether to use alphaToCoverage or not. When enabled, this can improve the
+     * anti-aliasing of line edges when using MSAA.
+     *
+     * @type {boolean}
+     */
+    get alphaToCoverage() {
+      return "USE_ALPHA_TO_COVERAGE" in this.defines;
+    }
+    set alphaToCoverage(value) {
+      if (!this.defines) return;
+      if (value === true !== this.alphaToCoverage) {
+        this.needsUpdate = true;
+      }
+      if (value === true) {
+        this.defines.USE_ALPHA_TO_COVERAGE = "";
+      } else {
+        delete this.defines.USE_ALPHA_TO_COVERAGE;
+      }
+    }
+  };
+
+  // node_modules/three/examples/jsm/lines/LineSegments2.js
+  var _viewport = new Vector4();
+  var _start2 = new Vector3();
+  var _end2 = new Vector3();
+  var _start4 = new Vector4();
+  var _end4 = new Vector4();
+  var _ssOrigin = new Vector4();
+  var _ssOrigin3 = new Vector3();
+  var _mvMatrix = new Matrix4();
+  var _line = new Line3();
+  var _closestPoint = new Vector3();
+  var _box2 = new Box3();
+  var _sphere2 = new Sphere();
+  var _clipToWorldVector = new Vector4();
+  var _ray3;
+  var _lineWidth;
+  function getWorldSpaceHalfWidth(camera, distance, resolution) {
+    _clipToWorldVector.set(0, 0, -distance, 1).applyMatrix4(camera.projectionMatrix);
+    _clipToWorldVector.multiplyScalar(1 / _clipToWorldVector.w);
+    _clipToWorldVector.x = _lineWidth / resolution.width;
+    _clipToWorldVector.y = _lineWidth / resolution.height;
+    _clipToWorldVector.applyMatrix4(camera.projectionMatrixInverse);
+    _clipToWorldVector.multiplyScalar(1 / _clipToWorldVector.w);
+    return Math.abs(Math.max(_clipToWorldVector.x, _clipToWorldVector.y));
+  }
+  function raycastWorldUnits(lineSegments, intersects2) {
+    const matrixWorld = lineSegments.matrixWorld;
+    const geometry = lineSegments.geometry;
+    const instanceStart = geometry.attributes.instanceStart;
+    const instanceEnd = geometry.attributes.instanceEnd;
+    const segmentCount = Math.min(geometry.instanceCount, instanceStart.count);
+    for (let i = 0, l = segmentCount; i < l; i++) {
+      _line.start.fromBufferAttribute(instanceStart, i);
+      _line.end.fromBufferAttribute(instanceEnd, i);
+      _line.applyMatrix4(matrixWorld);
+      const pointOnLine = new Vector3();
+      const point = new Vector3();
+      _ray3.distanceSqToSegment(_line.start, _line.end, point, pointOnLine);
+      const isInside = point.distanceTo(pointOnLine) < _lineWidth * 0.5;
+      if (isInside) {
+        intersects2.push({
+          point,
+          pointOnLine,
+          distance: _ray3.origin.distanceTo(point),
+          object: lineSegments,
+          face: null,
+          faceIndex: i,
+          uv: null,
+          uv1: null
+        });
+      }
+    }
+  }
+  function raycastScreenSpace(lineSegments, camera, intersects2) {
+    const projectionMatrix = camera.projectionMatrix;
+    const material = lineSegments.material;
+    const resolution = material.resolution;
+    const matrixWorld = lineSegments.matrixWorld;
+    const geometry = lineSegments.geometry;
+    const instanceStart = geometry.attributes.instanceStart;
+    const instanceEnd = geometry.attributes.instanceEnd;
+    const segmentCount = Math.min(geometry.instanceCount, instanceStart.count);
+    const near = -camera.near;
+    _ray3.at(1, _ssOrigin);
+    _ssOrigin.w = 1;
+    _ssOrigin.applyMatrix4(camera.matrixWorldInverse);
+    _ssOrigin.applyMatrix4(projectionMatrix);
+    _ssOrigin.multiplyScalar(1 / _ssOrigin.w);
+    _ssOrigin.x *= resolution.x / 2;
+    _ssOrigin.y *= resolution.y / 2;
+    _ssOrigin.z = 0;
+    _ssOrigin3.copy(_ssOrigin);
+    _mvMatrix.multiplyMatrices(camera.matrixWorldInverse, matrixWorld);
+    for (let i = 0, l = segmentCount; i < l; i++) {
+      _start4.fromBufferAttribute(instanceStart, i);
+      _end4.fromBufferAttribute(instanceEnd, i);
+      _start4.w = 1;
+      _end4.w = 1;
+      _start4.applyMatrix4(_mvMatrix);
+      _end4.applyMatrix4(_mvMatrix);
+      const isBehindCameraNear = _start4.z > near && _end4.z > near;
+      if (isBehindCameraNear) {
+        continue;
+      }
+      if (_start4.z > near) {
+        const deltaDist = _start4.z - _end4.z;
+        const t = (_start4.z - near) / deltaDist;
+        _start4.lerp(_end4, t);
+      } else if (_end4.z > near) {
+        const deltaDist = _end4.z - _start4.z;
+        const t = (_end4.z - near) / deltaDist;
+        _end4.lerp(_start4, t);
+      }
+      _start4.applyMatrix4(projectionMatrix);
+      _end4.applyMatrix4(projectionMatrix);
+      _start4.multiplyScalar(1 / _start4.w);
+      _end4.multiplyScalar(1 / _end4.w);
+      _start4.x *= resolution.x / 2;
+      _start4.y *= resolution.y / 2;
+      _end4.x *= resolution.x / 2;
+      _end4.y *= resolution.y / 2;
+      _line.start.copy(_start4);
+      _line.start.z = 0;
+      _line.end.copy(_end4);
+      _line.end.z = 0;
+      const param = _line.closestPointToPointParameter(_ssOrigin3, true);
+      _line.at(param, _closestPoint);
+      const zPos = MathUtils.lerp(_start4.z, _end4.z, param);
+      const isInClipSpace = zPos >= -1 && zPos <= 1;
+      const isInside = _ssOrigin3.distanceTo(_closestPoint) < _lineWidth * 0.5;
+      if (isInClipSpace && isInside) {
+        _line.start.fromBufferAttribute(instanceStart, i);
+        _line.end.fromBufferAttribute(instanceEnd, i);
+        _line.start.applyMatrix4(matrixWorld);
+        _line.end.applyMatrix4(matrixWorld);
+        const pointOnLine = new Vector3();
+        const point = new Vector3();
+        _ray3.distanceSqToSegment(_line.start, _line.end, point, pointOnLine);
+        intersects2.push({
+          point,
+          pointOnLine,
+          distance: _ray3.origin.distanceTo(point),
+          object: lineSegments,
+          face: null,
+          faceIndex: i,
+          uv: null,
+          uv1: null
+        });
+      }
+    }
+  }
+  var LineSegments2 = class extends Mesh {
+    /**
+     * Constructs a new wide line.
+     *
+     * @param {LineSegmentsGeometry} [geometry] - The line geometry.
+     * @param {LineMaterial} [material] - The line material.
+     */
+    constructor(geometry = new LineSegmentsGeometry(), material = new LineMaterial({ color: Math.random() * 16777215 })) {
+      super(geometry, material);
+      this.isLineSegments2 = true;
+      this.type = "LineSegments2";
+    }
+    /**
+     * Computes an array of distance values which are necessary for rendering dashed lines.
+     * For each vertex in the geometry, the method calculates the cumulative length from the
+     * current point to the very beginning of the line.
+     *
+     * @return {LineSegments2} A reference to this instance.
+     */
+    computeLineDistances() {
+      const geometry = this.geometry;
+      const instanceStart = geometry.attributes.instanceStart;
+      const instanceEnd = geometry.attributes.instanceEnd;
+      const lineDistances = new Float32Array(2 * instanceStart.count);
+      for (let i = 0, j = 0, l = instanceStart.count; i < l; i++, j += 2) {
+        _start2.fromBufferAttribute(instanceStart, i);
+        _end2.fromBufferAttribute(instanceEnd, i);
+        lineDistances[j] = j === 0 ? 0 : lineDistances[j - 1];
+        lineDistances[j + 1] = lineDistances[j] + _start2.distanceTo(_end2);
+      }
+      const instanceDistanceBuffer = new InstancedInterleavedBuffer(lineDistances, 2, 1);
+      geometry.setAttribute("instanceDistanceStart", new InterleavedBufferAttribute(instanceDistanceBuffer, 1, 0));
+      geometry.setAttribute("instanceDistanceEnd", new InterleavedBufferAttribute(instanceDistanceBuffer, 1, 1));
+      return this;
+    }
+    /**
+     * Computes intersection points between a casted ray and this instance.
+     *
+     * @param {Raycaster} raycaster - The raycaster.
+     * @param {Array<Object>} intersects - The target array that holds the intersection points.
+     */
+    raycast(raycaster, intersects2) {
+      const worldUnits = this.material.worldUnits;
+      const camera = raycaster.camera;
+      if (camera === null && !worldUnits) {
+        console.error('LineSegments2: "Raycaster.camera" needs to be set in order to raycast against LineSegments2 while worldUnits is set to false.');
+      }
+      if (worldUnits === false && (this.material.resolution.x === 0 || this.material.resolution.y === 0)) {
+        return;
+      }
+      const threshold = raycaster.params.Line2 !== void 0 ? raycaster.params.Line2.threshold || 0 : 0;
+      _ray3 = raycaster.ray;
+      const matrixWorld = this.matrixWorld;
+      const geometry = this.geometry;
+      const material = this.material;
+      _lineWidth = material.linewidth + threshold;
+      if (geometry.boundingSphere === null) {
+        geometry.computeBoundingSphere();
+      }
+      _sphere2.copy(geometry.boundingSphere).applyMatrix4(matrixWorld);
+      let sphereMargin;
+      if (worldUnits) {
+        sphereMargin = _lineWidth * 0.5;
+      } else {
+        const distanceToSphere = Math.max(camera.near, _sphere2.distanceToPoint(_ray3.origin));
+        sphereMargin = getWorldSpaceHalfWidth(camera, distanceToSphere, material.resolution);
+      }
+      _sphere2.radius += sphereMargin;
+      if (_ray3.intersectsSphere(_sphere2) === false) {
+        return;
+      }
+      if (geometry.boundingBox === null) {
+        geometry.computeBoundingBox();
+      }
+      _box2.copy(geometry.boundingBox).applyMatrix4(matrixWorld);
+      let boxMargin;
+      if (worldUnits) {
+        boxMargin = _lineWidth * 0.5;
+      } else {
+        const distanceToBox = Math.max(camera.near, _box2.distanceToPoint(_ray3.origin));
+        boxMargin = getWorldSpaceHalfWidth(camera, distanceToBox, material.resolution);
+      }
+      _box2.expandByScalar(boxMargin);
+      if (_ray3.intersectsBox(_box2) === false) {
+        return;
+      }
+      if (worldUnits) {
+        raycastWorldUnits(this, intersects2);
+      } else {
+        raycastScreenSpace(this, camera, intersects2);
+      }
+    }
+    onBeforeRender(renderer) {
+      const uniforms = this.material.uniforms;
+      if (uniforms && uniforms.resolution) {
+        renderer.getViewport(_viewport);
+        this.material.uniforms.resolution.value.set(_viewport.z, _viewport.w);
+      }
+    }
+  };
+
+  // node_modules/three/examples/jsm/lines/LineGeometry.js
+  var LineGeometry = class extends LineSegmentsGeometry {
+    /**
+     * Constructs a new line geometry.
+     */
+    constructor() {
+      super();
+      this.isLineGeometry = true;
+      this.type = "LineGeometry";
+    }
+    /**
+     * Sets the given line positions for this geometry.
+     *
+     * @param {Float32Array|Array<number>} array - The position data to set.
+     * @return {LineGeometry} A reference to this geometry.
+     */
+    setPositions(array) {
+      const length = array.length - 3;
+      const points = new Float32Array(2 * length);
+      for (let i = 0; i < length; i += 3) {
+        points[2 * i] = array[i];
+        points[2 * i + 1] = array[i + 1];
+        points[2 * i + 2] = array[i + 2];
+        points[2 * i + 3] = array[i + 3];
+        points[2 * i + 4] = array[i + 4];
+        points[2 * i + 5] = array[i + 5];
+      }
+      super.setPositions(points);
+      return this;
+    }
+    /**
+     * Sets the given line colors for this geometry.
+     *
+     * @param {Float32Array|Array<number>} array - The position data to set.
+     * @return {LineGeometry} A reference to this geometry.
+     */
+    setColors(array) {
+      const length = array.length - 3;
+      const colors = new Float32Array(2 * length);
+      for (let i = 0; i < length; i += 3) {
+        colors[2 * i] = array[i];
+        colors[2 * i + 1] = array[i + 1];
+        colors[2 * i + 2] = array[i + 2];
+        colors[2 * i + 3] = array[i + 3];
+        colors[2 * i + 4] = array[i + 4];
+        colors[2 * i + 5] = array[i + 5];
+      }
+      super.setColors(colors);
+      return this;
+    }
+    /**
+     * Setups this line segments geometry from the given sequence of points.
+     *
+     * @param {Array<Vector3|Vector2>} points - An array of points in 2D or 3D space.
+     * @return {LineGeometry} A reference to this geometry.
+     */
+    setFromPoints(points) {
+      const length = points.length - 1;
+      const positions = new Float32Array(6 * length);
+      for (let i = 0; i < length; i++) {
+        positions[6 * i] = points[i].x;
+        positions[6 * i + 1] = points[i].y;
+        positions[6 * i + 2] = points[i].z || 0;
+        positions[6 * i + 3] = points[i + 1].x;
+        positions[6 * i + 4] = points[i + 1].y;
+        positions[6 * i + 5] = points[i + 1].z || 0;
+      }
+      super.setPositions(positions);
+      return this;
+    }
+    /**
+     * Setups this line segments geometry from the given line.
+     *
+     * @param {Line} line - The line that should be used as a data source for this geometry.
+     * @return {LineGeometry} A reference to this geometry.
+     */
+    fromLine(line) {
+      const geometry = line.geometry;
+      this.setPositions(geometry.attributes.position.array);
+      return this;
+    }
+  };
+
+  // node_modules/three/examples/jsm/lines/Line2.js
+  var Line2 = class extends LineSegments2 {
+    /**
+     * Constructs a new wide line.
+     *
+     * @param {LineGeometry} [geometry] - The line geometry.
+     * @param {LineMaterial} [material] - The line material.
+     */
+    constructor(geometry = new LineGeometry(), material = new LineMaterial({ color: Math.random() * 16777215 })) {
+      super(geometry, material);
+      this.isLine2 = true;
+      this.type = "Line2";
+    }
+  };
+
   // js/obstacles.js
   var ObstacleManager = class {
     constructor(scene, track) {
@@ -45274,11 +46114,11 @@ void main() {
         }
       });
     }
-    // Remove any leftover human / animal / debris meshes from the scene
+    // Remove any leftover human / animal obstacle meshes from the scene
     cleanupSceneObstacles() {
       const toRemove = [];
       this.scene.traverse((child) => {
-        if (child.name === "stylizedHuman" || child.name === "stylizedAnimal" || child.name === "trackCargoDebris" || child.userData && (child.userData.type === "human" || child.userData.type === "dog" || child.userData.type === "deer" || child.userData.type === "cow" || child.userData.type === "elephant" || child.userData.type === "boar" || child.userData.type === "crate")) {
+        if (child.name === "stylizedHuman" || child.name === "stylizedAnimal" || child.userData && (child.userData.type === "human" || child.userData.type === "dog" || child.userData.type === "deer" || child.userData.type === "cow" || child.userData.type === "elephant" || child.userData.type === "boar")) {
           toRemove.push(child);
         }
       });
@@ -46070,10 +46910,10 @@ void main() {
             ud.torsoGroup.rotation.set(0.2, 0, -0.04);
           }
           if (ud.headGroup) ud.headGroup.rotation.set(0.08, 0.22, 0);
-          if (ud.legL) ud.legL.rotation.set(0.62, 0.04, -0.05);
-          if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.8, 0, 0);
-          if (ud.legR) ud.legR.rotation.set(-0.42, -0.04, 0.05);
-          if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.25, 0, 0);
+          if (ud.legL) ud.legL.rotation.set(-0.55, 0.04, -0.05);
+          if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.65, 0, 0);
+          if (ud.legR) ud.legR.rotation.set(0.35, -0.04, 0.05);
+          if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.15, 0, 0);
           if (ud.armR) ud.armR.rotation.set(0.65, 0, 0.12);
           if (ud.forearmR) ud.forearmR.rotation.set(-1.42, 0, 0);
           if (ud.armL) ud.armL.rotation.set(-0.7, 0, -0.12);
@@ -46086,10 +46926,10 @@ void main() {
             ud.torsoGroup.rotation.set(0.22, 0, 0.06);
           }
           if (ud.headGroup) ud.headGroup.rotation.set(0.08, -0.3, 0);
-          if (ud.legR) ud.legR.rotation.set(0.58, 0.04, 0.06);
-          if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.75, 0, 0);
-          if (ud.legL) ud.legL.rotation.set(-0.45, -0.04, -0.05);
-          if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.28, 0, 0);
+          if (ud.legR) ud.legR.rotation.set(-0.52, 0.04, 0.06);
+          if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.6, 0, 0);
+          if (ud.legL) ud.legL.rotation.set(0.38, -0.04, -0.05);
+          if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.15, 0, 0);
           if (ud.armL) ud.armL.rotation.set(0.6, 0, -0.12);
           if (ud.forearmL) ud.forearmL.rotation.set(-1.38, 0, 0);
           if (ud.armR) ud.armR.rotation.set(-0.68, 0, 0.12);
@@ -46102,14 +46942,14 @@ void main() {
             ud.torsoGroup.rotation.set(0.3, 0, 0);
           }
           if (ud.headGroup) ud.headGroup.rotation.set(0.1, 0, 0);
-          if (ud.legR) ud.legR.rotation.set(0.72, 0, 0.04);
-          if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.95, 0, 0);
-          if (ud.legL) ud.legL.rotation.set(-0.52, 0, -0.04);
-          if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.35, 0, 0);
-          if (ud.armL) ud.armL.rotation.set(0.8, 0, -0.18);
-          if (ud.forearmL) ud.forearmL.rotation.set(-1.48, 0, 0);
-          if (ud.armR) ud.armR.rotation.set(-0.85, 0, 0.18);
-          if (ud.forearmR) ud.forearmR.rotation.set(-1.38, 0, 0);
+          if (ud.legL) ud.legL.rotation.set(-0.65, 0, -0.04);
+          if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.75, 0, 0);
+          if (ud.legR) ud.legR.rotation.set(0.45, 0, 0.04);
+          if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.2, 0, 0);
+          if (ud.armR) ud.armR.rotation.set(0.8, 0, 0.18);
+          if (ud.forearmR) ud.forearmR.rotation.set(-1.48, 0, 0);
+          if (ud.armL) ud.armL.rotation.set(-0.85, 0, -0.18);
+          if (ud.forearmL) ud.forearmL.rotation.set(-1.38, 0, 0);
           break;
         case "mid":
         case 3:
@@ -46119,10 +46959,10 @@ void main() {
             ud.torsoGroup.rotation.set(0.26, 0, 0);
           }
           if (ud.headGroup) ud.headGroup.rotation.set(0.06, 0, 0);
-          if (ud.legR) ud.legR.rotation.set(0.68, 0, 0.04);
-          if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.85, 0, 0);
-          if (ud.legL) ud.legL.rotation.set(-0.48, 0, -0.04);
-          if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.35, 0, 0);
+          if (ud.legR) ud.legR.rotation.set(-0.55, 0, 0.04);
+          if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.65, 0, 0);
+          if (ud.legL) ud.legL.rotation.set(0.38, 0, -0.04);
+          if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.18, 0, 0);
           if (ud.armL) ud.armL.rotation.set(0.65, 0, -0.15);
           if (ud.forearmL) ud.forearmL.rotation.set(-1.45, 0, 0);
           if (ud.armR) ud.armR.rotation.set(-0.75, 0, 0.15);
@@ -47288,26 +48128,26 @@ void main() {
       if (lateralOffset !== 0 && transform.normal) {
         mesh.position.add(transform.normal.clone().multiplyScalar(lateralOffset));
       }
-      mesh.quaternion.setFromUnitVectors(
-        new Vector3(0, 0, 1),
-        transform.tangent
-      );
       const pose = humanPose || "mid";
-      if (type === "human") {
-        if (pose === "enter" || pose === 1) {
-          mesh.rotateY(-Math.PI * 0.45);
-        } else if (pose === "exit" || pose === 2) {
-          mesh.rotateY(Math.PI * 0.55);
-        } else if (pose === "sudden" || pose === 4) {
-          mesh.rotateY(-Math.PI * 0.5);
-        } else {
-          mesh.rotateY(Math.PI);
-        }
+      const isSudden = pose === "sudden" || pose === 4;
+      if (isSudden) {
+        const moveDir = (transform.normal || new Vector3(-1, 0, 0)).clone().multiplyScalar((lateralOffset || 3) < 0 ? 1 : -1).normalize();
+        mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), moveDir);
       } else {
-        if (pose === "sudden" || pose === 4) {
-          mesh.rotateY(-Math.PI * 0.5);
+        const approachDir = (transform.tangent || new Vector3(0, 0, 1)).clone().negate().normalize();
+        mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), approachDir);
+        if (type === "human") {
+          if (pose === "enter" || pose === 1) {
+            const enterDir = (transform.normal || new Vector3(-1, 0, 0)).clone().multiplyScalar((lateralOffset || 1) < 0 ? 1 : -1).normalize();
+            mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), enterDir);
+            mesh.rotateY(-0.15);
+          } else if (pose === "exit" || pose === 2) {
+            const exitDir = (transform.normal || new Vector3(-1, 0, 0)).clone().multiplyScalar((lateralOffset || 1) < 0 ? -1 : 1).normalize();
+            mesh.quaternion.setFromUnitVectors(new Vector3(0, 0, 1), exitDir);
+            mesh.rotateY(0.15);
+          }
         } else {
-          mesh.rotateY(Math.PI * 0.75);
+          mesh.rotateY(0.25);
         }
       }
       const obstacleObj = {
@@ -47561,6 +48401,54 @@ void main() {
       this.activeScenarioIndex = index;
       return obs;
     }
+    // Dedicated Weight-Tier Obstacle Spawner for Testing Power Sources:
+    // - Tier 1: Only 150kg (1 Power Source: Down-Left)
+    // - Tier 2: Over 150kg - 250kg (e.g. 200kg: 2 Power Sources)
+    // - Tier 3: 250kg - 350kg (e.g. 320kg / 350kg: 3 Power Sources)
+    // - Tier 4: Over 350kg (e.g. 400kg: All 4 Power Sources)
+    spawnWeightTierObstacle(tier = 1, trainProgress = 0, trackLength = 3600) {
+      this.clearAllObstacles();
+      const actualTrackLength = trackLength || this.track && this.track.totalLength || 3600;
+      const dist = 600;
+      const deltaProgress = dist / actualTrackLength;
+      const targetProgress = (trainProgress + deltaProgress) % 1;
+      let mass = 150;
+      let type = "boar";
+      let name = "Tier 1: Only 150kg (1 Power Source: Down-Left)";
+      if (tier === 1 || tier === 150) {
+        mass = 150;
+        type = "boar";
+        name = "Tier 1: Only 150kg (1 Power Source: Down-Left)";
+      } else if (tier === 2 || tier === 200) {
+        mass = 200;
+        type = "boar";
+        name = "Tier 2: 200kg Over 150-250kg (2 Power Sources: Bilateral)";
+      } else if (tier === 3 || tier === 300 || tier === 320 || tier === 350) {
+        mass = 320;
+        type = "cow";
+        name = "Tier 3: 320kg in 250-350kg (3 Power Sources: Tri-Channel)";
+      } else {
+        mass = 400;
+        type = "cow";
+        name = "Tier 4: 400kg Over 350kg (All 4 Power Sources: Quad)";
+      }
+      const obs = this.spawnObstacle(
+        type,
+        targetProgress,
+        true,
+        0,
+        mass,
+        name,
+        "mid"
+      );
+      obs.initialDist = dist;
+      obs.isScenario = true;
+      if (this.train && this.train.captureNet && this.train.captureNet.reset) {
+        this.train.captureNet.reset();
+      }
+      this.activeScenarioIndex = null;
+      return obs;
+    }
     // Initial track obstacles: Applies Scenario 1 (Enter) so scene is active on load
     initDefaultObstacles() {
       this.applyScenario(1, 0, this.track && this.track.totalLength || 3600);
@@ -47586,9 +48474,14 @@ void main() {
       };
     }
     // Weight-Tiered Electric Shock Specifications (1 to 4 Power Sources)
+    // Rules:
+    // - Only 150kg (≤ 150kg): 1 Power Source
+    // - Over 150kg - 250kg (> 150kg & ≤ 250kg): 2 Power Sources
+    // - 250kg - 350kg (> 250kg & ≤ 350kg): 3 Power Sources
+    // - Over 350kg (> 350kg): All 4 Power Sources
     getTailoredShockSpecs(obs) {
       const mass = obs && obs.mass !== void 0 ? obs.mass : 72;
-      if (mass < 150) {
+      if (mass <= 150) {
         return {
           tier: 1,
           powerSourcesCount: 1,
@@ -47598,12 +48491,12 @@ void main() {
           current: "1.2 mA",
           energy: "0.04 J",
           compliance: "IEC 60479-1 / RDSO Protocol",
-          typeLabel: "HUMAN / LIGHT HAZARD (<150KG)",
+          typeLabel: "LIGHT HAZARD (\u2264150KG)",
           badge: "1x POWER SOURCE: 2.0 kV / 1.2 mA",
           color: "#38bdf8",
-          desc: `Under 150 kg (${mass} kg): 1 power source active (Down-Left preferred ground angle).`
+          desc: `Only 150 kg or under (${mass} kg): 1 power source active (Down-Left preferred ground angle).`
         };
-      } else if (mass >= 150 && mass < 250) {
+      } else if (mass > 150 && mass <= 250) {
         return {
           tier: 2,
           powerSourcesCount: 2,
@@ -47613,12 +48506,12 @@ void main() {
           current: "3.0 mA",
           energy: "0.95 J",
           compliance: "IEC 60335-2-76 / RDSO Track Deterrence",
-          typeLabel: "MEDIUM HAZARD (150-250KG)",
+          typeLabel: "MEDIUM HAZARD (OVER 150-250KG)",
           badge: "2x POWER SOURCES: 6.0 kV / 3.0 mA",
           color: "#f97316",
-          desc: `150-250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep).`
+          desc: `Over 150 kg to 250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep).`
         };
-      } else if (mass >= 250 && mass < 350) {
+      } else if (mass > 250 && mass <= 350) {
         return {
           tier: 3,
           powerSourcesCount: 3,
@@ -47631,7 +48524,7 @@ void main() {
           typeLabel: "HEAVY HAZARD (250-350KG)",
           badge: "3x POWER SOURCES: 7.2 kV / 3.5 mA",
           color: "#e11d48",
-          desc: `250-350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam).`
+          desc: `250 kg to 350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam).`
         };
       } else {
         return {
@@ -47643,10 +48536,10 @@ void main() {
           current: "3.8 mA",
           energy: "1.40 J",
           compliance: "RDSO Tech Circular 129 / IEC 60335-2-76",
-          typeLabel: "CRITICAL HAZARD (\u2265350KG)",
+          typeLabel: "CRITICAL HAZARD (OVER 350KG)",
           badge: "4x POWER SOURCES: 7.8 kV / 3.8 mA",
           color: "#ec4899",
-          desc: `350 kg and above (${mass} kg): All 4 power sources active (Quad full-power convergence).`
+          desc: `Over 350 kg (${mass} kg): All 4 power sources active (Quad full-power convergence).`
         };
       }
     }
@@ -47658,9 +48551,29 @@ void main() {
       obs.shockTime = this.animTime;
       obs.deterMode = "electric_shock";
       obs.fleeStartTime = this.animTime;
-      obs.fleeDirection = Math.random() > 0.5 ? 1 : -1;
+      let fleeDir = 1;
+      if (obs.startLateralOffset && Math.abs(obs.startLateralOffset) > 0.5) {
+        fleeDir = Math.sign(obs.startLateralOffset);
+      } else if (Math.abs(obs.lateralOffset) > 0.2) {
+        fleeDir = Math.sign(obs.lateralOffset);
+      } else {
+        fleeDir = Math.random() > 0.5 ? 1 : -1;
+      }
+      obs.fleeDirection = fleeDir;
+      obs.escapeDirSign = fleeDir;
+      obs.escapeStartOffset = obs.lateralOffset || 0;
       obs.isCleared = false;
       this.fxTimer = 1.2;
+      const transform = this.track.getTrackTransform(obs.progress, 0);
+      const tangent = (transform.tangent || new Vector3(0, 0, 1)).clone().normalize();
+      const sideDir = new Vector3(-tangent.z, 0, tangent.x).normalize();
+      const escapeHeading = sideDir.clone().multiplyScalar(fleeDir).normalize();
+      if (obs.mesh) {
+        obs.mesh.quaternion.setFromUnitVectors(
+          new Vector3(0, 0, 1),
+          escapeHeading
+        );
+      }
       if (audio) {
         audio.playElectricShockDischarge(obs.type || "human", obs.mass);
       }
@@ -47669,11 +48582,135 @@ void main() {
     triggerAnimalDeterrence(obs, audio, train = null) {
       this.triggerDeterrence(obs, audio, train);
     }
+    // Mid-body target height for electric rays & non-lethal deterrence
+    // Ensures rays strike the center of mass (mid-torso / flank) rather than legs or feet
+    getObstacleMidHeight(obs) {
+      if (!obs) return 1;
+      const type = obs.type || obs.userData && obs.userData.type;
+      switch (type) {
+        case "elephant":
+          return 1.85;
+        // Massive Asian elephant mid-flank / chest (center of torso)
+        case "cow":
+          return 1.05;
+        // Zebu cow mid-barrel / ribcage
+        case "human":
+          return 1.15;
+        // Adult human chest / solar plexus / mid-torso
+        case "deer":
+          return 0.82;
+        // Spotted deer mid-chest
+        case "boar":
+          return 0.55;
+        // Wild boar mid-flank
+        case "dog":
+          return 0.38;
+        // Stray dog mid-body
+        default:
+          return 1;
+      }
+    }
+    // Computes distinct, anatomically realistic target positions on different body parts
+    // for multi-channel power sources (Top-Left, Top-Right, Down-Left, Down-Right).
+    // Ensures 2, 3, or 4 power sources strike different body parts instead of converging on a single spot!
+    getObstacleBodyPartTarget(obs, emitterIndex = 2, totalActiveCount = 1) {
+      const worldTarget = new Vector3();
+      if (!obs || !obs.mesh) return worldTarget;
+      const type = obs.type || obs.userData && obs.userData.type || "human";
+      obs.mesh.updateWorldMatrix(true, false);
+      if (totalActiveCount <= 1) {
+        const midH = this.getObstacleMidHeight(obs);
+        obs.mesh.getWorldPosition(worldTarget);
+        worldTarget.y += midH;
+        return worldTarget;
+      }
+      const localOffset = new Vector3(0, this.getObstacleMidHeight(obs), 0);
+      switch (type) {
+        case "elephant":
+          if (emitterIndex === 0) {
+            localOffset.set(-0.62, 2.35, 0.45);
+          } else if (emitterIndex === 1) {
+            localOffset.set(0.62, 2.35, 0.45);
+          } else if (emitterIndex === 2) {
+            localOffset.set(-0.75, 1.55, -0.2);
+          } else if (emitterIndex === 3) {
+            localOffset.set(0.75, 1.55, -0.2);
+          }
+          break;
+        case "cow":
+          if (emitterIndex === 0) {
+            localOffset.set(-0.3, 1.35, 0.35);
+          } else if (emitterIndex === 1) {
+            localOffset.set(0.3, 1.35, 0.35);
+          } else if (emitterIndex === 2) {
+            localOffset.set(-0.36, 0.92, -0.15);
+          } else if (emitterIndex === 3) {
+            localOffset.set(0.36, 0.92, -0.15);
+          }
+          break;
+        case "human":
+          if (emitterIndex === 0) {
+            localOffset.set(-0.24, 1.38, 0.08);
+          } else if (emitterIndex === 1) {
+            localOffset.set(0.24, 1.38, 0.08);
+          } else if (emitterIndex === 2) {
+            localOffset.set(-0.16, 0.95, 0.05);
+          } else if (emitterIndex === 3) {
+            localOffset.set(0.16, 0.95, 0.05);
+          }
+          break;
+        case "deer":
+          if (emitterIndex === 0) {
+            localOffset.set(-0.18, 1.05, 0.2);
+          } else if (emitterIndex === 1) {
+            localOffset.set(0.18, 1.05, 0.2);
+          } else if (emitterIndex === 2) {
+            localOffset.set(-0.2, 0.72, -0.12);
+          } else if (emitterIndex === 3) {
+            localOffset.set(0.2, 0.72, -0.12);
+          }
+          break;
+        case "boar":
+          if (emitterIndex === 0) {
+            localOffset.set(-0.18, 0.68, 0.16);
+          } else if (emitterIndex === 1) {
+            localOffset.set(0.18, 0.68, 0.16);
+          } else if (emitterIndex === 2) {
+            localOffset.set(-0.2, 0.42, -0.1);
+          } else if (emitterIndex === 3) {
+            localOffset.set(0.2, 0.42, -0.1);
+          }
+          break;
+        case "dog":
+          if (emitterIndex === 0) {
+            localOffset.set(-0.11, 0.48, 0.12);
+          } else if (emitterIndex === 1) {
+            localOffset.set(0.11, 0.48, 0.12);
+          } else if (emitterIndex === 2) {
+            localOffset.set(-0.13, 0.32, -0.08);
+          } else if (emitterIndex === 3) {
+            localOffset.set(0.13, 0.32, -0.08);
+          }
+          break;
+        default:
+          if (emitterIndex === 0) localOffset.set(-0.25, 1.25, 0.1);
+          else if (emitterIndex === 1) localOffset.set(0.25, 1.25, 0.1);
+          else if (emitterIndex === 2) localOffset.set(-0.25, 0.85, -0.1);
+          else if (emitterIndex === 3) localOffset.set(0.25, 0.85, -0.1);
+          break;
+      }
+      worldTarget.copy(obs.mesh.localToWorld(localOffset));
+      return worldTarget;
+    }
     spawnDeterrenceFX(obs, train = null) {
       if (train) this.train = train;
       while (this.fxGroup.children.length > 0) {
         const c = this.fxGroup.children[0];
         if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+          if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
+          else c.material.dispose();
+        }
         this.fxGroup.remove(c);
       }
       const shockSpecs = this.getTailoredShockSpecs(obs);
@@ -47696,27 +48733,30 @@ void main() {
         );
         fallbackOrigin.y += 0.5;
       }
-      const targetPos = new Vector3();
-      if (obs.mesh) {
-        obs.mesh.getWorldPosition(targetPos);
-        targetPos.y += 0.6;
-      }
       if (activeEmitters.length === 0) {
-        activeEmitters.push({ emitter: null, index: 2 });
+        shockSpecs.activeIndices.forEach((idx) => {
+          activeEmitters.push({ emitter: null, index: idx });
+        });
       }
+      const totalActiveCount = activeEmitters.length;
+      const screenRes = new Vector2(
+        typeof window !== "undefined" ? window.innerWidth : 1920,
+        typeof window !== "undefined" ? window.innerHeight : 1080
+      );
       activeEmitters.forEach((item) => {
-        const segs = 18;
-        const points = [];
+        const segs = 20;
+        const flatPoints = [];
         const eTip = item.emitter && item.emitter.tip ? item.emitter.tip : null;
         const origin = new Vector3();
         if (eTip) eTip.getWorldPosition(origin);
         else origin.copy(fallbackOrigin);
+        const partTarget = this.getObstacleBodyPartTarget(obs, item.index, totalActiveCount);
         const targetOffset = new Vector3(
-          (Math.random() - 0.5) * 0.35,
-          (Math.random() - 0.5) * 0.4,
-          (Math.random() - 0.5) * 0.35
+          (Math.random() - 0.5) * 0.12,
+          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 0.12
         );
-        const effectiveEnd = targetPos.clone().add(targetOffset);
+        const effectiveEnd = partTarget.clone().add(targetOffset);
         for (let i = 0; i <= segs; i++) {
           const t = i / segs;
           const p = origin.clone().lerp(effectiveEnd, t);
@@ -47726,33 +48766,73 @@ void main() {
             p.y += (Math.random() - 0.5) * 0.4 * envelope;
             p.z += (Math.random() - 0.5) * 0.55 * envelope;
           }
-          points.push(p);
+          flatPoints.push(p.x, p.y, p.z);
         }
-        const geom = new BufferGeometry().setFromPoints(points);
-        const mat = new LineBasicMaterial({
+        const geomGlow = new LineGeometry();
+        geomGlow.setPositions(flatPoints);
+        const matGlow = new LineMaterial({
           color: shockSpecs.color || 3718648,
-          linewidth: 2,
+          linewidth: 9.5,
           transparent: true,
-          opacity: 0.95
+          opacity: 0.7,
+          blending: AdditiveBlending,
+          depthWrite: false
         });
-        const line = new Line(geom, mat);
-        line.userData = {
+        matGlow.resolution.copy(screenRes);
+        const glowRay = new Line2(geomGlow, matGlow);
+        glowRay.userData = {
           isLightning: true,
+          isGlowRay: true,
           emitterTip: eTip,
           fallbackOrigin: origin.clone(),
           obs,
+          emitterIndex: item.index,
+          totalActiveCount,
           targetOffset,
-          segs
+          segs,
+          baseOpacity: 0.7
         };
-        this.fxGroup.add(line);
-        const flare = new PointLight(3718648, 4, 12);
+        this.fxGroup.add(glowRay);
+        const geomCore = new LineGeometry();
+        geomCore.setPositions(flatPoints);
+        const matCore = new LineMaterial({
+          color: 16777215,
+          linewidth: 4.8,
+          transparent: true,
+          opacity: 0.98,
+          blending: AdditiveBlending,
+          depthWrite: false
+        });
+        matCore.resolution.copy(screenRes);
+        const coreRay = new Line2(geomCore, matCore);
+        coreRay.userData = {
+          isLightning: true,
+          isCoreRay: true,
+          emitterTip: eTip,
+          fallbackOrigin: origin.clone(),
+          obs,
+          emitterIndex: item.index,
+          totalActiveCount,
+          targetOffset,
+          segs,
+          baseOpacity: 0.98
+        };
+        this.fxGroup.add(coreRay);
+        const flare = new PointLight(shockSpecs.color || 3718648, 5, 14);
         flare.position.copy(origin);
         flare.userData = { isNozzleFlare: true, emitterTip: eTip };
         this.fxGroup.add(flare);
+        const contactFlash = new PointLight(shockSpecs.color || 3718648, 4.8, 10);
+        contactFlash.position.copy(effectiveEnd);
+        contactFlash.userData = {
+          isContactFlash: true,
+          obs,
+          emitterIndex: item.index,
+          totalActiveCount,
+          targetOffset
+        };
+        this.fxGroup.add(contactFlash);
       });
-      const targetFlash = new PointLight(3718648, 5, 15);
-      targetFlash.position.copy(targetPos);
-      this.fxGroup.add(targetFlash);
     }
     // Coach Side Electric Shock FX for perimeter repulsion (2-3m flank clearance)
     spawnCoachSideShockFX(obs, nearest) {
@@ -47763,21 +48843,27 @@ void main() {
       const origin = new Vector3();
       if (eTip) eTip.getWorldPosition(origin);
       else origin.copy(this.train.mesh.position);
+      const midHeight = this.getObstacleMidHeight(obs);
       const targetPos = new Vector3();
       if (obs.mesh) {
         obs.mesh.getWorldPosition(targetPos);
-        targetPos.y += 0.5;
+        targetPos.y += midHeight;
       }
       const pulseDir = targetPos.clone().sub(origin).normalize();
+      const screenRes = new Vector2(
+        typeof window !== "undefined" ? window.innerWidth : 1920,
+        typeof window !== "undefined" ? window.innerHeight : 1080
+      );
       for (let fork = 0; fork < 2; fork++) {
         const segs = 16;
-        const points = [];
+        const flatPoints = [];
+        const forkOffset = fork === 0 ? new Vector3(0, 0.16, 0.14) : new Vector3(0, -0.16, -0.14);
         const targetOffset = new Vector3(
-          (Math.random() - 0.5) * 0.28,
-          (Math.random() - 0.5) * 0.32,
-          (Math.random() - 0.5) * 0.28
+          (Math.random() - 0.5) * 0.18,
+          (Math.random() - 0.5) * 0.14,
+          (Math.random() - 0.5) * 0.18
         );
-        const effectiveEnd = targetPos.clone().add(targetOffset);
+        const effectiveEnd = targetPos.clone().add(forkOffset).add(targetOffset);
         for (let i = 0; i <= segs; i++) {
           const t = i / segs;
           const p = origin.clone().lerp(effectiveEnd, t);
@@ -47787,26 +48873,60 @@ void main() {
             p.y += (Math.random() - 0.5) * 0.35 * envelope;
             p.z += (Math.random() - 0.5) * 0.45 * envelope;
           }
-          points.push(p);
+          flatPoints.push(p.x, p.y, p.z);
         }
-        const geom = new BufferGeometry().setFromPoints(points);
-        const mat = new LineBasicMaterial({
+        const geomGlow = new LineGeometry();
+        geomGlow.setPositions(flatPoints);
+        const matGlow = new LineMaterial({
           color: fork === 0 ? 3718648 : 61695,
-          linewidth: 2,
+          linewidth: 8.5,
           transparent: true,
-          opacity: 0.95
+          opacity: 0.65,
+          blending: AdditiveBlending,
+          depthWrite: false
         });
-        const line = new Line(geom, mat);
-        line.userData = {
+        matGlow.resolution.copy(screenRes);
+        const glowLine = new Line2(geomGlow, matGlow);
+        glowLine.userData = {
           isLightning: true,
           isSideLightning: true,
+          isGlowRay: true,
           emitterTip: eTip,
           fallbackOrigin: origin.clone(),
           obs,
+          midHeight,
+          forkOffset,
           targetOffset,
-          segs
+          segs,
+          baseOpacity: 0.65
         };
-        this.fxGroup.add(line);
+        this.fxGroup.add(glowLine);
+        const geomCore = new LineGeometry();
+        geomCore.setPositions(flatPoints);
+        const matCore = new LineMaterial({
+          color: 16777215,
+          linewidth: 4.5,
+          transparent: true,
+          opacity: 0.98,
+          blending: AdditiveBlending,
+          depthWrite: false
+        });
+        matCore.resolution.copy(screenRes);
+        const coreLine = new Line2(geomCore, matCore);
+        coreLine.userData = {
+          isLightning: true,
+          isSideLightning: true,
+          isCoreRay: true,
+          emitterTip: eTip,
+          fallbackOrigin: origin.clone(),
+          obs,
+          midHeight,
+          forkOffset,
+          targetOffset,
+          segs,
+          baseOpacity: 0.98
+        };
+        this.fxGroup.add(coreLine);
       }
       const ringGeo = new TorusGeometry(0.24, 0.025, 8, 24);
       const ringMat = new MeshBasicMaterial({
@@ -47942,29 +49062,35 @@ void main() {
             );
             obs.lateralOffset = curOffset;
             const transform = this.track.getTrackTransform(obs.progress, 0);
-            const normal = transform.normal ? transform.normal.clone() : new Vector3(1, 0, 0);
+            const normal = transform.normal ? transform.normal.clone() : new Vector3(-1, 0, 0);
             obs.mesh.position.copy(transform.position).add(normal.multiplyScalar(curOffset));
             if (p < 1) {
+              const dashHeading = normal.clone().multiplyScalar((obs.startLateralOffset || 2.4) < 0 ? 1 : -1).normalize();
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                dashHeading
+              );
               const runCycle = obs.suddenTimer * 18;
-              if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
+              const legSwing = Math.sin(runCycle) * 0.65;
+              if (ud.legL) ud.legL.rotation.x = -legSwing;
               if (ud.lowerLegL)
-                ud.lowerLegL.rotation.x = -Math.max(0.15, -Math.sin(runCycle) * 1.1);
-              if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
+                ud.lowerLegL.rotation.x = Math.max(0.1, legSwing * 1.1);
+              if (ud.legR) ud.legR.rotation.x = legSwing;
               if (ud.lowerLegR)
-                ud.lowerLegR.rotation.x = -Math.max(0.15, Math.sin(runCycle) * 1.1);
-              if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
+                ud.lowerLegR.rotation.x = Math.max(0.1, -legSwing * 1.1);
+              if (ud.armL) ud.armL.rotation.x = legSwing * 0.85;
               if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
-              if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
+              if (ud.armR) ud.armR.rotation.x = -legSwing * 0.85;
               if (ud.forearmR) ud.forearmR.rotation.x = -1.35;
               if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.28;
             } else {
               obs.isSuddenEmerging = false;
               this.applyHumanPose(obs.mesh, "sudden");
+              const approachDir = transform.tangent.clone().negate().normalize();
               obs.mesh.quaternion.setFromUnitVectors(
                 new Vector3(0, 0, 1),
-                transform.tangent
+                approachDir
               );
-              obs.mesh.rotateY(Math.PI);
             }
             return;
           }
@@ -47973,16 +49099,16 @@ void main() {
             obs.mesh.position.add(
               obs.sideRepelDir.clone().multiplyScalar(4 * dt)
             );
+            obs.mesh.quaternion.setFromUnitVectors(
+              new Vector3(0, 0, 1),
+              obs.sideRepelDir
+            );
             if (repelT < 0.4) {
               obs.mesh.position.y += Math.sin(repelT / 0.4 * Math.PI) * 0.18;
               if (ud.headGroup) ud.headGroup.rotation.x = -0.35;
               if (ud.armL) ud.armL.rotation.set(-1.1, 0, -0.6);
               if (ud.armR) ud.armR.rotation.set(-1.1, 0, 0.6);
             } else {
-              obs.mesh.quaternion.setFromUnitVectors(
-                new Vector3(0, 0, 1),
-                obs.sideRepelDir
-              );
               const runCycle = this.animTime * 14 % (Math.PI * 2);
               if (ud.armL) ud.armL.rotation.x = Math.sin(runCycle) * 0.9;
               if (ud.armR) ud.armR.rotation.x = -Math.sin(runCycle) * 0.9;
@@ -47997,7 +49123,6 @@ void main() {
           }
           if (obs.isDeterred) {
             const fleeT = this.animTime - obs.fleeStartTime;
-            const fleeDir = obs.fleeDirection || 1;
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const tangent = transform.tangent.clone().normalize();
             const sideDir = new Vector3(
@@ -48005,53 +49130,57 @@ void main() {
               0,
               tangent.x
             ).normalize();
+            if (obs.escapeDirSign === void 0 || obs.escapeDirSign === null) {
+              let dirSign = 1;
+              if (obs.startLateralOffset && Math.abs(obs.startLateralOffset) > 0.5) {
+                dirSign = Math.sign(obs.startLateralOffset);
+              } else if (Math.abs(obs.lateralOffset) > 0.2) {
+                dirSign = Math.sign(obs.lateralOffset);
+              } else {
+                dirSign = obs.fleeDirection || 1;
+              }
+              obs.escapeDirSign = dirSign;
+              obs.escapeStartOffset = obs.lateralOffset || 0;
+            }
+            const fleeDir = obs.escapeDirSign;
+            const fleeHeading = sideDir.clone().multiplyScalar(fleeDir).normalize();
             if (obs.moveOffTrackOnShock) {
               const fleeDist = Math.min(5.5, fleeT * 4.2);
-              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              const currentOffset = obs.escapeStartOffset + fleeDir * fleeDist;
+              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(currentOffset));
               lateralPos.y = Math.max(
                 0.05,
-                transform.position.y - Math.min(0.28, fleeDist * 0.08)
+                transform.position.y - Math.min(0.28, Math.abs(currentOffset) * 0.08)
               );
               obs.mesh.position.copy(lateralPos);
-              if (fleeDist >= 2.5) {
+              if (Math.abs(currentOffset) >= 2.5) {
                 obs.isCleared = true;
               }
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                fleeHeading
+              );
               if (fleeT < 0.35) {
                 obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.22;
                 if (ud.headGroup) ud.headGroup.rotation.x = -0.3;
                 if (ud.armL) ud.armL.rotation.set(-0.8, 0, -0.6);
                 if (ud.armR) ud.armR.rotation.set(-0.8, 0, 0.6);
               } else if (fleeT < 2.5) {
-                const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(
-                  new Vector3(0, 0, 1),
-                  fleeHeading
-                );
                 const runCycle = (fleeT - 0.35) * 14;
-                if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
+                const legSwing = Math.sin(runCycle) * 0.65;
+                if (ud.legL) ud.legL.rotation.x = -legSwing;
                 if (ud.lowerLegL)
-                  ud.lowerLegL.rotation.x = -Math.max(
-                    0.15,
-                    -Math.sin(runCycle) * 1.1
-                  );
-                if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
+                  ud.lowerLegL.rotation.x = Math.max(0.1, legSwing * 1.1);
+                if (ud.legR) ud.legR.rotation.x = legSwing;
                 if (ud.lowerLegR)
-                  ud.lowerLegR.rotation.x = -Math.max(
-                    0.15,
-                    Math.sin(runCycle) * 1.1
-                  );
-                if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
+                  ud.lowerLegR.rotation.x = Math.max(0.1, -legSwing * 1.1);
+                if (ud.armL) ud.armL.rotation.x = legSwing * 0.85;
                 if (ud.forearmL) ud.forearmL.rotation.x = -1.4;
-                if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
+                if (ud.armR) ud.armR.rotation.x = -legSwing * 0.85;
                 if (ud.forearmR) ud.forearmR.rotation.x = -1.4;
                 if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.26;
                 if (ud.headGroup) ud.headGroup.rotation.x = 0.08;
               } else {
-                const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(
-                  new Vector3(0, 0, 1),
-                  safeHeading
-                );
                 if (ud.headGroup) {
                   ud.headGroup.rotation.y = -fleeDir * 0.8;
                   ud.headGroup.rotation.x = -0.1;
@@ -48120,10 +49249,10 @@ void main() {
           if (pose === "enter" || pose === 1) {
             const stepRhythm = localT * 2.2;
             const sway = Math.sin(stepRhythm);
-            if (ud.legL) ud.legL.rotation.x = 0.62 + sway * 0.08;
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.8 + Math.cos(stepRhythm) * 0.06;
-            if (ud.legR) ud.legR.rotation.x = -0.42 - sway * 0.06;
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.25 - Math.sin(stepRhythm) * 0.04;
+            if (ud.legL) ud.legL.rotation.x = -0.55 - sway * 0.08;
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = 0.65 + Math.cos(stepRhythm) * 0.06;
+            if (ud.legR) ud.legR.rotation.x = 0.35 + sway * 0.06;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = 0.15 - Math.sin(stepRhythm) * 0.04;
             if (ud.torsoGroup) {
               ud.torsoGroup.position.y = 0.94 + Math.abs(sway) * 0.015;
               ud.torsoGroup.rotation.x = 0.2 + sway * 0.03;
@@ -48146,10 +49275,10 @@ void main() {
           } else if (pose === "exit" || pose === 2) {
             const stepRhythm = localT * 2.2;
             const sway = Math.sin(stepRhythm);
-            if (ud.legR) ud.legR.rotation.x = 0.58 + sway * 0.08;
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.75 + Math.cos(stepRhythm) * 0.06;
-            if (ud.legL) ud.legL.rotation.x = -0.45 - sway * 0.06;
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.28 - Math.sin(stepRhythm) * 0.04;
+            if (ud.legR) ud.legR.rotation.x = -0.52 - sway * 0.08;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = 0.6 + Math.cos(stepRhythm) * 0.06;
+            if (ud.legL) ud.legL.rotation.x = 0.38 + sway * 0.06;
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = 0.15 - Math.sin(stepRhythm) * 0.04;
             if (ud.torsoGroup) {
               ud.torsoGroup.position.y = 0.94 + Math.abs(sway) * 0.015;
               ud.torsoGroup.rotation.x = 0.22 + sway * 0.03;
@@ -48171,15 +49300,15 @@ void main() {
             }
           } else if (pose === "sudden" || pose === 4) {
             const sprintCycle = localT * 12;
-            const legDrive = Math.sin(sprintCycle) * 0.75;
-            if (ud.legR) ud.legR.rotation.x = legDrive;
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0.15, legDrive * 1.2);
+            const legDrive = Math.sin(sprintCycle) * 0.65;
             if (ud.legL) ud.legL.rotation.x = -legDrive;
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0.15, -legDrive * 1.2);
-            if (ud.armL) ud.armL.rotation.set(-legDrive * 0.9, 0, -0.15);
-            if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = Math.max(0.1, legDrive * 1.1);
+            if (ud.legR) ud.legR.rotation.x = legDrive;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = Math.max(0.1, -legDrive * 1.1);
             if (ud.armR) ud.armR.rotation.set(legDrive * 0.9, 0, 0.15);
             if (ud.forearmR) ud.forearmR.rotation.x = -1.35;
+            if (ud.armL) ud.armL.rotation.set(-legDrive * 0.9, 0, -0.15);
+            if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
             if (ud.torsoGroup) {
               ud.torsoGroup.rotation.x = 0.28 + Math.abs(Math.sin(sprintCycle)) * 0.04;
               ud.torsoGroup.position.y = 0.94 + Math.abs(Math.sin(sprintCycle)) * 0.02;
@@ -48189,10 +49318,10 @@ void main() {
             const runCycle = localT * 2;
             const bob = Math.sin(runCycle);
             if (!isTrainClose) {
-              if (ud.legR) ud.legR.rotation.x = 0.68 + bob * 0.06;
-              if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.85 + Math.cos(runCycle) * 0.05;
-              if (ud.legL) ud.legL.rotation.x = -0.48 - bob * 0.05;
-              if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.35 - Math.sin(runCycle) * 0.04;
+              if (ud.legR) ud.legR.rotation.x = -0.55 - bob * 0.06;
+              if (ud.lowerLegR) ud.lowerLegR.rotation.x = 0.65 + Math.cos(runCycle) * 0.05;
+              if (ud.legL) ud.legL.rotation.x = 0.38 + bob * 0.05;
+              if (ud.lowerLegL) ud.lowerLegL.rotation.x = 0.18 + Math.sin(runCycle) * 0.04;
               if (ud.armL) ud.armL.rotation.x = 0.65 + bob * 0.08;
               if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
               if (ud.armR) ud.armR.rotation.x = -0.75 - bob * 0.08;
@@ -48210,15 +49339,15 @@ void main() {
               }
             } else {
               const panicSprint = localT * 14;
-              const panicDrive = Math.sin(panicSprint) * 0.85;
-              if (ud.legR) ud.legR.rotation.x = panicDrive;
-              if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0.2, panicDrive * 1.3);
+              const panicDrive = Math.sin(panicSprint) * 0.7;
               if (ud.legL) ud.legL.rotation.x = -panicDrive;
-              if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0.2, -panicDrive * 1.3);
-              if (ud.armL) ud.armL.rotation.set(-panicDrive, 0, -0.2);
-              if (ud.forearmL) ud.forearmL.rotation.x = -1.5;
+              if (ud.lowerLegL) ud.lowerLegL.rotation.x = Math.max(0.12, panicDrive * 1.15);
+              if (ud.legR) ud.legR.rotation.x = panicDrive;
+              if (ud.lowerLegR) ud.lowerLegR.rotation.x = Math.max(0.12, -panicDrive * 1.15);
               if (ud.armR) ud.armR.rotation.set(panicDrive, 0, 0.2);
               if (ud.forearmR) ud.forearmR.rotation.x = -1.4;
+              if (ud.armL) ud.armL.rotation.set(-panicDrive, 0, -0.2);
+              if (ud.forearmL) ud.forearmL.rotation.x = -1.5;
               if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.32;
               if (ud.headGroup) ud.headGroup.rotation.set(0.12, 0, 0);
             }
@@ -48238,9 +49367,14 @@ void main() {
             );
             obs.lateralOffset = curOffset;
             const transform = this.track.getTrackTransform(obs.progress, 0);
-            const normal = transform.normal ? transform.normal.clone() : new Vector3(1, 0, 0);
-            obs.mesh.position.copy(transform.position).add(normal.multiplyScalar(curOffset));
+            const normal = transform.normal ? transform.normal.clone() : new Vector3(-1, 0, 0);
+            obs.mesh.position.copy(transform.position).add(normal.clone().multiplyScalar(curOffset));
             if (p < 1) {
+              const dashHeading = normal.clone().multiplyScalar((obs.startLateralOffset || 3) < 0 ? 1 : -1).normalize();
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                dashHeading
+              );
               const speedScale = ud.type === "dog" ? 22 : ud.type === "deer" ? 18 : ud.type === "cow" ? 14 : 8;
               const runCycle = obs.suddenTimer * speedScale;
               if (ud.legs) {
@@ -48255,11 +49389,12 @@ void main() {
               }
             } else {
               obs.isSuddenEmerging = false;
+              const approachDir = transform.tangent.clone().negate().normalize();
               obs.mesh.quaternion.setFromUnitVectors(
                 new Vector3(0, 0, 1),
-                transform.tangent
+                approachDir
               );
-              obs.mesh.rotateY(Math.PI * 0.75);
+              obs.mesh.rotateY(0.25);
               if (ud.legs) {
                 Object.values(ud.legs).forEach((l) => {
                   if (l) l.rotation.x = 0;
@@ -48274,16 +49409,16 @@ void main() {
             obs.mesh.position.add(
               obs.sideRepelDir.clone().multiplyScalar(pushSpeed * dt)
             );
+            obs.mesh.quaternion.setFromUnitVectors(
+              new Vector3(0, 0, 1),
+              obs.sideRepelDir
+            );
             if (repelT < 0.35) {
               obs.mesh.position.y += Math.sin(repelT / 0.35 * Math.PI) * 0.28;
               if (ud.headGroup) ud.headGroup.rotation.y = (Math.random() - 0.5) * 0.4;
               if (ud.trunk) ud.trunk.rotation.x = -0.65;
               if (ud.tail) ud.tail.rotation.z = Math.sin(this.animTime * 15) * 0.6;
             } else {
-              obs.mesh.quaternion.setFromUnitVectors(
-                new Vector3(0, 0, 1),
-                obs.sideRepelDir
-              );
               const speedScale = ud.type === "dog" ? 24 : ud.type === "deer" ? 20 : ud.type === "cow" ? 14 : 10;
               const runCycle = this.animTime * speedScale % (Math.PI * 2);
               if (ud.legs) {
@@ -48305,7 +49440,6 @@ void main() {
           }
           if (obs.isDeterred) {
             const fleeT = this.animTime - obs.fleeStartTime;
-            const fleeDir = obs.fleeDirection || 1;
             const transform = this.track.getTrackTransform(obs.progress, 0);
             const tangent = transform.tangent.clone().normalize();
             const sideDir = new Vector3(
@@ -48313,26 +49447,40 @@ void main() {
               0,
               tangent.x
             ).normalize();
+            if (obs.escapeDirSign === void 0 || obs.escapeDirSign === null) {
+              let dirSign = 1;
+              if (obs.startLateralOffset && Math.abs(obs.startLateralOffset) > 0.5) {
+                dirSign = Math.sign(obs.startLateralOffset);
+              } else if (Math.abs(obs.lateralOffset) > 0.2) {
+                dirSign = Math.sign(obs.lateralOffset);
+              } else {
+                dirSign = obs.fleeDirection || 1;
+              }
+              obs.escapeDirSign = dirSign;
+              obs.escapeStartOffset = obs.lateralOffset || 0;
+            }
+            const fleeDir = obs.escapeDirSign;
+            const fleeHeading = sideDir.clone().multiplyScalar(fleeDir).normalize();
             if (obs.moveOffTrackOnShock) {
               const fleeDist = Math.min(6.8, fleeT * 5);
-              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              const currentOffset = obs.escapeStartOffset + fleeDir * fleeDist;
+              const lateralPos = transform.position.clone().add(sideDir.clone().multiplyScalar(currentOffset));
               lateralPos.y = Math.max(
                 0.05,
-                transform.position.y - Math.min(0.28, fleeDist * 0.08)
+                transform.position.y - Math.min(0.28, Math.abs(currentOffset) * 0.08)
               );
               obs.mesh.position.copy(lateralPos);
-              if (fleeDist >= 2.8) {
+              if (Math.abs(currentOffset) >= 2.8) {
                 obs.isCleared = true;
               }
+              obs.mesh.quaternion.setFromUnitVectors(
+                new Vector3(0, 0, 1),
+                fleeHeading
+              );
               if (fleeT < 0.35) {
                 obs.mesh.position.y += Math.sin(fleeT / 0.35 * Math.PI) * 0.25;
                 if (ud.headGroup) ud.headGroup.rotation.y = -fleeDir * 0.4;
               } else if (fleeT < 2.5) {
-                const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-                obs.mesh.quaternion.setFromUnitVectors(
-                  new Vector3(0, 0, 1),
-                  fleeHeading
-                );
                 const runCycle = (fleeT - 0.35) * (ud.type === "dog" ? 24 : ud.type === "deer" ? 20 : 12);
                 if (ud.legs) {
                   if (ud.legs.legFL)
@@ -48345,6 +49493,9 @@ void main() {
                     ud.legs.legBL.rotation.x = -Math.sin(runCycle) * 0.75;
                 }
               } else {
+                if (ud.headGroup) {
+                  ud.headGroup.rotation.y = -fleeDir * 0.5;
+                }
                 if (ud.legs) {
                   Object.values(ud.legs).forEach((l) => {
                     if (l) l.rotation.x = 0;
@@ -48411,7 +49562,7 @@ void main() {
               child.material.opacity = Math.max(0, (1 - p) * 0.95);
             }
             child.position.copy(ud.origin).lerp(ud.target, p * 0.85);
-          } else if (child.isLine && child.userData.isLightning) {
+          } else if ((child.isLine2 || child.isLine) && child.userData && child.userData.isLightning) {
             const ud = child.userData;
             if (ud.emitterTip) {
               ud.emitterTip.getWorldPosition(tempStart);
@@ -48419,14 +49570,26 @@ void main() {
               tempStart.copy(ud.fallbackOrigin);
             }
             if (ud.obs && ud.obs.mesh) {
-              ud.obs.mesh.getWorldPosition(tempEnd);
-              tempEnd.add(ud.targetOffset);
+              if (ud.isSideLightning) {
+                ud.obs.mesh.getWorldPosition(tempEnd);
+                const midH = ud.midHeight !== void 0 ? ud.midHeight : this.getObstacleMidHeight(ud.obs);
+                tempEnd.y += midH;
+                if (ud.forkOffset) tempEnd.add(ud.forkOffset);
+                if (ud.targetOffset) tempEnd.add(ud.targetOffset);
+              } else {
+                const partTarget = this.getObstacleBodyPartTarget(
+                  ud.obs,
+                  ud.emitterIndex !== void 0 ? ud.emitterIndex : 2,
+                  ud.totalActiveCount || 1
+                );
+                tempEnd.copy(partTarget);
+                if (ud.targetOffset) tempEnd.add(ud.targetOffset);
+              }
             }
-            const posAttr = child.geometry.attributes.position;
-            const arr = posAttr.array;
             const segs = ud.segs || 16;
             const dist = tempStart.distanceTo(tempEnd);
             const jitterAmp = Math.min(1.2, Math.max(0.18, dist * 0.015)) * progress;
+            const flatCoords = [];
             for (let i = 0; i <= segs; i++) {
               const t = i / segs;
               const p = tempStart.clone().lerp(tempEnd, t);
@@ -48436,12 +49599,30 @@ void main() {
                 p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
                 p.z += (Math.random() - 0.5) * jitterAmp * envelope;
               }
-              arr[i * 3] = p.x;
-              arr[i * 3 + 1] = p.y;
-              arr[i * 3 + 2] = p.z;
+              flatCoords.push(p.x, p.y, p.z);
             }
-            posAttr.needsUpdate = true;
-            child.material.opacity = 0.95 * progress;
+            if (child.isLine2 && child.geometry && child.geometry.setPositions) {
+              child.geometry.setPositions(flatCoords);
+              if (child.material) {
+                child.material.resolution.set(
+                  typeof window !== "undefined" ? window.innerWidth : 1920,
+                  typeof window !== "undefined" ? window.innerHeight : 1080
+                );
+                child.material.opacity = (ud.baseOpacity || 0.95) * progress;
+              }
+            } else if (child.isLine && child.geometry && child.geometry.attributes && child.geometry.attributes.position) {
+              const posAttr = child.geometry.attributes.position;
+              const arr = posAttr.array;
+              for (let i = 0; i <= segs; i++) {
+                arr[i * 3] = flatCoords[i * 3];
+                arr[i * 3 + 1] = flatCoords[i * 3 + 1];
+                arr[i * 3 + 2] = flatCoords[i * 3 + 2];
+              }
+              posAttr.needsUpdate = true;
+              if (child.material) {
+                child.material.opacity = (ud.baseOpacity || 0.95) * progress;
+              }
+            }
           } else if (child.isPointLight) {
             if (child.userData.isNozzleFlare && child.userData.emitterTip) {
               child.userData.emitterTip.getWorldPosition(child.position);
@@ -48449,9 +49630,28 @@ void main() {
             } else if (child.userData.isSideNozzleFlare && child.userData.emitterTip) {
               child.userData.emitterTip.getWorldPosition(child.position);
               child.intensity = (Math.random() > 0.3 ? 5 : 2) * progress;
+            } else if (child.userData.isContactFlash && child.userData.obs && child.userData.obs.mesh) {
+              const partTarget = this.getObstacleBodyPartTarget(
+                child.userData.obs,
+                child.userData.emitterIndex !== void 0 ? child.userData.emitterIndex : 2,
+                child.userData.totalActiveCount || 1
+              );
+              child.position.copy(partTarget);
+              if (child.userData.targetOffset)
+                child.position.add(child.userData.targetOffset);
+              child.intensity = (Math.random() > 0.2 ? 5.5 : 2) * progress;
             } else if (child.userData.isSideTargetLight && child.userData.obs && child.userData.obs.mesh) {
-              child.userData.obs.mesh.getWorldPosition(child.position).add(child.userData.targetOffset);
+              child.userData.obs.mesh.getWorldPosition(child.position);
+              const midH = child.userData.midHeight !== void 0 ? child.userData.midHeight : this.getObstacleMidHeight(child.userData.obs);
+              child.position.y += midH;
+              if (child.userData.forkOffset) child.position.add(child.userData.forkOffset);
+              if (child.userData.targetOffset) child.position.add(child.userData.targetOffset);
               child.intensity = (Math.random() > 0.2 ? 6 : 2) * progress;
+            } else if (child.userData.isTargetFlash && child.userData.obs && child.userData.obs.mesh) {
+              child.userData.obs.mesh.getWorldPosition(child.position);
+              const midH = child.userData.midHeight !== void 0 ? child.userData.midHeight : this.getObstacleMidHeight(child.userData.obs);
+              child.position.y += midH;
+              child.intensity = (Math.random() > 0.2 ? 7.5 : 2) * progress;
             } else {
               child.intensity = (Math.random() > 0.2 ? 7.5 : 2) * progress;
             }
@@ -48570,7 +49770,7 @@ void main() {
             this.telemetry.tailoredLabel = "TRACK CLEAR";
             this.telemetry.action = `\u2705 TARGET MOVED OFF TRACK VIA ELECTRIC SHOCK (800M-80M) \u2014 TRACK CLEAR (NO NET)`;
             this.telemetry.alertType = "success";
-          } else if (minForwardDist <= 800 && minForwardDist >= 80) {
+          } else if (minForwardDist <= 800 && minForwardDist > 80) {
             this.telemetry.tailoredSpec = `${tailored.badge} (800M-80M ONLY ELECTRICITY)`;
             this.telemetry.tailoredLabel = tailored.typeLabel;
             const shouldAutoShock = aiSensorAuto && !closestObstacle.hasBeenShocked;
@@ -48582,33 +49782,29 @@ void main() {
             }
             this.telemetry.action = `\u26A1 800M-80M ONLY ELECTRICITY ACTIVE: ${closestObstacle.name.toUpperCase()} (${closestObstacle.mass}KG) \u2014 NON-LETHAL PULSE DELIVERED (NO NET)`;
             this.telemetry.alertType = closestObstacle.hasBeenShocked ? "deploy" : "info";
-          } else if (minForwardDist < 80) {
+          } else if (minForwardDist <= 80) {
             if (isUnder150kg) {
-              if (minForwardDist <= 40) {
-                if (aiSensorAuto && captureNet && !captureNet.isDeployed) {
-                  captureNet.triggerSolenoidDeploy(audio);
+              if (aiSensorAuto && captureNet && !captureNet.isDeployed) {
+                captureNet.triggerSolenoidDeploy(audio);
+                if (audio) audio.playTargetAcquiredBeep(false);
+              }
+              if (minForwardDist <= 14) {
+                if (closestObstacle.mesh && closestObstacle.mesh.parent) {
+                  closestObstacle.mesh.parent.remove(closestObstacle.mesh);
                 }
-                if (minForwardDist <= 14) {
-                  if (closestObstacle.mesh && closestObstacle.mesh.parent) {
-                    closestObstacle.mesh.parent.remove(closestObstacle.mesh);
-                  }
-                  if (captureNet)
-                    captureNet.collectObstacle(
-                      closestObstacle.mesh,
-                      closestObstacle
-                    );
-                  closestObstacle.isCollected = true;
-                  if (audio) audio.playRescueSuccessChime();
-                  this.telemetry.collectedCount++;
-                  this.telemetry.collectedWeight += closestObstacle.mass;
-                  this.telemetry.action = `\u{1F3AF} SAFELY SECURED IN NET CRADLE (${closestObstacle.mass}KG) \u2014 RESCUE SUCCESS!`;
-                  this.telemetry.alertType = "success";
-                } else {
-                  this.telemetry.action = `\u{1FAA4} TARGET STILL ON TRACK (<80M) \u2014 BACKUP CAPTURE NET DEPLOYED (${closestObstacle.mass}KG \u2264 150KG)`;
-                  this.telemetry.alertType = "deploy";
-                }
+                if (captureNet)
+                  captureNet.collectObstacle(
+                    closestObstacle.mesh,
+                    closestObstacle
+                  );
+                closestObstacle.isCollected = true;
+                if (audio) audio.playRescueSuccessChime();
+                this.telemetry.collectedCount++;
+                this.telemetry.collectedWeight += closestObstacle.mass;
+                this.telemetry.action = `\u{1F3AF} SAFELY SECURED IN NET CRADLE (${closestObstacle.mass}KG \u2264 150KG) \u2014 RESCUE SUCCESS!`;
+                this.telemetry.alertType = "success";
               } else {
-                this.telemetry.action = `\u26A1 800M-80M SHOCK FIRED \u2014 TARGET APPROACHING 40M: NET READY (${closestObstacle.mass}KG \u2264 150KG)`;
+                this.telemetry.action = `\u{1FAA4} TARGET ON TRACK (\u226480M): CAPTURE NET OPEN (${closestObstacle.mass}KG \u2264 150KG) \u2014 READY TO SCOOP!`;
                 this.telemetry.alertType = "deploy";
               }
             } else {
@@ -48619,7 +49815,7 @@ void main() {
                 physics.setEmergencyBrake(true);
               }
               if (audio) audio.startHorn();
-              this.telemetry.action = `\u26A0\uFE0F HEAVY OBSTACLE STILL ON TRACK (<80M) \u2014 ${closestObstacle.mass}KG > 150KG: NET LOCKED! EMERGENCY BRAKE ENGAGED`;
+              this.telemetry.action = `\u26A0\uFE0F HEAVY OBSTACLE ON TRACK (\u226480M) \u2014 ${closestObstacle.mass}KG > 150KG: NET LOCKED! EMERGENCY BRAKE ENGAGED`;
               this.telemetry.alertType = "hazard";
             }
           } else {
@@ -48682,7 +49878,6 @@ void main() {
       this.isPaused = false;
       this.aiSensorAuto = true;
       this.autoSpin = false;
-      this.beamDischargingTimer = 0;
       this.activeSpeedPreset = 120;
       this.controls = new OrbitControls(this.camera, this.renderer.domElement);
       this.controls.enableDamping = true;
@@ -48726,6 +49921,11 @@ void main() {
         btnAnimalElephant: document.getElementById("btn-animal-elephant"),
         btnAnimalCowSudden: document.getElementById("btn-animal-cow-sudden"),
         btnClearObstacles: document.getElementById("btn-clear-obstacles"),
+        // Power Source Weight Tier Test Buttons
+        btnTier1: document.getElementById("btn-tier-1"),
+        btnTier2: document.getElementById("btn-tier-2"),
+        btnTier3: document.getElementById("btn-tier-3"),
+        btnTier4: document.getElementById("btn-tier-4"),
         // Scenario Stepper Dock Elements (1-by-1 Scenarios 1 to 10)
         btnScenPrev: document.getElementById("btn-scen-prev"),
         btnScenNext: document.getElementById("btn-scen-next"),
@@ -48747,7 +49947,7 @@ void main() {
         consoleSpeedVal: document.getElementById("console-speed-val"),
         btnRunPause: document.getElementById("btn-run-pause"),
         btnAiSensorMode: document.getElementById("btn-ai-sensor-mode"),
-        btnConsoleShock: document.getElementById("btn-console-shock") || document.getElementById("btn-console-beam"),
+        btnConsoleShock: document.getElementById("btn-console-shock"),
         btnConsoleNet: document.getElementById("btn-console-net"),
         btnConsoleHorn: document.getElementById("btn-console-horn"),
         btnConsoleEmergency: document.getElementById("btn-console-emergency"),
@@ -49031,6 +50231,10 @@ void main() {
       if (this.dom.btnAnimalCow) this.dom.btnAnimalCow.addEventListener("click", () => this.applyScenario(7));
       if (this.dom.btnAnimalElephant) this.dom.btnAnimalElephant.addEventListener("click", () => this.applyScenario(8));
       if (this.dom.btnAnimalCowSudden) this.dom.btnAnimalCowSudden.addEventListener("click", () => this.applyScenario(9));
+      if (this.dom.btnTier1) this.dom.btnTier1.addEventListener("click", () => this.testWeightTier(1));
+      if (this.dom.btnTier2) this.dom.btnTier2.addEventListener("click", () => this.testWeightTier(2));
+      if (this.dom.btnTier3) this.dom.btnTier3.addEventListener("click", () => this.testWeightTier(3));
+      if (this.dom.btnTier4) this.dom.btnTier4.addEventListener("click", () => this.testWeightTier(4));
       if (this.dom.btnClearObstacles) {
         this.dom.btnClearObstacles.addEventListener("click", () => {
           this.obstacles.clearAllObstacles();
@@ -49105,11 +50309,13 @@ void main() {
       if (!target) {
         target = this.obstacles.spawnHumanAhead("mid", this.physics.trackProgress, this.track.totalLength, 70, false);
       }
+      const specs = target ? this.obstacles.getTailoredShockSpecs(target) : null;
+      const activeIndices = specs ? specs.activeIndices : [0, 1, 2, 3];
       if (target) {
         this.obstacles.triggerDeterrence(target, this.audio, this.train);
       }
       if (this.train && this.train.pulseShockEmitters) {
-        this.train.pulseShockEmitters(1);
+        this.train.pulseShockEmitters(1, activeIndices);
         setTimeout(() => {
           if (this.train && this.train.pulseShockEmitters) this.train.pulseShockEmitters(0);
         }, 1e3);
@@ -49118,7 +50324,8 @@ void main() {
         this.audio.playElectricShockDischarge(target ? target.type : "human", target ? target.mass : 72);
       }
       if (this.dom.btnConsoleShock) {
-        this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: FIRED";
+        const pCount = specs ? specs.powerSourcesCount : 4;
+        this.dom.btnConsoleShock.innerText = `\u26A1 E-SHOCK: FIRED (${pCount}X)`;
         setTimeout(() => {
           if (this.dom.btnConsoleShock) this.dom.btnConsoleShock.innerText = "\u26A1 E-SHOCK: ACTIVE";
         }, 1200);
@@ -49203,30 +50410,35 @@ void main() {
         this.controls.update();
         return;
       }
-      let centerOffsetY = 0.95;
+      let centerOffsetY = 1.15;
       let camDist = 3.6;
       let latDist = 2;
       let heightOff = 0.45;
       if (targetObs.type === "dog") {
-        centerOffsetY = 0.35;
+        centerOffsetY = 0.38;
         camDist = 2.4;
         latDist = 1.4;
         heightOff = 0.3;
       } else if (targetObs.type === "deer") {
-        centerOffsetY = 0.7;
+        centerOffsetY = 0.82;
         camDist = 3.6;
         latDist = 1.8;
         heightOff = 0.4;
       } else if (targetObs.type === "cow") {
-        centerOffsetY = 0.85;
+        centerOffsetY = 1.05;
         camDist = 5;
         latDist = 2.6;
         heightOff = 0.6;
       } else if (targetObs.type === "elephant") {
-        centerOffsetY = 1.6;
+        centerOffsetY = 1.85;
         camDist = 8.5;
         latDist = 4.5;
         heightOff = 1.2;
+      } else if (targetObs.type === "boar") {
+        centerOffsetY = 0.55;
+        camDist = 3;
+        latDist = 1.6;
+        heightOff = 0.35;
       }
       const targetPos = targetObs.mesh.position;
       const targetCenter = targetPos.clone().add(new Vector3(0, centerOffsetY, 0));
@@ -49234,7 +50446,7 @@ void main() {
       const tangent = transform.tangent ? transform.tangent.clone().normalize() : new Vector3(0, 0, 1);
       const normal = transform.normal ? transform.normal.clone().normalize() : new Vector3(1, 0, 0);
       const up = new Vector3(0, 1, 0);
-      const camOffset = tangent.clone().multiplyScalar(camDist).add(normal.clone().multiplyScalar(latDist)).add(up.clone().multiplyScalar(heightOff));
+      const camOffset = tangent.clone().negate().multiplyScalar(camDist).add(normal.clone().multiplyScalar(latDist)).add(up.clone().multiplyScalar(heightOff));
       const idealCamPos = targetCenter.clone().add(camOffset);
       if (forceReposition) {
         this.camera.position.copy(idealCamPos);
@@ -49273,7 +50485,44 @@ void main() {
       if (this.dom.btnAnimalCow) this.dom.btnAnimalCow.classList.toggle("active", index === 7);
       if (this.dom.btnAnimalElephant) this.dom.btnAnimalElephant.classList.toggle("active", index === 8);
       if (this.dom.btnAnimalCowSudden) this.dom.btnAnimalCowSudden.classList.toggle("active", index === 9);
+      for (let t = 1; t <= 4; t++) {
+        const tb = document.getElementById(`btn-tier-${t}`);
+        if (tb) tb.classList.remove("active");
+      }
       this.updateScenarioHUD(index);
+    }
+    // Dedicated interactive tester for weight-tiered power sources (1x, 2x, 3x, 4x)
+    testWeightTier(tier = 1) {
+      const obs = this.obstacles.spawnWeightTierObstacle(
+        tier,
+        this.physics.trackProgress,
+        this.track.totalLength
+      );
+      this.currentScenario = null;
+      for (let i = 1; i <= 10; i++) {
+        const btn = document.getElementById(`btn-scen-${i}`);
+        if (btn) btn.classList.remove("active");
+      }
+      ["btnHumanEnter", "btnHumanExit", "btnHumanMid", "btnHumanSudden", "btnAnimalDog", "btnAnimalDeer", "btnAnimalCow", "btnAnimalElephant", "btnAnimalCowSudden"].forEach((k) => {
+        if (this.dom[k]) this.dom[k].classList.remove("active");
+      });
+      for (let t = 1; t <= 4; t++) {
+        const tb = document.getElementById(`btn-tier-${t}`);
+        if (tb) tb.classList.toggle("active", t === tier);
+      }
+      this.setCameraMode("target");
+      this.focusOnTarget(true);
+      const specs = this.obstacles.getTailoredShockSpecs(obs);
+      const badgeEl = document.getElementById("scen-card-badge");
+      const titleEl = document.getElementById("scen-card-title");
+      const leadEl = document.getElementById("scen-leg-lead");
+      const trailEl = document.getElementById("scen-leg-trail");
+      const descEl = document.getElementById("scen-card-desc");
+      if (badgeEl) badgeEl.innerText = `WEIGHT TIER TEST \u2022 TIER ${specs.tier} / 4`;
+      if (titleEl) titleEl.innerText = `${specs.tier}. ${obs.name.toUpperCase()}`;
+      if (leadEl) leadEl.innerText = `POWER SOURCES: ${specs.powerSourcesCount} / 4 ACTIVE [${specs.activeLabels.join(", ")}]`;
+      if (trailEl) trailEl.innerText = `SPECS: ${specs.voltage} \u2022 ${specs.current} \u2022 ${specs.energy} (${specs.compliance})`;
+      if (descEl) descEl.innerText = specs.desc;
     }
     prevScenario() {
       const nextIdx = this.currentScenario <= 1 ? 10 : this.currentScenario - 1;
@@ -49339,9 +50588,9 @@ void main() {
         {
           badge: "SCENARIO 7 / 10 \u2022 800M-80M ONLY ELECTRICITY",
           title: "7. INDIAN ZEBU COW ON TRACK (360 KG)",
-          lead: "SPECIES: BOS INDICUS (360 KG > 150 KG)",
+          lead: "SPECIES: BOS INDICUS (360 KG > 350 KG)",
           trail: "SAFETY: ONLY ELECTRICITY (800M-80M) \u2022 NET LOCKED",
-          desc: "Heavy cattle grazing 650m ahead. Weight 360kg > 150kg: Net is LOCKED. Non-lethal electric shock (4 power sources) clears cow off track safely before 80m."
+          desc: "Heavy cattle grazing 650m ahead. Weight 360kg > 350kg: Net is LOCKED. Non-lethal electric shock (All 4 power sources active) clears cow off track safely before 80m."
         },
         {
           badge: "SCENARIO 8 / 10 \u2022 800M-80M ONLY ELECTRICITY",
@@ -49373,7 +50622,7 @@ void main() {
       if (descEl) descEl.innerText = meta.desc;
     }
     cycleCamera() {
-      const modes = ["orbit", "beam", "cab", "target", "action", "drone", "net"];
+      const modes = ["orbit", "cab", "target", "action", "drone", "net"];
       const idx = modes.indexOf(this.cameraMode);
       const nextMode = modes[(idx + 1) % modes.length];
       this.setCameraMode(nextMode);
@@ -49456,25 +50705,15 @@ void main() {
         this.controls.autoRotate = this.autoSpin;
         this.controls.autoRotateSpeed = 2;
         this.controls.update();
-      } else if (this.cameraMode === "beam") {
-        const fwdDist = this.train.locoLength / 2 + 0.6;
-        const camPos = locoPos.clone().add(forward.clone().multiplyScalar(fwdDist)).add(up.clone().multiplyScalar(2.1));
-        this.camera.position.copy(camPos);
-        let targetObs = this.obstacles.obstacles.find((o) => !o.isCollected && !o.isDeterred && o.mesh);
-        if (targetObs) {
-          this.camera.lookAt(targetObs.mesh.position.clone().add(up.clone().multiplyScalar(1)));
-        } else {
-          const lookTarget = camPos.clone().add(forward.clone().multiplyScalar(80)).add(up.clone().multiplyScalar(-0.4));
-          this.camera.lookAt(lookTarget);
-        }
       } else if (this.cameraMode === "target") {
         let targetObs = this.obstacles.obstacles.find((o) => !o.isCollected && o.mesh);
         if (targetObs && targetObs.mesh) {
-          let centerOffsetY = 0.95;
-          if (targetObs.type === "dog") centerOffsetY = 0.35;
-          else if (targetObs.type === "deer") centerOffsetY = 0.7;
-          else if (targetObs.type === "cow") centerOffsetY = 0.85;
-          else if (targetObs.type === "elephant") centerOffsetY = 1.6;
+          let centerOffsetY = 1.15;
+          if (targetObs.type === "dog") centerOffsetY = 0.38;
+          else if (targetObs.type === "deer") centerOffsetY = 0.82;
+          else if (targetObs.type === "cow") centerOffsetY = 1.05;
+          else if (targetObs.type === "elephant") centerOffsetY = 1.85;
+          else if (targetObs.type === "boar") centerOffsetY = 0.55;
           const targetPos = targetObs.mesh.position;
           const targetCenter = targetPos.clone().add(new Vector3(0, centerOffsetY, 0));
           this.controls.target.lerp(targetCenter, 0.18);
@@ -49643,14 +50882,6 @@ void main() {
     animate() {
       requestAnimationFrame(this.animate);
       const rawDt = Math.min(this.clock.getDelta(), 0.1);
-      if (this.beamDischargingTimer > 0) {
-        this.beamDischargingTimer -= rawDt;
-        if (this.beamDischargingTimer <= 0) {
-          if (this.dom.btnConsoleBeam) {
-            this.dom.btnConsoleBeam.innerText = "\u26A1 BEAM: ARMED";
-          }
-        }
-      }
       if (this.isPaused) {
         this.updateCamera();
         this.updateHUD();

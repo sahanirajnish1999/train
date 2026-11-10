@@ -151,7 +151,7 @@
           </button>
         </div>
         <div class="kavach-sub">
-          1 km LiDAR & Camera • Electric Shock • Capture Net (< 150 kg)
+          1 km LiDAR & Camera • Tiered Power Sources (1x/2x/3x/4x) • Net (≤ 150 kg)
         </div>
 
         <!-- Active Sensors Status Row -->
@@ -162,14 +162,14 @@
           <span class="sensor-badge active" id="badge-lidar"
             >📡 LiDAR (1km)</span
           >
-          <span class="sensor-badge active" id="badge-shock"
-            >⚡ 4x Front Senders</span
+          <span class="sensor-badge active" id="badge-shock" title="Locomotive Quad Directional Power Sources (Tier 1: 1x, Tier 2: 2x, Tier 3: 3x, Tier 4: 4x)"
+            >⚡ 4x Power Sources</span
           >
           <span class="sensor-badge active" id="badge-side-guard" title="Coach flank directional power sources (2-3m repulsion guard)"
             >⚡ Coach Side Guards (2-3m)</span
           >
           <span class="sensor-badge active" id="badge-net"
-            >🪤 Net (<150kg)</span
+            >🪤 Net (≤150kg)</span
           >
         </div>
 
@@ -271,14 +271,14 @@
           <button
             class="spawn-btn"
             id="btn-animal-cow"
-            title="7. Indian Cow on Track (360kg: 800m-80m Electricity Only, Net Locked) [Key 7]"
+            title="7. Indian Cow on Track (360kg > 350kg: 4x Power Sources, Net Locked) [Key 7]"
           >
             🐄 7. Cow (360kg Shock)
           </button>
           <button
             class="spawn-btn"
             id="btn-animal-elephant"
-            title="8. Wild Elephant on Track (3,800kg: Quad Electricity Only, Net Locked) [Key 8]"
+            title="8. Wild Elephant on Track (3,800kg > 350kg: Quad Electricity Only, Net Locked) [Key 8]"
           >
             🐘 8. Elephant (3.8t Shock)
           </button>
@@ -289,6 +289,39 @@
             title="9. Cow Sudden Intrusion (360kg > 150kg: Net Locked Hazard, No Electricity, E-Brake) [Key 9]"
           >
             ⚠️ 9. Cow Sudden (360kg > 150kg Net Locked)
+          </button>
+        </div>
+
+        <!-- POWER SOURCE WEIGHT TIERS (E-SHOCK TEST) -->
+        <div class="kavach-spawner-header" style="margin-top: 6px;">⚡ POWER SOURCE WEIGHT TIERS (E-SHOCK):</div>
+        <div class="kavach-spawner-grid" style="margin-bottom: 8px;">
+          <button
+            class="spawn-btn"
+            id="btn-tier-1"
+            title="Tier 1: Only 150kg -> 1 Power Source (Down-Left)"
+          >
+            ⚡ ≤150kg (1 Source)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-tier-2"
+            title="Tier 2: Over 150kg - 250kg -> 2 Power Sources (Down-Left + Down-Right)"
+          >
+            ⚡ 150-250kg (2 Sources)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-tier-3"
+            title="Tier 3: 250kg - 350kg -> 3 Power Sources (Top-Left + Top-Right + Down-Left)"
+          >
+            ⚡ 250-350kg (3 Sources)
+          </button>
+          <button
+            class="spawn-btn"
+            id="btn-tier-4"
+            title="Tier 4: Over 350kg -> All 4 Power Sources (Quad Full Convergence)"
+          >
+            ⚡ &gt;350kg (4 Sources)
           </button>
         </div>
 
@@ -353,7 +386,7 @@
             class="viewport-btn"
             data-cam="target"
             id="btn-cam-target"
-            title="Target View Looking Back at Approaching Train"
+            title="Target View Facing Approaching Train [Click to Toggle Opposite Side]"
           >
             RX TARGET
           </button>
@@ -506,7 +539,7 @@
           <span>|</span>
           <span
             ><strong
-              >2. IF STILL ON TRACK: DEPLOY NET IF WEIGHT &lt; 150 KG</strong
+              >2. IF STILL ON TRACK: DEPLOY NET IF WEIGHT &le; 150 KG</strong
             ></span
           >
           <span>|</span>
@@ -664,6 +697,6 @@
       });
     </script>
     <!-- Main Self-Contained Bundle with Cache-Buster -->
-    <script src="bundle.js?v=20261108_2to3m_guard_v2"></script>
+    <script src="bundle.js?v=20261108_multi_bodyparts_v12"></script>
   </body>
 </html>

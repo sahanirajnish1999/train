@@ -7,6 +7,9 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 
 export class ObstacleManager {
   constructor(scene, track) {
@@ -136,22 +139,20 @@ export class ObstacleManager {
     });
   }
 
-  // Remove any leftover human / animal / debris meshes from the scene
+  // Remove any leftover human / animal obstacle meshes from the scene
   cleanupSceneObstacles() {
     const toRemove = [];
     this.scene.traverse((child) => {
       if (
         child.name === "stylizedHuman" ||
         child.name === "stylizedAnimal" ||
-        child.name === "trackCargoDebris" ||
         (child.userData &&
           (child.userData.type === "human" ||
             child.userData.type === "dog" ||
             child.userData.type === "deer" ||
             child.userData.type === "cow" ||
             child.userData.type === "elephant" ||
-            child.userData.type === "boar" ||
-            child.userData.type === "crate"))
+            child.userData.type === "boar"))
       ) {
         toRemove.push(child);
       }
@@ -1095,13 +1096,13 @@ export class ObstacleManager {
         }
         if (ud.headGroup) ud.headGroup.rotation.set(0.08, 0.22, 0);
 
-        // Lead leg (Left): stepping up and forward onto rail
-        if (ud.legL) ud.legL.rotation.set(0.62, 0.04, -0.05);
-        if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.80, 0, 0);
+        // Lead leg (Left): stepping up and forward onto rail (thigh forward, knee bent backward)
+        if (ud.legL) ud.legL.rotation.set(-0.55, 0.04, -0.05);
+        if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.65, 0, 0);
 
-        // Trailing leg (Right): driving off the outer ground
-        if (ud.legR) ud.legR.rotation.set(-0.42, -0.04, 0.05);
-        if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.25, 0, 0);
+        // Trailing leg (Right): driving off the outer ground (thigh back, natural knee extension)
+        if (ud.legR) ud.legR.rotation.set(0.35, -0.04, 0.05);
+        if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.15, 0, 0);
 
         // Arms in dynamic 90-degree running pump
         if (ud.armR) ud.armR.rotation.set(0.65, 0, 0.12);
@@ -1120,12 +1121,12 @@ export class ObstacleManager {
         if (ud.headGroup) ud.headGroup.rotation.set(0.08, -0.30, 0);
 
         // Outside lead leg (Right): driving forward/down to ground
-        if (ud.legR) ud.legR.rotation.set(0.58, 0.04, 0.06);
-        if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.75, 0, 0);
+        if (ud.legR) ud.legR.rotation.set(-0.52, 0.04, 0.06);
+        if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.60, 0, 0);
 
         // Inside trailing leg (Left): pushing off the rail behind
-        if (ud.legL) ud.legL.rotation.set(-0.45, -0.04, -0.05);
-        if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.28, 0, 0);
+        if (ud.legL) ud.legL.rotation.set(0.38, -0.04, -0.05);
+        if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.15, 0, 0);
 
         // Arms in counter-stride
         if (ud.armL) ud.armL.rotation.set(0.60, 0, -0.12);
@@ -1143,17 +1144,17 @@ export class ObstacleManager {
         }
         if (ud.headGroup) ud.headGroup.rotation.set(0.10, 0, 0);
 
-        // Sprint drive legs
-        if (ud.legR) ud.legR.rotation.set(0.72, 0, 0.04);
-        if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.95, 0, 0);
-        if (ud.legL) ud.legL.rotation.set(-0.52, 0, -0.04);
-        if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.35, 0, 0);
+        // Sprint drive legs: Left forward, Right back
+        if (ud.legL) ud.legL.rotation.set(-0.65, 0, -0.04);
+        if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.75, 0, 0);
+        if (ud.legR) ud.legR.rotation.set(0.45, 0, 0.04);
+        if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.20, 0, 0);
 
         // Sprint arms
-        if (ud.armL) ud.armL.rotation.set(0.80, 0, -0.18);
-        if (ud.forearmL) ud.forearmL.rotation.set(-1.48, 0, 0);
-        if (ud.armR) ud.armR.rotation.set(-0.85, 0, 0.18);
-        if (ud.forearmR) ud.forearmR.rotation.set(-1.38, 0, 0);
+        if (ud.armR) ud.armR.rotation.set(0.80, 0, 0.18);
+        if (ud.forearmR) ud.forearmR.rotation.set(-1.48, 0, 0);
+        if (ud.armL) ud.armL.rotation.set(-0.85, 0, -0.18);
+        if (ud.forearmL) ud.forearmL.rotation.set(-1.38, 0, 0);
         break;
 
       case "mid":
@@ -1167,10 +1168,10 @@ export class ObstacleManager {
         if (ud.headGroup) ud.headGroup.rotation.set(0.06, 0, 0);
 
         // Dynamic running stride: Right leg forward, Left leg back
-        if (ud.legR) ud.legR.rotation.set(0.68, 0, 0.04);
-        if (ud.lowerLegR) ud.lowerLegR.rotation.set(-0.85, 0, 0);
-        if (ud.legL) ud.legL.rotation.set(-0.48, 0, -0.04);
-        if (ud.lowerLegL) ud.lowerLegL.rotation.set(-0.35, 0, 0);
+        if (ud.legR) ud.legR.rotation.set(-0.55, 0, 0.04);
+        if (ud.lowerLegR) ud.lowerLegR.rotation.set(0.65, 0, 0);
+        if (ud.legL) ud.legL.rotation.set(0.38, 0, -0.04);
+        if (ud.lowerLegL) ud.lowerLegL.rotation.set(0.18, 0, 0);
 
         // Arms in 90-degree bent running form (Left forward, Right back)
         if (ud.armL) ud.armL.rotation.set(0.65, 0, -0.15);
@@ -2579,29 +2580,47 @@ export class ObstacleManager {
     if (lateralOffset !== 0 && transform.normal) {
       mesh.position.add(transform.normal.clone().multiplyScalar(lateralOffset));
     }
-    mesh.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      transform.tangent,
-    );
 
-    // Realistic orientation relative to track & rails
+    // Realistic orientation relative to track & oncoming train
     const pose = humanPose || "mid";
-    if (type === "human") {
-      if (pose === "enter" || pose === 1) {
-        mesh.rotateY(-Math.PI * 0.45);
-      } else if (pose === "exit" || pose === 2) {
-        mesh.rotateY(Math.PI * 0.55);
-      } else if (pose === "sudden" || pose === 4) {
-        mesh.rotateY(-Math.PI * 0.5);
-      } else {
-        mesh.rotateY(Math.PI);
-      }
+    const isSudden = pose === "sudden" || pose === 4;
+
+    if (isSudden) {
+      // Dashing onto track: head and body point forward toward track centerline
+      const moveDir = (transform.normal || new THREE.Vector3(-1, 0, 0))
+        .clone()
+        .multiplyScalar((lateralOffset || 3.0) < 0 ? 1 : -1)
+        .normalize();
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), moveDir);
     } else {
-      // Animals
-      if (pose === "sudden" || pose === 4) {
-        mesh.rotateY(-Math.PI * 0.5); // Facing dash path into track
+      // Facing oncoming train (approaching along track from -tangent)
+      const approachDir = (transform.tangent || new THREE.Vector3(0, 0, 1))
+        .clone()
+        .negate()
+        .normalize();
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), approachDir);
+
+      if (type === "human") {
+        if (pose === "enter" || pose === 1) {
+          // Facing onto track: towards track centerline
+          const enterDir = (transform.normal || new THREE.Vector3(-1, 0, 0))
+            .clone()
+            .multiplyScalar((lateralOffset || 1.0) < 0 ? 1 : -1)
+            .normalize();
+          mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), enterDir);
+          mesh.rotateY(-0.15); // Slight angle for stepping pose
+        } else if (pose === "exit" || pose === 2) {
+          // Facing off track: away from track centerline
+          const exitDir = (transform.normal || new THREE.Vector3(-1, 0, 0))
+            .clone()
+            .multiplyScalar((lateralOffset || 1.0) < 0 ? -1 : 1)
+            .normalize();
+          mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), exitDir);
+          mesh.rotateY(0.15); // Slight angle for stepping pose
+        }
       } else {
-        mesh.rotateY(Math.PI * 0.75); // Diagonally standing across tracks
+        // Animals standing on track: alert posture facing incoming headlights with slight natural angle
+        mesh.rotateY(0.25);
       }
     }
 
@@ -2921,6 +2940,59 @@ export class ObstacleManager {
     return obs;
   }
 
+  // Dedicated Weight-Tier Obstacle Spawner for Testing Power Sources:
+  // - Tier 1: Only 150kg (1 Power Source: Down-Left)
+  // - Tier 2: Over 150kg - 250kg (e.g. 200kg: 2 Power Sources)
+  // - Tier 3: 250kg - 350kg (e.g. 320kg / 350kg: 3 Power Sources)
+  // - Tier 4: Over 350kg (e.g. 400kg: All 4 Power Sources)
+  spawnWeightTierObstacle(tier = 1, trainProgress = 0, trackLength = 3600) {
+    this.clearAllObstacles();
+    const actualTrackLength = trackLength || (this.track && this.track.totalLength) || 3600;
+    const dist = 600; // In 800m-80m electric shock zone
+    const deltaProgress = dist / actualTrackLength;
+    const targetProgress = (trainProgress + deltaProgress) % 1.0;
+
+    let mass = 150;
+    let type = "boar";
+    let name = "Tier 1: Only 150kg (1 Power Source: Down-Left)";
+
+    if (tier === 1 || tier === 150) {
+      mass = 150;
+      type = "boar";
+      name = "Tier 1: Only 150kg (1 Power Source: Down-Left)";
+    } else if (tier === 2 || tier === 200) {
+      mass = 200;
+      type = "boar";
+      name = "Tier 2: 200kg Over 150-250kg (2 Power Sources: Bilateral)";
+    } else if (tier === 3 || tier === 300 || tier === 320 || tier === 350) {
+      mass = 320;
+      type = "cow";
+      name = "Tier 3: 320kg in 250-350kg (3 Power Sources: Tri-Channel)";
+    } else {
+      mass = 400;
+      type = "cow";
+      name = "Tier 4: 400kg Over 350kg (All 4 Power Sources: Quad)";
+    }
+
+    const obs = this.spawnObstacle(
+      type,
+      targetProgress,
+      true,
+      0.0,
+      mass,
+      name,
+      "mid"
+    );
+    obs.initialDist = dist;
+    obs.isScenario = true;
+
+    if (this.train && this.train.captureNet && this.train.captureNet.reset) {
+      this.train.captureNet.reset();
+    }
+    this.activeScenarioIndex = null;
+    return obs;
+  }
+
   // Initial track obstacles: Applies Scenario 1 (Enter) so scene is active on load
   initDefaultObstacles() {
     this.applyScenario(1, 0, (this.track && this.track.totalLength) || 3600);
@@ -2950,10 +3022,15 @@ export class ObstacleManager {
   }
 
   // Weight-Tiered Electric Shock Specifications (1 to 4 Power Sources)
+  // Rules:
+  // - Only 150kg (≤ 150kg): 1 Power Source
+  // - Over 150kg - 250kg (> 150kg & ≤ 250kg): 2 Power Sources
+  // - 250kg - 350kg (> 250kg & ≤ 350kg): 3 Power Sources
+  // - Over 350kg (> 350kg): All 4 Power Sources
   getTailoredShockSpecs(obs) {
     const mass = obs && obs.mass !== undefined ? obs.mass : 72;
 
-    if (mass < 150) {
+    if (mass <= 150) {
       return {
         tier: 1,
         powerSourcesCount: 1,
@@ -2963,12 +3040,12 @@ export class ObstacleManager {
         current: "1.2 mA",
         energy: "0.04 J",
         compliance: "IEC 60479-1 / RDSO Protocol",
-        typeLabel: "HUMAN / LIGHT HAZARD (<150KG)",
+        typeLabel: "LIGHT HAZARD (≤150KG)",
         badge: "1x POWER SOURCE: 2.0 kV / 1.2 mA",
         color: "#38bdf8",
-        desc: `Under 150 kg (${mass} kg): 1 power source active (Down-Left preferred ground angle).`,
+        desc: `Only 150 kg or under (${mass} kg): 1 power source active (Down-Left preferred ground angle).`,
       };
-    } else if (mass >= 150 && mass < 250) {
+    } else if (mass > 150 && mass <= 250) {
       return {
         tier: 2,
         powerSourcesCount: 2,
@@ -2978,12 +3055,12 @@ export class ObstacleManager {
         current: "3.0 mA",
         energy: "0.95 J",
         compliance: "IEC 60335-2-76 / RDSO Track Deterrence",
-        typeLabel: "MEDIUM HAZARD (150-250KG)",
+        typeLabel: "MEDIUM HAZARD (OVER 150-250KG)",
         badge: "2x POWER SOURCES: 6.0 kV / 3.0 mA",
         color: "#f97316",
-        desc: `150-250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep).`,
+        desc: `Over 150 kg to 250 kg (${mass} kg): 2 power sources active (Down-Left + Down-Right bilateral sweep).`,
       };
-    } else if (mass >= 250 && mass < 350) {
+    } else if (mass > 250 && mass <= 350) {
       return {
         tier: 3,
         powerSourcesCount: 3,
@@ -2996,7 +3073,7 @@ export class ObstacleManager {
         typeLabel: "HEAVY HAZARD (250-350KG)",
         badge: "3x POWER SOURCES: 7.2 kV / 3.5 mA",
         color: "#e11d48",
-        desc: `250-350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam).`,
+        desc: `250 kg to 350 kg (${mass} kg): 3 power sources active (Top-Left + Top-Right + Down-Left tri-channel beam).`,
       };
     } else {
       return {
@@ -3008,10 +3085,10 @@ export class ObstacleManager {
         current: "3.8 mA",
         energy: "1.40 J",
         compliance: "RDSO Tech Circular 129 / IEC 60335-2-76",
-        typeLabel: "CRITICAL HAZARD (≥350KG)",
+        typeLabel: "CRITICAL HAZARD (OVER 350KG)",
         badge: "4x POWER SOURCES: 7.8 kV / 3.8 mA",
         color: "#ec4899",
-        desc: `350 kg and above (${mass} kg): All 4 power sources active (Quad full-power convergence).`,
+        desc: `Over 350 kg (${mass} kg): All 4 power sources active (Quad full-power convergence).`,
       };
     }
   }
@@ -3025,9 +3102,31 @@ export class ObstacleManager {
     obs.shockTime = this.animTime;
     obs.deterMode = "electric_shock";
     obs.fleeStartTime = this.animTime;
-    obs.fleeDirection = Math.random() > 0.5 ? 1 : -1;
+
+    let fleeDir = 1;
+    if (obs.startLateralOffset && Math.abs(obs.startLateralOffset) > 0.5) {
+      fleeDir = Math.sign(obs.startLateralOffset);
+    } else if (Math.abs(obs.lateralOffset) > 0.2) {
+      fleeDir = Math.sign(obs.lateralOffset);
+    } else {
+      fleeDir = Math.random() > 0.5 ? 1 : -1;
+    }
+    obs.fleeDirection = fleeDir;
+    obs.escapeDirSign = fleeDir;
+    obs.escapeStartOffset = obs.lateralOffset || 0;
     obs.isCleared = false;
     this.fxTimer = 1.2;
+
+    const transform = this.track.getTrackTransform(obs.progress, 0);
+    const tangent = (transform.tangent || new THREE.Vector3(0, 0, 1)).clone().normalize();
+    const sideDir = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
+    const escapeHeading = sideDir.clone().multiplyScalar(fleeDir).normalize();
+    if (obs.mesh) {
+      obs.mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        escapeHeading,
+      );
+    }
 
     if (audio) {
       audio.playElectricShockDischarge(obs.type || "human", obs.mass);
@@ -3040,11 +3139,174 @@ export class ObstacleManager {
     this.triggerDeterrence(obs, audio, train);
   }
 
+  // Mid-body target height for electric rays & non-lethal deterrence
+  // Ensures rays strike the center of mass (mid-torso / flank) rather than legs or feet
+  getObstacleMidHeight(obs) {
+    if (!obs) return 1.0;
+    const type = obs.type || (obs.userData && obs.userData.type);
+    switch (type) {
+      case "elephant":
+        return 1.85; // Massive Asian elephant mid-flank / chest (center of torso)
+      case "cow":
+        return 1.05; // Zebu cow mid-barrel / ribcage
+      case "human":
+        return 1.15; // Adult human chest / solar plexus / mid-torso
+      case "deer":
+        return 0.82; // Spotted deer mid-chest
+      case "boar":
+        return 0.55; // Wild boar mid-flank
+      case "dog":
+        return 0.38; // Stray dog mid-body
+      default:
+        return 1.0;
+    }
+  }
+
+  // Computes distinct, anatomically realistic target positions on different body parts
+  // for multi-channel power sources (Top-Left, Top-Right, Down-Left, Down-Right).
+  // Ensures 2, 3, or 4 power sources strike different body parts instead of converging on a single spot!
+  getObstacleBodyPartTarget(obs, emitterIndex = 2, totalActiveCount = 1) {
+    const worldTarget = new THREE.Vector3();
+    if (!obs || !obs.mesh) return worldTarget;
+
+    const type = obs.type || (obs.userData && obs.userData.type) || "human";
+    obs.mesh.updateWorldMatrix(true, false);
+
+    // If only 1 power source is active (e.g. Tier 1 under 150kg), aim at the solid center of mass
+    if (totalActiveCount <= 1) {
+      const midH = this.getObstacleMidHeight(obs);
+      obs.mesh.getWorldPosition(worldTarget);
+      worldTarget.y += midH;
+      return worldTarget;
+    }
+
+    // Anatomical local offsets (+z: front/chest/head, -z: back/rump, +x: right, -x: left, +y: height)
+    const localOffset = new THREE.Vector3(0, this.getObstacleMidHeight(obs), 0);
+
+    switch (type) {
+      case "elephant":
+        // Asian Elephant (~3,800 kg): massive 3.2m height, 1.8m width, 3.5m length
+        if (emitterIndex === 0) {
+          // Top-Left -> Upper Left Shoulder / Cranial Dome
+          localOffset.set(-0.62, 2.35, 0.45);
+        } else if (emitterIndex === 1) {
+          // Top-Right -> Upper Right Shoulder / Cranial Dome
+          localOffset.set(0.62, 2.35, 0.45);
+        } else if (emitterIndex === 2) {
+          // Down-Left -> Left Ribcage & Mid-Flank Barrel
+          localOffset.set(-0.75, 1.55, -0.20);
+        } else if (emitterIndex === 3) {
+          // Down-Right -> Right Ribcage & Mid-Flank Barrel
+          localOffset.set(0.75, 1.55, -0.20);
+        }
+        break;
+
+      case "cow":
+        // Indian Zebu Cow (~360 kg): 1.6m height, 0.9m width, 2.2m length
+        if (emitterIndex === 0) {
+          // Top-Left -> Upper Left Shoulder & Dorsal Hump
+          localOffset.set(-0.30, 1.35, 0.35);
+        } else if (emitterIndex === 1) {
+          // Top-Right -> Upper Right Shoulder & Dorsal Hump
+          localOffset.set(0.30, 1.35, 0.35);
+        } else if (emitterIndex === 2) {
+          // Down-Left -> Left Barrel Ribcage & Flank
+          localOffset.set(-0.36, 0.92, -0.15);
+        } else if (emitterIndex === 3) {
+          // Down-Right -> Right Barrel Ribcage & Flank
+          localOffset.set(0.36, 0.92, -0.15);
+        }
+        break;
+
+      case "human":
+        // Athletic Runner / Pedestrian (~72 kg): 1.8m height
+        if (emitterIndex === 0) {
+          // Top-Left -> Left Shoulder & Upper Chest
+          localOffset.set(-0.24, 1.38, 0.08);
+        } else if (emitterIndex === 1) {
+          // Top-Right -> Right Shoulder & Upper Chest
+          localOffset.set(0.24, 1.38, 0.08);
+        } else if (emitterIndex === 2) {
+          // Down-Left -> Lower Left Torso / Flank / Hip
+          localOffset.set(-0.16, 0.95, 0.05);
+        } else if (emitterIndex === 3) {
+          // Down-Right -> Lower Right Torso / Flank / Hip
+          localOffset.set(0.16, 0.95, 0.05);
+        }
+        break;
+
+      case "deer":
+        // Spotted Deer (~48 kg): 1.3m height
+        if (emitterIndex === 0) {
+          // Top-Left -> Upper Left Shoulder
+          localOffset.set(-0.18, 1.05, 0.20);
+        } else if (emitterIndex === 1) {
+          // Top-Right -> Upper Right Shoulder
+          localOffset.set(0.18, 1.05, 0.20);
+        } else if (emitterIndex === 2) {
+          // Down-Left -> Left Mid-Ribcage
+          localOffset.set(-0.20, 0.72, -0.12);
+        } else if (emitterIndex === 3) {
+          // Down-Right -> Right Mid-Ribcage
+          localOffset.set(0.20, 0.72, -0.12);
+        }
+        break;
+
+      case "boar":
+        // Wild Boar (~95 kg): 0.8m height
+        if (emitterIndex === 0) {
+          // Top-Left -> Upper Left Shoulder
+          localOffset.set(-0.18, 0.68, 0.16);
+        } else if (emitterIndex === 1) {
+          // Top-Right -> Upper Right Shoulder
+          localOffset.set(0.18, 0.68, 0.16);
+        } else if (emitterIndex === 2) {
+          // Down-Left -> Left Flank
+          localOffset.set(-0.20, 0.42, -0.10);
+        } else if (emitterIndex === 3) {
+          // Down-Right -> Right Flank
+          localOffset.set(0.20, 0.42, -0.10);
+        }
+        break;
+
+      case "dog":
+        // Stray Dog (~22 kg): 0.6m height
+        if (emitterIndex === 0) {
+          // Top-Left -> Upper Left Shoulder
+          localOffset.set(-0.11, 0.48, 0.12);
+        } else if (emitterIndex === 1) {
+          // Top-Right -> Upper Right Shoulder
+          localOffset.set(0.11, 0.48, 0.12);
+        } else if (emitterIndex === 2) {
+          // Down-Left -> Left Flank / Ribcage
+          localOffset.set(-0.13, 0.32, -0.08);
+        } else if (emitterIndex === 3) {
+          // Down-Right -> Right Flank / Ribcage
+          localOffset.set(0.13, 0.32, -0.08);
+        }
+        break;
+
+      default:
+        if (emitterIndex === 0) localOffset.set(-0.25, 1.25, 0.10);
+        else if (emitterIndex === 1) localOffset.set(0.25, 1.25, 0.10);
+        else if (emitterIndex === 2) localOffset.set(-0.25, 0.85, -0.10);
+        else if (emitterIndex === 3) localOffset.set(0.25, 0.85, -0.10);
+        break;
+    }
+
+    worldTarget.copy(obs.mesh.localToWorld(localOffset));
+    return worldTarget;
+  }
+
   spawnDeterrenceFX(obs, train = null) {
     if (train) this.train = train;
     while (this.fxGroup.children.length > 0) {
       const c = this.fxGroup.children[0];
       if (c.geometry) c.geometry.dispose();
+      if (c.material) {
+        if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
+        else c.material.dispose();
+      }
       this.fxGroup.remove(c);
     }
 
@@ -3077,30 +3339,37 @@ export class ObstacleManager {
       fallbackOrigin.y += 0.5;
     }
 
-    const targetPos = new THREE.Vector3();
-    if (obs.mesh) {
-      obs.mesh.getWorldPosition(targetPos);
-      targetPos.y += 0.6;
+    if (activeEmitters.length === 0) {
+      shockSpecs.activeIndices.forEach((idx) => {
+        activeEmitters.push({ emitter: null, index: idx });
+      });
     }
 
-    if (activeEmitters.length === 0) {
-      activeEmitters.push({ emitter: null, index: 2 });
-    }
+    const totalActiveCount = activeEmitters.length;
+
+    const screenRes = new THREE.Vector2(
+      typeof window !== "undefined" ? window.innerWidth : 1920,
+      typeof window !== "undefined" ? window.innerHeight : 1080,
+    );
 
     activeEmitters.forEach((item) => {
-      const segs = 18;
-      const points = [];
+      const segs = 20;
+      const flatPoints = [];
       const eTip = item.emitter && item.emitter.tip ? item.emitter.tip : null;
       const origin = new THREE.Vector3();
       if (eTip) eTip.getWorldPosition(origin);
       else origin.copy(fallbackOrigin);
 
+      // Target DISTINCT, anatomically realistic body part for each power source emitter!
+      // (Top-Left -> Left Shoulder, Top-Right -> Right Shoulder, Down-Left -> Left Flank, Down-Right -> Right Flank)
+      const partTarget = this.getObstacleBodyPartTarget(obs, item.index, totalActiveCount);
+
       const targetOffset = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.35,
-        (Math.random() - 0.5) * 0.4,
-        (Math.random() - 0.5) * 0.35,
+        (Math.random() - 0.5) * 0.12,
+        (Math.random() - 0.5) * 0.10,
+        (Math.random() - 0.5) * 0.12,
       );
-      const effectiveEnd = targetPos.clone().add(targetOffset);
+      const effectiveEnd = partTarget.clone().add(targetOffset);
 
       for (let i = 0; i <= segs; i++) {
         const t = i / segs;
@@ -3111,36 +3380,81 @@ export class ObstacleManager {
           p.y += (Math.random() - 0.5) * 0.4 * envelope;
           p.z += (Math.random() - 0.5) * 0.55 * envelope;
         }
-        points.push(p);
+        flatPoints.push(p.x, p.y, p.z);
       }
 
-      const geom = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({
+      // 1. Radiant Glowing Plasma Aura (Width ~9.5px)
+      const geomGlow = new LineGeometry();
+      geomGlow.setPositions(flatPoints);
+      const matGlow = new LineMaterial({
         color: shockSpecs.color || 0x38bdf8,
-        linewidth: 2,
+        linewidth: 9.5,
         transparent: true,
-        opacity: 0.95,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
-      const line = new THREE.Line(geom, mat);
-      line.userData = {
+      matGlow.resolution.copy(screenRes);
+      const glowRay = new Line2(geomGlow, matGlow);
+      glowRay.userData = {
         isLightning: true,
+        isGlowRay: true,
         emitterTip: eTip,
         fallbackOrigin: origin.clone(),
         obs: obs,
+        emitterIndex: item.index,
+        totalActiveCount: totalActiveCount,
         targetOffset: targetOffset,
         segs: segs,
+        baseOpacity: 0.7,
       };
-      this.fxGroup.add(line);
+      this.fxGroup.add(glowRay);
 
-      const flare = new THREE.PointLight(0x38bdf8, 4.0, 12);
+      // 2. High-Voltage Solid Electric Core Ray (Width 4.8px — +3-4px width increase)
+      const geomCore = new LineGeometry();
+      geomCore.setPositions(flatPoints);
+      const matCore = new LineMaterial({
+        color: 0xffffff,
+        linewidth: 4.8,
+        transparent: true,
+        opacity: 0.98,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      matCore.resolution.copy(screenRes);
+      const coreRay = new Line2(geomCore, matCore);
+      coreRay.userData = {
+        isLightning: true,
+        isCoreRay: true,
+        emitterTip: eTip,
+        fallbackOrigin: origin.clone(),
+        obs: obs,
+        emitterIndex: item.index,
+        totalActiveCount: totalActiveCount,
+        targetOffset: targetOffset,
+        segs: segs,
+        baseOpacity: 0.98,
+      };
+      this.fxGroup.add(coreRay);
+
+      // Nozzle Flare PointLight
+      const flare = new THREE.PointLight(shockSpecs.color || 0x38bdf8, 5.0, 14);
       flare.position.copy(origin);
       flare.userData = { isNozzleFlare: true, emitterTip: eTip };
       this.fxGroup.add(flare);
-    });
 
-    const targetFlash = new THREE.PointLight(0x38bdf8, 5.0, 15);
-    targetFlash.position.copy(targetPos);
-    this.fxGroup.add(targetFlash);
+      // Distinct Contact Flash PointLight on this exact body part!
+      const contactFlash = new THREE.PointLight(shockSpecs.color || 0x38bdf8, 4.8, 10);
+      contactFlash.position.copy(effectiveEnd);
+      contactFlash.userData = {
+        isContactFlash: true,
+        obs: obs,
+        emitterIndex: item.index,
+        totalActiveCount: totalActiveCount,
+        targetOffset: targetOffset,
+      };
+      this.fxGroup.add(contactFlash);
+    });
   }
 
   // Coach Side Electric Shock FX for perimeter repulsion (2-3m flank clearance)
@@ -3155,24 +3469,33 @@ export class ObstacleManager {
     if (eTip) eTip.getWorldPosition(origin);
     else origin.copy(this.train.mesh.position);
 
+    const midHeight = this.getObstacleMidHeight(obs);
     const targetPos = new THREE.Vector3();
     if (obs.mesh) {
       obs.mesh.getWorldPosition(targetPos);
-      targetPos.y += 0.5;
+      targetPos.y += midHeight;
     }
 
     const pulseDir = targetPos.clone().sub(origin).normalize();
 
-    // 1. Dual High-Voltage Lightning Arc tendrils
+    // 1. Dual High-Voltage Lightning Arc tendrils (Thick 4.5px Core + 8.5px Plasma Glow)
+    const screenRes = new THREE.Vector2(
+      typeof window !== "undefined" ? window.innerWidth : 1920,
+      typeof window !== "undefined" ? window.innerHeight : 1080,
+    );
+
     for (let fork = 0; fork < 2; fork++) {
       const segs = 16;
-      const points = [];
+      const flatPoints = [];
+      const forkOffset = fork === 0
+        ? new THREE.Vector3(0, 0.16, 0.14)
+        : new THREE.Vector3(0, -0.16, -0.14);
       const targetOffset = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.28,
-        (Math.random() - 0.5) * 0.32,
-        (Math.random() - 0.5) * 0.28,
+        (Math.random() - 0.5) * 0.18,
+        (Math.random() - 0.5) * 0.14,
+        (Math.random() - 0.5) * 0.18,
       );
-      const effectiveEnd = targetPos.clone().add(targetOffset);
+      const effectiveEnd = targetPos.clone().add(forkOffset).add(targetOffset);
 
       for (let i = 0; i <= segs; i++) {
         const t = i / segs;
@@ -3183,27 +3506,64 @@ export class ObstacleManager {
           p.y += (Math.random() - 0.5) * 0.35 * envelope;
           p.z += (Math.random() - 0.5) * 0.45 * envelope;
         }
-        points.push(p);
+        flatPoints.push(p.x, p.y, p.z);
       }
 
-      const geom = new THREE.BufferGeometry().setFromPoints(points);
-      const mat = new THREE.LineBasicMaterial({
+      // Outer plasma aura (8.5px)
+      const geomGlow = new LineGeometry();
+      geomGlow.setPositions(flatPoints);
+      const matGlow = new LineMaterial({
         color: fork === 0 ? 0x38bdf8 : 0x00f0ff,
-        linewidth: 2,
+        linewidth: 8.5,
         transparent: true,
-        opacity: 0.95,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
-      const line = new THREE.Line(geom, mat);
-      line.userData = {
+      matGlow.resolution.copy(screenRes);
+      const glowLine = new Line2(geomGlow, matGlow);
+      glowLine.userData = {
         isLightning: true,
         isSideLightning: true,
+        isGlowRay: true,
         emitterTip: eTip,
         fallbackOrigin: origin.clone(),
         obs: obs,
+        midHeight: midHeight,
+        forkOffset: forkOffset,
         targetOffset: targetOffset,
         segs: segs,
+        baseOpacity: 0.65,
       };
-      this.fxGroup.add(line);
+      this.fxGroup.add(glowLine);
+
+      // Inner electric core ray (4.5px)
+      const geomCore = new LineGeometry();
+      geomCore.setPositions(flatPoints);
+      const matCore = new LineMaterial({
+        color: 0xffffff,
+        linewidth: 4.5,
+        transparent: true,
+        opacity: 0.98,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      matCore.resolution.copy(screenRes);
+      const coreLine = new Line2(geomCore, matCore);
+      coreLine.userData = {
+        isLightning: true,
+        isSideLightning: true,
+        isCoreRay: true,
+        emitterTip: eTip,
+        fallbackOrigin: origin.clone(),
+        obs: obs,
+        midHeight: midHeight,
+        forkOffset: forkOffset,
+        targetOffset: targetOffset,
+        segs: segs,
+        baseOpacity: 0.98,
+      };
+      this.fxGroup.add(coreLine);
     }
 
     // 2. Kinetic Force Shockwave Ring (Expanding electric repulsive pulse pushing away)
@@ -3388,32 +3748,40 @@ export class ObstacleManager {
           const transform = this.track.getTrackTransform(obs.progress, 0);
           const normal = transform.normal
             ? transform.normal.clone()
-            : new THREE.Vector3(1, 0, 0);
+            : new THREE.Vector3(-1, 0, 0);
           obs.mesh.position
             .copy(transform.position)
             .add(normal.multiplyScalar(curOffset));
 
           if (p < 1.0) {
+            // Keep head and chest facing forward toward track centerline
+            const dashHeading = normal.clone().multiplyScalar((obs.startLateralOffset || 2.4) < 0 ? 1 : -1).normalize();
+            obs.mesh.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              dashHeading,
+            );
             const runCycle = obs.suddenTimer * 18.0;
-            if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
+            const legSwing = Math.sin(runCycle) * 0.65;
+            if (ud.legL) ud.legL.rotation.x = -legSwing;
             if (ud.lowerLegL)
-              ud.lowerLegL.rotation.x = -Math.max(0.15, -Math.sin(runCycle) * 1.1);
-            if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
+              ud.lowerLegL.rotation.x = Math.max(0.10, legSwing * 1.1);
+            if (ud.legR) ud.legR.rotation.x = legSwing;
             if (ud.lowerLegR)
-              ud.lowerLegR.rotation.x = -Math.max(0.15, Math.sin(runCycle) * 1.1);
-            if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
+              ud.lowerLegR.rotation.x = Math.max(0.10, -legSwing * 1.1);
+            if (ud.armL) ud.armL.rotation.x = legSwing * 0.85;
             if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
-            if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
+            if (ud.armR) ud.armR.rotation.x = -legSwing * 0.85;
             if (ud.forearmR) ud.forearmR.rotation.x = -1.35;
             if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.28;
           } else {
             obs.isSuddenEmerging = false;
             this.applyHumanPose(obs.mesh, "sudden");
+            // Snap to face oncoming train headlights (-tangent)
+            const approachDir = transform.tangent.clone().negate().normalize();
             obs.mesh.quaternion.setFromUnitVectors(
               new THREE.Vector3(0, 0, 1),
-              transform.tangent,
+              approachDir,
             );
-            obs.mesh.rotateY(Math.PI); // Snap to face oncoming headlights
           }
           return;
         }
@@ -3425,16 +3793,18 @@ export class ObstacleManager {
             obs.sideRepelDir.clone().multiplyScalar(4.0 * dt),
           );
 
+          // Face the repel direction immediately (run forward away from train)
+          obs.mesh.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            obs.sideRepelDir,
+          );
+
           if (repelT < 0.4) {
             obs.mesh.position.y += Math.sin((repelT / 0.4) * Math.PI) * 0.18;
             if (ud.headGroup) ud.headGroup.rotation.x = -0.35;
             if (ud.armL) ud.armL.rotation.set(-1.1, 0, -0.6);
             if (ud.armR) ud.armR.rotation.set(-1.1, 0, 0.6);
           } else {
-            obs.mesh.quaternion.setFromUnitVectors(
-              new THREE.Vector3(0, 0, 1),
-              obs.sideRepelDir,
-            );
             const runCycle = (this.animTime * 14) % (Math.PI * 2);
             if (ud.armL) ud.armL.rotation.x = Math.sin(runCycle) * 0.9;
             if (ud.armR) ud.armR.rotation.x = -Math.sin(runCycle) * 0.9;
@@ -3452,7 +3822,6 @@ export class ObstacleManager {
         // D. Electric Shock Reaction
         if (obs.isDeterred) {
           const fleeT = this.animTime - obs.fleeStartTime;
-          const fleeDir = obs.fleeDirection || 1;
           const transform = this.track.getTrackTransform(obs.progress, 0);
           const tangent = transform.tangent.clone().normalize();
           const sideDir = new THREE.Vector3(
@@ -3461,21 +3830,44 @@ export class ObstacleManager {
             tangent.x,
           ).normalize();
 
+          if (obs.escapeDirSign === undefined || obs.escapeDirSign === null) {
+            let dirSign = 1;
+            if (obs.startLateralOffset && Math.abs(obs.startLateralOffset) > 0.5) {
+              dirSign = Math.sign(obs.startLateralOffset);
+            } else if (Math.abs(obs.lateralOffset) > 0.2) {
+              dirSign = Math.sign(obs.lateralOffset);
+            } else {
+              dirSign = obs.fleeDirection || 1;
+            }
+            obs.escapeDirSign = dirSign;
+            obs.escapeStartOffset = obs.lateralOffset || 0;
+          }
+
+          const fleeDir = obs.escapeDirSign;
+          const fleeHeading = sideDir.clone().multiplyScalar(fleeDir).normalize();
+
           if (obs.moveOffTrackOnShock) {
             // Human escapes track safely
             const fleeDist = Math.min(5.5, fleeT * 4.2);
+            const currentOffset = obs.escapeStartOffset + fleeDir * fleeDist;
             const lateralPos = transform.position
               .clone()
-              .add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              .add(sideDir.clone().multiplyScalar(currentOffset));
             lateralPos.y = Math.max(
               0.05,
-              transform.position.y - Math.min(0.28, fleeDist * 0.08),
+              transform.position.y - Math.min(0.28, Math.abs(currentOffset) * 0.08),
             );
             obs.mesh.position.copy(lateralPos);
 
-            if (fleeDist >= 2.5) {
+            if (Math.abs(currentOffset) >= 2.5) {
               obs.isCleared = true;
             }
+
+            // Immediately set the fleeing heading forward (head first, facing direction of escape!)
+            obs.mesh.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              fleeHeading,
+            );
 
             if (fleeT < 0.35) {
               // 1. Initial Shock Reflex Jump!
@@ -3484,40 +3876,24 @@ export class ObstacleManager {
               if (ud.armL) ud.armL.rotation.set(-0.8, 0, -0.6);
               if (ud.armR) ud.armR.rotation.set(-0.8, 0, 0.6);
             } else if (fleeT < 2.5) {
-              // 2. High-speed running sprint off the track
-              const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-              obs.mesh.quaternion.setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                fleeHeading,
-              );
-
+              // 2. High-speed running sprint off the track (anatomical forward knee & leg drive)
               const runCycle = (fleeT - 0.35) * 14.0;
-              if (ud.legL) ud.legL.rotation.x = Math.sin(runCycle) * 0.75;
+              const legSwing = Math.sin(runCycle) * 0.65;
+              if (ud.legL) ud.legL.rotation.x = -legSwing;
               if (ud.lowerLegL)
-                ud.lowerLegL.rotation.x = -Math.max(
-                  0.15,
-                  -Math.sin(runCycle) * 1.1,
-                );
-              if (ud.legR) ud.legR.rotation.x = -Math.sin(runCycle) * 0.75;
+                ud.lowerLegL.rotation.x = Math.max(0.10, legSwing * 1.1);
+              if (ud.legR) ud.legR.rotation.x = legSwing;
               if (ud.lowerLegR)
-                ud.lowerLegR.rotation.x = -Math.max(
-                  0.15,
-                  Math.sin(runCycle) * 1.1,
-                );
+                ud.lowerLegR.rotation.x = Math.max(0.10, -legSwing * 1.1);
 
-              if (ud.armL) ud.armL.rotation.x = -Math.sin(runCycle) * 0.85;
+              if (ud.armL) ud.armL.rotation.x = legSwing * 0.85;
               if (ud.forearmL) ud.forearmL.rotation.x = -1.4;
-              if (ud.armR) ud.armR.rotation.x = Math.sin(runCycle) * 0.85;
+              if (ud.armR) ud.armR.rotation.x = -legSwing * 0.85;
               if (ud.forearmR) ud.forearmR.rotation.x = -1.4;
               if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.26;
               if (ud.headGroup) ud.headGroup.rotation.x = 0.08;
             } else {
               // 3. Safe on the grassy shoulder, turning to watch the train pass safely
-              const safeHeading = sideDir.clone().multiplyScalar(fleeDir);
-              obs.mesh.quaternion.setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                safeHeading,
-              );
               if (ud.headGroup) {
                 ud.headGroup.rotation.y = -fleeDir * 0.8;
                 ud.headGroup.rotation.x = -0.1;
@@ -3594,13 +3970,13 @@ export class ObstacleManager {
           const stepRhythm = localT * 2.2;
           const sway = Math.sin(stepRhythm);
 
-          // Lead leg (Left): high knee drive stepping over the rail
-          if (ud.legL) ud.legL.rotation.x = 0.62 + sway * 0.08;
-          if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.80 + Math.cos(stepRhythm) * 0.06;
+          // Lead leg (Left): high knee drive stepping forward over the rail
+          if (ud.legL) ud.legL.rotation.x = -0.55 - sway * 0.08;
+          if (ud.lowerLegL) ud.lowerLegL.rotation.x = 0.65 + Math.cos(stepRhythm) * 0.06;
 
-          // Trailing leg (Right): driving off the outer ground
-          if (ud.legR) ud.legR.rotation.x = -0.42 - sway * 0.06;
-          if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.25 - Math.sin(stepRhythm) * 0.04;
+          // Trailing leg (Right): driving off the outer ground behind
+          if (ud.legR) ud.legR.rotation.x = 0.35 + sway * 0.06;
+          if (ud.lowerLegR) ud.lowerLegR.rotation.x = 0.15 - Math.sin(stepRhythm) * 0.04;
 
           // Torso running lean & bob
           if (ud.torsoGroup) {
@@ -3631,13 +4007,13 @@ export class ObstacleManager {
           const stepRhythm = localT * 2.2;
           const sway = Math.sin(stepRhythm);
 
-          // Outside lead leg (Right): driving forward
-          if (ud.legR) ud.legR.rotation.x = 0.58 + sway * 0.08;
-          if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.75 + Math.cos(stepRhythm) * 0.06;
+          // Outside lead leg (Right): driving forward to ground
+          if (ud.legR) ud.legR.rotation.x = -0.52 - sway * 0.08;
+          if (ud.lowerLegR) ud.lowerLegR.rotation.x = 0.60 + Math.cos(stepRhythm) * 0.06;
 
-          // Inside trailing leg (Left): pushing off rail
-          if (ud.legL) ud.legL.rotation.x = -0.45 - sway * 0.06;
-          if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.28 - Math.sin(stepRhythm) * 0.04;
+          // Inside trailing leg (Left): pushing off rail behind
+          if (ud.legL) ud.legL.rotation.x = 0.38 + sway * 0.06;
+          if (ud.lowerLegL) ud.lowerLegL.rotation.x = 0.15 - Math.sin(stepRhythm) * 0.04;
 
           // Torso running lean
           if (ud.torsoGroup) {
@@ -3665,18 +4041,18 @@ export class ObstacleManager {
         } else if (pose === "sudden" || pose === 4) {
           // SCENARIO 4: SUDDEN EMERGENCE DASH (High-speed running sprint across track)
           const sprintCycle = localT * 12.0;
-          const legDrive = Math.sin(sprintCycle) * 0.75;
+          const legDrive = Math.sin(sprintCycle) * 0.65;
 
-          if (ud.legR) ud.legR.rotation.x = legDrive;
-          if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0.15, legDrive * 1.2);
           if (ud.legL) ud.legL.rotation.x = -legDrive;
-          if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0.15, -legDrive * 1.2);
+          if (ud.lowerLegL) ud.lowerLegL.rotation.x = Math.max(0.10, legDrive * 1.1);
+          if (ud.legR) ud.legR.rotation.x = legDrive;
+          if (ud.lowerLegR) ud.lowerLegR.rotation.x = Math.max(0.10, -legDrive * 1.1);
 
           // Arms pumping in rapid sprint opposition
-          if (ud.armL) ud.armL.rotation.set(-legDrive * 0.9, 0, -0.15);
-          if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
           if (ud.armR) ud.armR.rotation.set(legDrive * 0.9, 0, 0.15);
           if (ud.forearmR) ud.forearmR.rotation.x = -1.35;
+          if (ud.armL) ud.armL.rotation.set(-legDrive * 0.9, 0, -0.15);
+          if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
 
           if (ud.torsoGroup) {
             ud.torsoGroup.rotation.x = 0.28 + Math.abs(Math.sin(sprintCycle)) * 0.04;
@@ -3690,10 +4066,10 @@ export class ObstacleManager {
 
           if (!isTrainClose) {
             // Elegant runner stride in motion matching Image 2
-            if (ud.legR) ud.legR.rotation.x = 0.68 + bob * 0.06;
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -0.85 + Math.cos(runCycle) * 0.05;
-            if (ud.legL) ud.legL.rotation.x = -0.48 - bob * 0.05;
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -0.35 - Math.sin(runCycle) * 0.04;
+            if (ud.legR) ud.legR.rotation.x = -0.55 - bob * 0.06;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = 0.65 + Math.cos(runCycle) * 0.05;
+            if (ud.legL) ud.legL.rotation.x = 0.38 + bob * 0.05;
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = 0.18 + Math.sin(runCycle) * 0.04;
 
             if (ud.armL) ud.armL.rotation.x = 0.65 + bob * 0.08;
             if (ud.forearmL) ud.forearmL.rotation.x = -1.45;
@@ -3714,17 +4090,17 @@ export class ObstacleManager {
           } else {
             // Alarmed: sprint to escape!
             const panicSprint = localT * 14.0;
-            const panicDrive = Math.sin(panicSprint) * 0.85;
+            const panicDrive = Math.sin(panicSprint) * 0.70;
 
-            if (ud.legR) ud.legR.rotation.x = panicDrive;
-            if (ud.lowerLegR) ud.lowerLegR.rotation.x = -Math.max(0.2, panicDrive * 1.3);
             if (ud.legL) ud.legL.rotation.x = -panicDrive;
-            if (ud.lowerLegL) ud.lowerLegL.rotation.x = -Math.max(0.2, -panicDrive * 1.3);
+            if (ud.lowerLegL) ud.lowerLegL.rotation.x = Math.max(0.12, panicDrive * 1.15);
+            if (ud.legR) ud.legR.rotation.x = panicDrive;
+            if (ud.lowerLegR) ud.lowerLegR.rotation.x = Math.max(0.12, -panicDrive * 1.15);
 
-            if (ud.armL) ud.armL.rotation.set(-panicDrive, 0, -0.2);
-            if (ud.forearmL) ud.forearmL.rotation.x = -1.5;
             if (ud.armR) ud.armR.rotation.set(panicDrive, 0, 0.2);
             if (ud.forearmR) ud.forearmR.rotation.x = -1.4;
+            if (ud.armL) ud.armL.rotation.set(-panicDrive, 0, -0.2);
+            if (ud.forearmL) ud.forearmL.rotation.x = -1.5;
 
             if (ud.torsoGroup) ud.torsoGroup.rotation.x = 0.32;
             if (ud.headGroup) ud.headGroup.rotation.set(0.12, 0, 0);
@@ -3751,12 +4127,18 @@ export class ObstacleManager {
           const transform = this.track.getTrackTransform(obs.progress, 0);
           const normal = transform.normal
             ? transform.normal.clone()
-            : new THREE.Vector3(1, 0, 0);
+            : new THREE.Vector3(-1, 0, 0);
           obs.mesh.position
             .copy(transform.position)
-            .add(normal.multiplyScalar(curOffset));
+            .add(normal.clone().multiplyScalar(curOffset));
 
           if (p < 1.0) {
+            // Keep head and body facing the dash direction forward!
+            const dashHeading = normal.clone().multiplyScalar((obs.startLateralOffset || 3.0) < 0 ? 1 : -1).normalize();
+            obs.mesh.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              dashHeading,
+            );
             const speedScale =
               ud.type === "dog"
                 ? 22.0
@@ -3778,11 +4160,13 @@ export class ObstacleManager {
             }
           } else {
             obs.isSuddenEmerging = false;
+            // Snap to face oncoming train headlights (-tangent)
+            const approachDir = transform.tangent.clone().negate().normalize();
             obs.mesh.quaternion.setFromUnitVectors(
               new THREE.Vector3(0, 0, 1),
-              transform.tangent,
+              approachDir,
             );
-            obs.mesh.rotateY(Math.PI * 0.75); // Turn to face incoming track
+            obs.mesh.rotateY(0.25); // Alert diagonal angle facing the headlights
             if (ud.legs) {
               Object.values(ud.legs).forEach((l) => {
                 if (l) l.rotation.x = 0;
@@ -3800,16 +4184,18 @@ export class ObstacleManager {
             obs.sideRepelDir.clone().multiplyScalar(pushSpeed * dt),
           );
 
+          // Face the repel direction immediately
+          obs.mesh.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            obs.sideRepelDir,
+          );
+
           if (repelT < 0.35) {
             obs.mesh.position.y += Math.sin((repelT / 0.35) * Math.PI) * 0.28;
             if (ud.headGroup) ud.headGroup.rotation.y = (Math.random() - 0.5) * 0.4;
             if (ud.trunk) ud.trunk.rotation.x = -0.65;
             if (ud.tail) ud.tail.rotation.z = Math.sin(this.animTime * 15) * 0.6;
           } else {
-            obs.mesh.quaternion.setFromUnitVectors(
-              new THREE.Vector3(0, 0, 1),
-              obs.sideRepelDir,
-            );
             const speedScale =
               ud.type === "dog"
                 ? 24.0
@@ -3841,7 +4227,6 @@ export class ObstacleManager {
         // C. Electric Shock Reaction & Fleeing Off Track
         if (obs.isDeterred) {
           const fleeT = this.animTime - obs.fleeStartTime;
-          const fleeDir = obs.fleeDirection || 1;
           const transform = this.track.getTrackTransform(obs.progress, 0);
           const tangent = transform.tangent.clone().normalize();
           const sideDir = new THREE.Vector3(
@@ -3850,31 +4235,48 @@ export class ObstacleManager {
             tangent.x,
           ).normalize();
 
+          if (obs.escapeDirSign === undefined || obs.escapeDirSign === null) {
+            let dirSign = 1;
+            if (obs.startLateralOffset && Math.abs(obs.startLateralOffset) > 0.5) {
+              dirSign = Math.sign(obs.startLateralOffset);
+            } else if (Math.abs(obs.lateralOffset) > 0.2) {
+              dirSign = Math.sign(obs.lateralOffset);
+            } else {
+              dirSign = obs.fleeDirection || 1;
+            }
+            obs.escapeDirSign = dirSign;
+            obs.escapeStartOffset = obs.lateralOffset || 0;
+          }
+
+          const fleeDir = obs.escapeDirSign;
+          const fleeHeading = sideDir.clone().multiplyScalar(fleeDir).normalize();
+
           if (obs.moveOffTrackOnShock) {
             const fleeDist = Math.min(6.8, fleeT * 5.0);
+            const currentOffset = obs.escapeStartOffset + fleeDir * fleeDist;
             const lateralPos = transform.position
               .clone()
-              .add(sideDir.clone().multiplyScalar(fleeDir * fleeDist));
+              .add(sideDir.clone().multiplyScalar(currentOffset));
             lateralPos.y = Math.max(
               0.05,
-              transform.position.y - Math.min(0.28, fleeDist * 0.08),
+              transform.position.y - Math.min(0.28, Math.abs(currentOffset) * 0.08),
             );
             obs.mesh.position.copy(lateralPos);
 
-            if (fleeDist >= 2.8) {
+            if (Math.abs(currentOffset) >= 2.8) {
               obs.isCleared = true;
             }
+
+            // Immediately set the fleeing heading forward (head first, running forward!)
+            obs.mesh.quaternion.setFromUnitVectors(
+              new THREE.Vector3(0, 0, 1),
+              fleeHeading,
+            );
 
             if (fleeT < 0.35) {
               obs.mesh.position.y += Math.sin((fleeT / 0.35) * Math.PI) * 0.25;
               if (ud.headGroup) ud.headGroup.rotation.y = -fleeDir * 0.4;
             } else if (fleeT < 2.5) {
-              const fleeHeading = sideDir.clone().multiplyScalar(fleeDir);
-              obs.mesh.quaternion.setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                fleeHeading,
-              );
-
               const runCycle =
                 (fleeT - 0.35) *
                 (ud.type === "dog" ? 24.0 : ud.type === "deer" ? 20.0 : 12.0);
@@ -3889,6 +4291,10 @@ export class ObstacleManager {
                   ud.legs.legBL.rotation.x = -Math.sin(runCycle) * 0.75;
               }
             } else {
+              // Reached safety on grassy shoulder: alert head turned toward passing train
+              if (ud.headGroup) {
+                ud.headGroup.rotation.y = -fleeDir * 0.5;
+              }
               if (ud.legs) {
                 Object.values(ud.legs).forEach((l) => {
                   if (l) l.rotation.x = 0;
@@ -3961,7 +4367,7 @@ export class ObstacleManager {
             child.material.opacity = Math.max(0, (1.0 - p) * 0.95);
           }
           child.position.copy(ud.origin).lerp(ud.target, p * 0.85);
-        } else if (child.isLine && child.userData.isLightning) {
+        } else if ((child.isLine2 || child.isLine) && child.userData && child.userData.isLightning) {
           const ud = child.userData;
           if (ud.emitterTip) {
             ud.emitterTip.getWorldPosition(tempStart);
@@ -3970,17 +4376,32 @@ export class ObstacleManager {
           }
 
           if (ud.obs && ud.obs.mesh) {
-            ud.obs.mesh.getWorldPosition(tempEnd);
-            tempEnd.add(ud.targetOffset);
+            if (ud.isSideLightning) {
+              ud.obs.mesh.getWorldPosition(tempEnd);
+              const midH =
+                ud.midHeight !== undefined
+                  ? ud.midHeight
+                  : this.getObstacleMidHeight(ud.obs);
+              tempEnd.y += midH;
+              if (ud.forkOffset) tempEnd.add(ud.forkOffset);
+              if (ud.targetOffset) tempEnd.add(ud.targetOffset);
+            } else {
+              const partTarget = this.getObstacleBodyPartTarget(
+                ud.obs,
+                ud.emitterIndex !== undefined ? ud.emitterIndex : 2,
+                ud.totalActiveCount || 1,
+              );
+              tempEnd.copy(partTarget);
+              if (ud.targetOffset) tempEnd.add(ud.targetOffset);
+            }
           }
 
-          const posAttr = child.geometry.attributes.position;
-          const arr = posAttr.array;
           const segs = ud.segs || 16;
           const dist = tempStart.distanceTo(tempEnd);
           const jitterAmp =
             Math.min(1.2, Math.max(0.18, dist * 0.015)) * progress;
 
+          const flatCoords = [];
           for (let i = 0; i <= segs; i++) {
             const t = i / segs;
             const p = tempStart.clone().lerp(tempEnd, t);
@@ -3990,12 +4411,36 @@ export class ObstacleManager {
               p.y += (Math.random() - 0.5) * jitterAmp * 0.75 * envelope;
               p.z += (Math.random() - 0.5) * jitterAmp * envelope;
             }
-            arr[i * 3] = p.x;
-            arr[i * 3 + 1] = p.y;
-            arr[i * 3 + 2] = p.z;
+            flatCoords.push(p.x, p.y, p.z);
           }
-          posAttr.needsUpdate = true;
-          child.material.opacity = 0.95 * progress;
+
+          if (child.isLine2 && child.geometry && child.geometry.setPositions) {
+            child.geometry.setPositions(flatCoords);
+            if (child.material) {
+              child.material.resolution.set(
+                typeof window !== "undefined" ? window.innerWidth : 1920,
+                typeof window !== "undefined" ? window.innerHeight : 1080,
+              );
+              child.material.opacity = (ud.baseOpacity || 0.95) * progress;
+            }
+          } else if (
+            child.isLine &&
+            child.geometry &&
+            child.geometry.attributes &&
+            child.geometry.attributes.position
+          ) {
+            const posAttr = child.geometry.attributes.position;
+            const arr = posAttr.array;
+            for (let i = 0; i <= segs; i++) {
+              arr[i * 3] = flatCoords[i * 3];
+              arr[i * 3 + 1] = flatCoords[i * 3 + 1];
+              arr[i * 3 + 2] = flatCoords[i * 3 + 2];
+            }
+            posAttr.needsUpdate = true;
+            if (child.material) {
+              child.material.opacity = (ud.baseOpacity || 0.95) * progress;
+            }
+          }
         } else if (child.isPointLight) {
           if (child.userData.isNozzleFlare && child.userData.emitterTip) {
             child.userData.emitterTip.getWorldPosition(child.position);
@@ -4007,14 +4452,47 @@ export class ObstacleManager {
             child.userData.emitterTip.getWorldPosition(child.position);
             child.intensity = (Math.random() > 0.3 ? 5.0 : 2.0) * progress;
           } else if (
+            child.userData.isContactFlash &&
+            child.userData.obs &&
+            child.userData.obs.mesh
+          ) {
+            const partTarget = this.getObstacleBodyPartTarget(
+              child.userData.obs,
+              child.userData.emitterIndex !== undefined
+                ? child.userData.emitterIndex
+                : 2,
+              child.userData.totalActiveCount || 1,
+            );
+            child.position.copy(partTarget);
+            if (child.userData.targetOffset)
+              child.position.add(child.userData.targetOffset);
+            child.intensity = (Math.random() > 0.2 ? 5.5 : 2.0) * progress;
+          } else if (
             child.userData.isSideTargetLight &&
             child.userData.obs &&
             child.userData.obs.mesh
           ) {
-            child.userData.obs.mesh
-              .getWorldPosition(child.position)
-              .add(child.userData.targetOffset);
+            child.userData.obs.mesh.getWorldPosition(child.position);
+            const midH =
+              child.userData.midHeight !== undefined
+                ? child.userData.midHeight
+                : this.getObstacleMidHeight(child.userData.obs);
+            child.position.y += midH;
+            if (child.userData.forkOffset) child.position.add(child.userData.forkOffset);
+            if (child.userData.targetOffset) child.position.add(child.userData.targetOffset);
             child.intensity = (Math.random() > 0.2 ? 6.0 : 2.0) * progress;
+          } else if (
+            child.userData.isTargetFlash &&
+            child.userData.obs &&
+            child.userData.obs.mesh
+          ) {
+            child.userData.obs.mesh.getWorldPosition(child.position);
+            const midH =
+              child.userData.midHeight !== undefined
+                ? child.userData.midHeight
+                : this.getObstacleMidHeight(child.userData.obs);
+            child.position.y += midH;
+            child.intensity = (Math.random() > 0.2 ? 7.5 : 2.0) * progress;
           } else {
             child.intensity = (Math.random() > 0.2 ? 7.5 : 2.0) * progress;
           }
@@ -4192,7 +4670,7 @@ export class ObstacleManager {
           this.telemetry.tailoredLabel = "TRACK CLEAR";
           this.telemetry.action = `✅ TARGET MOVED OFF TRACK VIA ELECTRIC SHOCK (800M-80M) — TRACK CLEAR (NO NET)`;
           this.telemetry.alertType = "success";
-        } else if (minForwardDist <= 800 && minForwardDist >= 80) {
+        } else if (minForwardDist <= 800 && minForwardDist > 80) {
           // Inside 800m - 80m: USE ONLY ELECTRICITY!
           this.telemetry.tailoredSpec = `${tailored.badge} (800M-80M ONLY ELECTRICITY)`;
           this.telemetry.tailoredLabel = tailored.typeLabel;
@@ -4210,38 +4688,36 @@ export class ObstacleManager {
           this.telemetry.alertType = closestObstacle.hasBeenShocked
             ? "deploy"
             : "info";
-        } else if (minForwardDist < 80) {
-          // Target did not move off track and train reaches < 80m:
+        } else if (minForwardDist <= 80) {
+          // Distance reaches <= 80m: CAPTURE NET WILL BE OPEN IF UNDER 150KG!
           if (isUnder150kg) {
-            if (minForwardDist <= 40) {
-              if (aiSensorAuto && captureNet && !captureNet.isDeployed) {
-                captureNet.triggerSolenoidDeploy(audio);
+            // Under / Equal 150kg: Capture Net opens immediately at 80m!
+            if (aiSensorAuto && captureNet && !captureNet.isDeployed) {
+              captureNet.triggerSolenoidDeploy(audio);
+              if (audio) audio.playTargetAcquiredBeep(false);
+            }
+            if (minForwardDist <= 14.0) {
+              // Capture to object under 150kg into net cradle
+              if (closestObstacle.mesh && closestObstacle.mesh.parent) {
+                closestObstacle.mesh.parent.remove(closestObstacle.mesh);
               }
-              if (minForwardDist <= 14.0) {
-                if (closestObstacle.mesh && closestObstacle.mesh.parent) {
-                  closestObstacle.mesh.parent.remove(closestObstacle.mesh);
-                }
-                if (captureNet)
-                  captureNet.collectObstacle(
-                    closestObstacle.mesh,
-                    closestObstacle,
-                  );
-                closestObstacle.isCollected = true;
-                if (audio) audio.playRescueSuccessChime();
-                this.telemetry.collectedCount++;
-                this.telemetry.collectedWeight += closestObstacle.mass;
-                this.telemetry.action = `🎯 SAFELY SECURED IN NET CRADLE (${closestObstacle.mass}KG) — RESCUE SUCCESS!`;
-                this.telemetry.alertType = "success";
-              } else {
-                this.telemetry.action = `🪤 TARGET STILL ON TRACK (<80M) — BACKUP CAPTURE NET DEPLOYED (${closestObstacle.mass}KG ≤ 150KG)`;
-                this.telemetry.alertType = "deploy";
-              }
+              if (captureNet)
+                captureNet.collectObstacle(
+                  closestObstacle.mesh,
+                  closestObstacle,
+                );
+              closestObstacle.isCollected = true;
+              if (audio) audio.playRescueSuccessChime();
+              this.telemetry.collectedCount++;
+              this.telemetry.collectedWeight += closestObstacle.mass;
+              this.telemetry.action = `🎯 SAFELY SECURED IN NET CRADLE (${closestObstacle.mass}KG ≤ 150KG) — RESCUE SUCCESS!`;
+              this.telemetry.alertType = "success";
             } else {
-              this.telemetry.action = `⚡ 800M-80M SHOCK FIRED — TARGET APPROACHING 40M: NET READY (${closestObstacle.mass}KG ≤ 150KG)`;
+              this.telemetry.action = `🪤 TARGET ON TRACK (≤80M): CAPTURE NET OPEN (${closestObstacle.mass}KG ≤ 150KG) — READY TO SCOOP!`;
               this.telemetry.alertType = "deploy";
             }
           } else {
-            // Over 150kg: Net NEVER opens!
+            // Over 150kg: Net strictly LOCKED! Emergency brake engaged!
             if (captureNet && captureNet.isDeployed) {
               captureNet.setDeployed(false);
             }
@@ -4249,7 +4725,7 @@ export class ObstacleManager {
               physics.setEmergencyBrake(true);
             }
             if (audio) audio.startHorn();
-            this.telemetry.action = `⚠️ HEAVY OBSTACLE STILL ON TRACK (<80M) — ${closestObstacle.mass}KG > 150KG: NET LOCKED! EMERGENCY BRAKE ENGAGED`;
+            this.telemetry.action = `⚠️ HEAVY OBSTACLE ON TRACK (≤80M) — ${closestObstacle.mass}KG > 150KG: NET LOCKED! EMERGENCY BRAKE ENGAGED`;
             this.telemetry.alertType = "hazard";
           }
         } else {
